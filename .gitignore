@@ -1,0 +1,12 @@
+_build
+_bin
+.vs
+/bin
+/build
+Makefile
+*.make
+obj
+*.vcxproj
+*.filters
+*.user
+/*.sln
