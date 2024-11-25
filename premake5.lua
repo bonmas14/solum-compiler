@@ -18,8 +18,7 @@ workspace "solum"
 
 project "solum-compiler"
     kind "ConsoleApp"
-    language "C"
-    cdialect "c11"
+    language "C++"
 
     flags { "MultiProcessorCompile" } -- specific to windows
 
@@ -29,21 +28,17 @@ project "solum-compiler"
         staticruntime "on"
         runtime "Debug"
 
-        -- libdirs {  }
-        -- links {  }
-
     filter "configurations:Release"
         targetdir "bin"
         targetsuffix "-r"
         staticruntime "on"
         runtime "Release"
 
-        -- libdirs {  }
-        -- links {  }
-
     filter {}
 
     -- includedirs { }
+    libdirs { "/usr/lib/llvm-14/lib" }
+    links { "LLVM" }
 
-    files { "./src/**.c", "./src/**.h" }
+    files { "./src/**.cpp" }
 
