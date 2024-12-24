@@ -18,7 +18,7 @@ workspace "solum"
 
 project "solum-compiler"
     kind "ConsoleApp"
-    language "C++"
+    language "C"
 
     flags { "MultiProcessorCompile" } -- specific to windows
 
@@ -40,5 +40,5 @@ project "solum-compiler"
     libdirs { "/usr/lib/llvm-14/lib" }
     links { "LLVM" }
 
-    files { "./src/**.cpp" }
+    files { "./src/**.c" }
 

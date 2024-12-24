@@ -1,0 +1,8 @@
+
+The scope of a project:
+
+1. parsing of a language
+2. code gen with LLVM
+3. Linking with raylib
+4. Making small game
+   - or hydraulic erosion simulation

@@ -1,12 +1,18 @@
-#include <stdio.h>
-
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-#include <llvm-c/Core.h>
+#include "stddefines.h"
+#include "scanner.h"
 
 int main(void) {
+    scanner_state_t state = { 0 };
+
+    if (!scan_file("scope", &state)) {
+        log_error("Main: couldn't open file and load it into memory.");
+    }
+
+    log_info("successfully loaded file into memory");
+
+    fprintf(stdout, state.file.data);
+
+    /* 
     // create context, module and builder
     LLVMContextRef context = LLVMContextCreate();
     LLVMModuleRef  module  = LLVMModuleCreateWithNameInContext("hello", context);
@@ -46,6 +52,6 @@ int main(void) {
     LLVMDisposeBuilder(builder);
     LLVMDisposeModule(module);
     LLVMContextDispose(context);
-
+*/
     return 0;
 }
