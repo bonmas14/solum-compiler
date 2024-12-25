@@ -27,5 +27,7 @@ bool list_delete(list_t *arr);
 
 bool  list_add(list_t *arr, void *data);
 void* list_get(list_t *arr, size_t index);
+/*
 void  list_insert_at(list_t *arr, size_t index, void *data);
 void  list_remove_at(list_t *arr, size_t index);
+*/

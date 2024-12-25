@@ -1,4 +1,5 @@
 #pragma once
+
 #include "stddefines.h"
 
 void log_info(const char *text);

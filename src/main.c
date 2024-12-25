@@ -10,7 +10,12 @@ int main(void) {
 
     log_info("successfully loaded file into memory");
 
-    fprintf(stdout, state.file.data);
+    for (size_t i = 0; i < state.lines.count; i++) {
+        line_tuple_t *line = (line_tuple_t*)list_get(&state.lines, i);
+        fprintf(stdout, "%.3zu | %.*s", i, line->stop - line->start + 1, line->start + state.file.data);
+    }
+
+    // fprintf(stdout, "%s", state.file.data);
 
     /* 
     // create context, module and builder

@@ -36,29 +36,54 @@ bool read_file(const char *filename, string_t *output) {
     return true;
 }
 
-bool scan_file(const char* filename, scanner_state_t *state) {
-    if (!read_file(filename, &state->file)) {
+bool scan(scanner_state_t *state) {
+    state->lines = (list_t){ 0 };
+
+    size_t init_size = state->file.size / APPROX_CHAR_PER_LINE;
+
+    if (!list_create(&state->lines, init_size, sizeof(line_tuple_t))) {
+        log_error("Scanner: Couldn't create list.");
         state->had_error = true;
         return false;
     }
 
-    /*
-    dynlist_t tokens = init_dynlist(INIT_TOKEN_COUNT, sizeof(token_t));
+    line_tuple_t line = { 0 };
+    line.start        = 0;
 
-    while (!match('\0')) {
-        if (tokens.count >= (file_size / sizeof(char))) break;
+    for (size_t i = 0; i < state->file.size; i++) {
+        if (state->file.data[i] != '\n') {
+            continue;
+        }
 
-        token_t tok = scan_next();
+        line.stop  = i;
 
-        dynlist_add(&tokens, &tok);
+        if (!list_add(&state->lines, (void*)&line)) {
+            state->had_error = true;
+            break;
+        }
+
+        line.start = i + 1;
     }
 
+    if (state->had_error) {
+        log_error("Scan: couldn't add another line segment to a list.");
+        return false;
+    }
 
-    state.count = tokens.count;
-    state.tokens = tokens.data;
+    return true;
+}
 
-    scanner_state_t output = state;
-    state = (scanner_state_t) { 0 };
-    */
+bool scan_file(const char* filename, scanner_state_t *state) {
+    if (!read_file(filename, &state->file)) {
+        log_error("Scanner: couldn't read file.");
+        state->had_error = true;
+        return false;
+    }
+
+    if (!scan(state)) {
+        log_error("Scanner: couldn't scan file.");
+        return false;
+    }
+
     return true;
 }

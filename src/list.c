@@ -1,7 +1,15 @@
 #include "list.h" 
 
 bool list_create(list_t *container, size_t init_size, size_t element_size) {
-    list_t list = { 0 };
+    if (init_size == 0) {
+        log_warning("List: init size was 0. defaulting to 1.");
+        init_size = 1;
+    }
+
+    if (element_size == 0) {
+        log_warning("List: element size was 0. defaulting to 1.");
+        element_size = 1;
+    }
 
     container->count        = 0;
     container->element_size = element_size;
@@ -73,6 +81,8 @@ bool list_add(list_t *list, void *data) {
     }
 
     list->count++;
+
+    return true;
 }
 
 void *list_get(list_t *list, size_t index) {
@@ -84,6 +94,7 @@ void *list_get(list_t *list, size_t index) {
     return &list->data[list->element_size * index];
 }
 
+/*
 void list_insert_at(list_t *list, size_t index, void *data) {
     log_error("List: inserting is not supported as I dont need that.");
 }
@@ -91,3 +102,4 @@ void list_insert_at(list_t *list, size_t index, void *data) {
 void list_remove_at(list_t *list, size_t index) {
     log_error("List: removing elements is not supported as I dont need that.");
 }
+*/

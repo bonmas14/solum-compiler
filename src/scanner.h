@@ -1,5 +1,10 @@
+#pragma once 
+
 #include "stddefines.h"
 #include "logger.h"
+#include "list.h"
+
+#define APPROX_CHAR_PER_LINE (25)
 
 typedef enum {
     TOKEN_IDENT = 256,
@@ -17,6 +22,11 @@ typedef struct {
     char    *data;
 } string_t;
 
+typedef struct  {
+    size_t start;
+    size_t stop;
+} line_tuple_t;
+
 typedef struct {
     bool had_error;
 
@@ -24,9 +34,10 @@ typedef struct {
     size_t current_line;
     size_t current_char;
 
+    // list of line_tuple_t
+    list_t   lines; 
     string_t file;
-} scanner_state_t;
-
+} scanner_state_t; 
 
 typedef struct {
     token_type_t type;

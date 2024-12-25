@@ -16,6 +16,8 @@ workspace "solum"
 
     filter {}
 
+    warnings "Extra"
+
 project "solum-compiler"
     kind "ConsoleApp"
     language "C"
