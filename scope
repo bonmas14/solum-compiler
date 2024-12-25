@@ -5,3 +5,98 @@ The scope of a project:
 3. Linking with raylib
 4. Making small game
    - or hydraulic erosion simulation
+
+// ---------------------
+
+keywords:
+    - external:  for functions and variables (from c or anything) for linking (no definition).
+    - default:   for returning 0 of specified in return/assignment type.
+    - override:  for overriding operators
+    - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
+
+// --------------------- generics
+
+list : struct<value_type> = {
+    count : u64;
+    size  : u64;
+    data  : ^value_type;
+};
+
+create_list : <value_type>(size : ^s32) -> value_type, bool {
+    data : ^value_type = allocate<value_type>(size);
+
+    if (data == null) {
+        return default, false;
+    }
+
+    output : list<value_type> = default;
+
+    output.size = size;
+    output.data = data;
+
+    return output, true;
+};
+
+value, valid : list<s32>, bool = create_list<s32>(10);
+// or 
+value, valid := create_list<s32>(10);
+
+sum : <arr_type>(arr : ^arr_type, length : s64) -> arr_type = {
+    result : arr_type = 0;
+
+    for (i : s64 = 0; i < length; i++) {
+        result += arr[i];         // ------------- this will raise a operator override error
+                                  // for situation when override with this type doesnt exist
+                                  // or it returns different type that needed here.
+    }
+
+    return result;
+};
+
+arr : [4]s32 = { 0, 1, 2, 3 }; // multiple dimensions arrays? no.
+
+result := sum(arr, 4);
+// or
+result : s32 = sum<s32>(arr, 4);
+// or 
+result : s32;
+result = sum(arr, 4);
+
+// --------------------- function pointers
+
+result := { print("hello!"); };
+
+callback : (a : s32, b : s32) -> s32, bool = prototype; 
+void_callback : () = prototype;
+
+
+my_callback : callback = {
+    result : s32 = a + b;
+    return result, true;
+};
+
+get_callback : () -> callback = {
+    return my_callback;
+};
+
+res, valid : s32, bool = get_callback().(4, 2);        // <<<<<<< 
+
+// ------------- external functions
+
+InitWindow := external;
+
+InitWindow();
+
+// ------------- operator overrides
+
+override + : (a : vec2, b : vec2) -> vec2 {
+    sum : vec2;
+
+    sum.x = a.x + b.x;
+    sum.y = a.y + b.y;
+
+    return sum;
+}
+
+// -------------
+

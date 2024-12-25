@@ -1,0 +1,34 @@
+The scope of a project:
+
+1. parsing of a language
+2. code gen with LLVM
+3. Linking with raylib
+4. Making small game
+   - or hydraulic erosion simulation
+
+
+
+keywords:
+    - external: for functions and variables (from c or anything) for linking (no definition).
+
+    if a {
+        "c" : {
+        },
+        "compare" : {
+        },
+    }
+
+
+list : struct<value_type> {
+    s32 count;
+    s32 size;
+    value_type^ ptr;
+}
+
+value : list<s32> = create_list<s32>(10);
+
+create_list : <value_type>(s32 size) -> <value_type> {
+    ptr : value_type^ = allocate<value_type>(size);
+}
+
+list.add();
