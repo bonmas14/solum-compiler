@@ -11,7 +11,6 @@ typedef enum {
 
 typedef struct {
     
-    
 } ast_node_t;
 
 typedef struct {

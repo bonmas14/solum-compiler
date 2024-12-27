@@ -14,6 +14,7 @@ typedef enum {
     // 
     _KW_STOP,
 
+    TOKEN_EOF   = 2047,
     TOKEN_ERROR = 2048,
 } token_type_t;
 
@@ -29,6 +30,7 @@ typedef struct  {
 
 typedef struct {
     bool had_error;
+    bool at_the_end;
 
     size_t file_index;
     size_t current_line;
@@ -40,8 +42,8 @@ typedef struct {
 } scanner_state_t; 
 
 typedef struct {
-    token_type_t type;
-    size_t l0, l1, c0, c1;
+    uint32_t type;
+    size_t c0, c1, l0, l1; // address in code. without human readable offsets (add 1 or so on)
 
     union {
         string_t str;
@@ -49,3 +51,7 @@ typedef struct {
 } token_t;
 
 bool scan_file(const char* filename, scanner_state_t *state);
+
+token_t advance_token(scanner_state_t *state);
+token_t peek_token(scanner_state_t *state, size_t offset);
+
