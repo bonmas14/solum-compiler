@@ -9,9 +9,8 @@ typedef enum {
     AST_ERROR = 2048,
 } ast_types_t;
 
-typedef struct {
-    
-} ast_node_t;
+// typedef struct {
+// } ast_node_t;
 
 typedef struct {
     bool had_error;
