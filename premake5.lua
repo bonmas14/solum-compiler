@@ -1,18 +1,25 @@
 workspace "solum"
     configurations { "Debug", "Release" }
+    platforms {  "native", "llvm" }
 
     architecture "x86_64"
 
-    defines { "_CRT_SECURE_NO_WARNINGS" }
+    defines "_CRT_SECURE_NO_WARNINGS"
 
     filter "configurations:Debug"
-        defines { "DEBUG" }  
+        defines "DEBUG"  
         symbols "On"
         optimize "Debug"
 
     filter "configurations:Release"
-        defines { "NDEBUG" }
+        defines "NDEBUG"
         optimize "Full"
+
+    filter "platforms:llvm" 
+        defines "BACKEND_LLVM" 
+
+    filter "platforms:native" 
+        defines "BACKEND_NATIVE"
 
     filter {}
 
@@ -36,11 +43,17 @@ project "solum-compiler"
         staticruntime "on"
         runtime "Release"
 
-    filter {}
 
-    -- includedirs { }
-    libdirs { "/usr/lib/llvm-14/lib" }
-    links { "LLVM" }
+    filter "platforms:llvm" 
+        targetprefix "llvm-"
+        -- libdirs { "/usr/lib/llvm-14/lib" }
+        -- includedirs { }
+        links { "LLVM" }
+
+    filter "platforms:native" 
+        targetprefix "native-"
+        -- nothing for now
+    filter {}
 
     files { "./src/**.c" }
 
