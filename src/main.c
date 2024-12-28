@@ -11,8 +11,12 @@ int main(void) {
     log_info("successfully loaded file into memory");
 
     for (size_t i = 0; i < state.lines.count; i++) {
-        line_tuple_t *line = (line_tuple_t*)list_get(&state.lines, i);
-        fprintf(stdout, "%.3zu | %.*s", i, line->stop - line->start + 1, line->start + state.file.data);
+
+        line_tuple_t *line  = (line_tuple_t*)list_get(&state.lines, i);
+        size_t        len   = line->stop - line->start + 1;
+        char         *start = state.file.data + line->start;
+
+        fprintf(stdout, "%.3zu | %.*s", i, (int)len, start);
     }
 
     // fprintf(stdout, "%s", state.file.data);

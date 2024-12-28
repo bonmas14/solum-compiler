@@ -9,12 +9,12 @@ char advance_char(scanner_state_t *state) {
     char peek_code = state->file.data[state->file_index];
 
     if (curr_code == 0 || curr_code == EOF || peek_code == 0 || peek_code == EOF) {
-        scan_state.at_the_end = true;
+        state->at_the_end = true;
     }
 
     state->current_char++;
 
-    if (current_code == '\n') {
+    if (curr_code == '\n') {
         state->current_char = 0;
         state->current_line++;
     }
@@ -42,7 +42,7 @@ bool char_is_digit(char in) {
 }
 
 bool char_is_hex_digit(char in) {
-    return is_digit(in) 
+    return char_is_digit(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
@@ -52,20 +52,20 @@ bool char_is_bin_digit(char in) {
 }
 
 uint8_t char_hex_to_int(char in) {
-    if (!is_hex_digit(in)) return 0;
-    if (is_digit(in))      return in - '0';
+    if (!char_is_hex_digit(in)) return 0;
+    if (char_is_digit(in))      return in - '0';
     if ((in & 0x20) == 0)  return in - 'A' + 10;
     else                   return in - 'a' + 10;
 }
 
 uint8_t char_bin_to_int(char in) {
-    if (!is_bin_digit(in)) return 0;
+    if (!char_is_bin_digit(in)) return 0;
     if (in == '1')         return 1;
     else                   return 0;
 }
 
 uint8_t char_digit_to_int(char in) {
-    if (!is_digit(in)) return 0;
+    if (!char_is_digit(in)) return 0;
     else               return in - '0';
 }
 
@@ -76,11 +76,11 @@ bool char_is_letter(char in) {
 }
 
 bool char_is_digit_or_letter(char in) {
-    return is_digit(in) || is_letter(in);
+    return char_is_digit(in) || char_is_letter(in);
 }
 
 bool char_is_special(char in) {
-    return in >= 0 && in <= 31 || in == 127 || in == EOF;
+    return (in >= 0 && in <= 31) || in == 127 || in == EOF;
 }
 
 // --- Scanning
@@ -95,11 +95,11 @@ token_t advance_token(scanner_state_t *state) {
     token_t token = { 0 };
 
 consume:
-    scan_state->had_error = false; 
+    state->had_error = false; 
     token    = (token_t){ 0 };
 
-    token.c0 = scan_state->current_char;
-    token.l0 = scan_state->current_line;
+    token.c0 = state->current_char;
+    token.l0 = state->current_line;
 
     char ch = advance_char(state);
 
@@ -108,17 +108,21 @@ consume:
         return token;
     }
 
-    if (is_special(ch) || ch == ' ') 
+    if (char_is_special(ch) || ch == ' ') 
         goto consume;
 
     token.type = ch;
 
     switch(ch) {
-        case '+': case '-': 
-        case '*': case '/': 
-        case '(': case ')': 
+        case '+': 
+        case '-': 
+        case '*':
             break;
 
+        case '(': 
+        case ')': 
+            break;
+/*
         case '"': 
             token = process_string(token);
             break;
@@ -139,13 +143,14 @@ consume:
             } else {
                 token.type = TOKEN_ERROR;
 
-                scan_state.had_error = true;
+                state.had_error = true;
             }
             break;
+*/
     }
 
-    token.c1 = scan_state->current_char;
-    token.l1 = scan_state->current_line;
+    token.c1 = state->current_char;
+    token.l1 = state->current_line;
 
     return token;
 }

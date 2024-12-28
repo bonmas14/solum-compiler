@@ -1,6 +1,6 @@
 workspace "solum"
     configurations { "Debug", "Release" }
-    platforms {  "native", "llvm" }
+    platforms { "native", "llvm" }
 
     architecture "x86_64"
 
