@@ -6,6 +6,7 @@ int main(void) {
 
     if (!scan_file("scope", &state)) {
         log_error("Main: couldn't open file and load it into memory.");
+        return -1;
     }
 
     log_info("successfully loaded file into memory");

@@ -2,6 +2,7 @@ workspace "solum"
     configurations { "Debug", "Release" }
     platforms { "native", "llvm" }
 
+    warnings "Extra"
     architecture "x86_64"
 
     defines "_CRT_SECURE_NO_WARNINGS"
@@ -23,13 +24,16 @@ workspace "solum"
 
     filter {}
 
-    warnings "Extra"
-
 project "solum-compiler"
     kind "ConsoleApp"
     language "C"
+    cdialect "c11"
 
-    flags { "MultiProcessorCompile" } -- specific to windows
+    files { "./src/**.c" }
+
+    filter "system:windows" 
+        flags { "MultiProcessorCompile" }
+    filter {}
 
     filter "configurations:Debug"
         targetdir "bin"
@@ -43,17 +47,22 @@ project "solum-compiler"
         staticruntime "on"
         runtime "Release"
 
-
     filter "platforms:llvm" 
         targetprefix "llvm-"
-        -- libdirs { "/usr/lib/llvm-14/lib" }
-        -- includedirs { }
-        links { "LLVM" }
+
+        filter "system:windows"
+            -- includedirs { "" }
+            -- libdirs { "" }
+            links { "LLVM-C" }
+            
+        filter "system:linux"  -- i need to find a better way...
+            includedirs { "/usr/lib/llvm-14/include/" } 
+            libdirs { "/usr/lib/llvm-14/lib/" }
+            links { "LLVMCore" }
 
     filter "platforms:native" 
         targetprefix "native-"
-        -- nothing for now
+
     filter {}
 
-    files { "./src/**.c" }
 
