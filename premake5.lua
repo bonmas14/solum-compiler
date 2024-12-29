@@ -49,10 +49,9 @@ project "solum-compiler"
 
     filter "platforms:llvm" 
         targetprefix "llvm-"
-
-        filter "system:windows"
-            -- includedirs { "" }
-            -- libdirs { "" }
+filter "system:windows"
+            includedirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
+            libdirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
             links { "LLVM-C" }
             
         filter "system:linux"  -- i need to find a better way...
