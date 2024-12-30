@@ -4,20 +4,16 @@
 int main(void) {
     scanner_state_t state = { 0 };
 
-    if (!scan_file("scope", &state)) {
+    if (!scan_file("test", &state)) {
         log_error("Main: couldn't open file and load it into memory.");
         return -1;
     }
 
-    log_info("successfully loaded file into memory");
+    token_t token = advance_token(&state);
 
-    for (size_t i = 0; i < state.lines.count; i++) {
-
-        line_tuple_t *line  = (line_tuple_t*)list_get(&state.lines, i);
-        size_t        len   = line->stop - line->start + 1;
-        char         *start = state.file.data + line->start;
-
-        fprintf(stdout, "%.3zu | %.*s", i, (int)len, start);
+    while (token.type != TOKEN_EOF) {
+        log_info_token("token", &state, token);
+        token = advance_token(&state);
     }
 
     // fprintf(stdout, "%s", state.file.data);

@@ -91,6 +91,51 @@ token_t create_token_at(scanner_state_t *state, size_t index) {
 }
 */
 
+// @todo we need to support escape codes
+token_t process_string(scanner_state_t *state) {
+    token_t result = { 0 };
+
+    result.type = TOKEN_CONST_STRING;
+    result.c0 = state->current_char;  // it is already after "
+    result.l0 = state->current_line;
+
+    while (!match_char(state, '"')) {
+        if (match_char(state, EOF)) {
+            state->had_error = true;
+            result.type = TOKEN_EOF;
+
+            result.c1 = state->current_char;
+            result.l1 = state->current_line;
+
+            log_error_token("Scanner: unexpected End Of Line.", state, result);
+            break;
+        }
+
+        char ch = advance_char(state);
+
+        // case where we just ignore \"
+        // we need to parse string instead
+        // of just getting reference from array
+        // but for now it is okay
+        //
+        // we will parse it later
+        if (ch == '\\') {
+            if (!match_char(state, '"')) {
+                continue;
+            }
+
+            advance_char(state);
+        }
+    }
+
+    result.c1 = state->current_char; 
+    result.l1 = state->current_line;
+
+    advance_char(state);
+
+    return result;
+}
+
 token_t advance_token(scanner_state_t *state) {
     token_t token = { 0 };
 
@@ -114,39 +159,43 @@ consume:
     token.type = ch;
 
     switch(ch) {
-        case '+': 
-        case '-': 
-        case '*':
-            break;
+        case '+': break;
+        case '*': break;
 
-        case '(': 
-        case ')': 
-            break;
-/*
+        case '(': break;
+        case ')': break;
+
+        case '-': break;
+        case '^': break;
+        case '@': break;
         case '"': 
-            token = process_string(token);
+            token = process_string(state);
             break;
 
         case '/':
-            if (!match_char('/'))
+            if (!match_char(state, '/'))
                 break;
 
-            while (!match_char('\n') && !state->at_the_end)
-                advance_char();
+            while (!match_char(state, '\n') && !state->at_the_end)
+                advance_char(state);
             goto consume;
 
         default:
-            if (is_letter(token.type)) {
-                token = process_word(token);
-            } else if (is_digit(token.type)) {
-                token = process_digit(token);
+            if (char_is_letter(ch)) {
+                // token = process_word(state);
+            } else if (char_is_digit(ch)) {
+                // token = process_digit(state);
             } else {
                 token.type = TOKEN_ERROR;
 
-                state.had_error = true;
+                token.c1 = state->current_char;
+                token.l1 = state->current_line;
+
+                state->had_error = true;
+
+                log_error_token("Scanner: unexpected token.", state, token);
             }
             break;
-*/
     }
 
     token.c1 = state->current_char;
@@ -259,4 +308,66 @@ bool scan_file(const char* filename, scanner_state_t *state) {
     }
 
     return true;
+}
+
+void print_token_info(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset) {
+
+    size_t start_line = token.l0 - line_start_offset;
+
+    if (start_line > token.l0) {
+        start_line = 0;
+    }
+
+    size_t stop_line = token.l1 + line_stop_offset + 1; 
+
+    if (stop_line > state->lines.count) {
+        stop_line = state->lines.count;
+    }
+
+    for (size_t i = start_line; i < stop_line; i++) {
+
+        line_tuple_t *line  = (line_tuple_t*)list_get(&state->lines, i);
+        size_t        len   = line->stop - line->start + 1;
+        char         *start = state->file.data + line->start;
+
+        if (i != token.l0) {
+            fprintf(stdout, "    %.3zu |%.*s", i, (int)len, start);
+        } else {
+            fprintf(stdout, " -> %.3zu |%.*s", i, (int)len, start);
+
+            fprintf(stdout, "        *");
+
+            for (size_t j = 0; j < token.c0; j++) {
+                fprintf(stdout, " ");
+            }
+
+            size_t token_size = token.c1 - token.c0;
+
+            if (token_size == 1) {
+                fprintf(stdout, "^\n");
+                continue;
+            }
+
+            fprintf(stdout, "^");
+            for (size_t j = 0; j < (token_size - 2); j++) {
+                fprintf(stdout, "-");
+            }
+
+            fprintf(stdout, "\n");
+        }
+    }
+}
+
+void log_info_token(const char *text, scanner_state_t *state, token_t token) {
+    log_info(text);
+    print_token_info(state, token, 1, 0);
+}
+
+void log_warning_token(const char *text, scanner_state_t *state, token_t token) {
+    log_warning(text);
+    print_token_info(state, token, 2, 0);
+}
+void log_error_token(const char *text, scanner_state_t *state, token_t token) {
+    log_error(text);
+    print_token_info(state, token, 3, 0);
 }
