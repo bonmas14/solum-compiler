@@ -1,3 +1,4 @@
+#define SCANNER_DEFINITION
 #include "scanner.h"
 
 // --- Processing
@@ -100,12 +101,12 @@ token_t process_string(scanner_state_t *state) {
     result.l0 = state->current_line;
 
     while (!match_char(state, '"')) {
+        result.c1 = state->current_char;
+        result.l1 = state->current_line;
+
         if (match_char(state, EOF)) {
             state->had_error = true;
             result.type = TOKEN_EOF;
-
-            result.c1 = state->current_char;
-            result.l1 = state->current_line;
 
             log_error_token("Scanner: unexpected End Of Line.", state, result);
             break;
@@ -134,6 +135,70 @@ token_t process_string(scanner_state_t *state) {
     advance_char(state);
 
     return result;
+}
+
+token_type_t is_word_available(string_t word) {
+    size_t matches = 0;
+
+    bool no_match_flags[_KW_STOP - _KW_START - 1] = { 0 };
+
+    if (word.size >= KEYWORDS_MAX_SIZE) {
+        return TOKEN_IDENT;
+    }
+
+    for (size_t i = 0; i < (word.size + 1); i++) {
+        matches = 0;
+        char current = word.data[i];
+
+        for (size_t kw = 0; kw < (_KW_STOP - _KW_START - 1); kw++) {
+            if (!no_match_flags[kw] && keywords[kw][i] == current) {
+                if (current == 0) {
+                    return kw + _KW_START + 1;
+                }
+                matches++;
+            } else {
+                no_match_flags[kw] = true;
+            }
+        }
+
+        if (matches == 0)
+            break;
+    }
+
+    return TOKEN_IDENT;
+}
+
+token_t process_word(scanner_state_t *state, token_t token) {
+    char buffer[MAX_IDENT_SIZE + 1] = { 0 };
+
+    size_t i = 0;
+    buffer[i++] = (char)token.type;
+
+    token.c1 = state->current_char;
+    token.l1 = state->current_line;
+
+    while (i < MAX_IDENT_SIZE && char_is_digit_or_letter(peek_char(state))) {
+        token.c1 = state->current_char;
+        token.l1 = state->current_line;
+        buffer[i++] = advance_char(state);
+    }
+
+    if (i == MAX_IDENT_SIZE) {
+        log_error_token("Scanner: Identifier was too big.", state, token);
+
+        state->had_error = true;
+    } 
+
+    buffer[i] = 0;
+
+    string_t str = { .size = i, .data = (char*)&buffer };
+
+    if (state->had_error)
+        token.type = TOKEN_ERROR;
+    else 
+        token.type = is_word_available(str);
+
+    return token;
 }
 
 token_t advance_token(scanner_state_t *state) {
@@ -182,7 +247,7 @@ consume:
 
         default:
             if (char_is_letter(ch)) {
-                // token = process_word(state);
+                token = process_word(state, token);
             } else if (char_is_digit(ch)) {
                 // token = process_digit(state);
             } else {
@@ -310,8 +375,119 @@ bool scan_file(const char* filename, scanner_state_t *state) {
     return true;
 }
 
-void print_token_info(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset) {
+void get_token_name(char *buffer, token_t token) {
+    switch (token.type) {
+        case TOKEN_IDENT:
+            sprintf(buffer, "%s", "TOKEN_IDENT");
+            break;
+        case TOKEN_CONST_INT:
+            sprintf(buffer, "%s", "TOKEN_CONST_INT");
+            break;
+        case TOKEN_CONST_FP:
+            sprintf(buffer, "%s", "TOKEN_CONST_FP");
+            break;
+        case TOKEN_CONST_STRING:
+            sprintf(buffer, "%s", "TOKEN_CONST_STRING");
+            break;
+        case TOK_STRUCT:
+            sprintf(buffer, "%s", "TOK_STRUCT");
+            break;
+        case TOK_UNION:
+            sprintf(buffer, "%s", "TOK_UNION");
+            break;
+        case TOK_U8:
+            sprintf(buffer, "%s", "TOK_U8");
+            break;
+        case TOK_U16:
+            sprintf(buffer, "%s", "TOK_U16");
+            break;
+        case TOK_U32:
+            sprintf(buffer, "%s", "TOK_U32");
+            break;
+        case TOK_U64:
+            sprintf(buffer, "%s", "TOK_U64");
+            break;
+        case TOK_S8:
+            sprintf(buffer, "%s", "TOK_S8");
+            break;
+        case TOK_S16:
+            sprintf(buffer, "%s", "TOK_S16");
+            break;
+        case TOK_S32:
+            sprintf(buffer, "%s", "TOK_S32");
+            break;
+        case TOK_S64:
+            sprintf(buffer, "%s", "TOK_S64");
+            break;
+        case TOK_F32:
+            sprintf(buffer, "%s", "TOK_F32");
+            break;
+        case TOK_F64:
+            sprintf(buffer, "%s", "TOK_F64");
+            break;
+        case TOK_BOOL:
+            sprintf(buffer, "%s", "TOK_BOOL");
+            break;
+        case TOK_NULL:
+            sprintf(buffer, "%s", "TOK_NULL");
+            break;
+        case TOK_DEFAULT:
+            sprintf(buffer, "%s", "TOK_DEFAULT");
+            break;
+        case TOK_IF:
+            sprintf(buffer, "%s", "TOK_IF");
+            break;
+        case TOK_ELSE:
+            sprintf(buffer, "%s", "TOK_ELSE");
+            break;
+        case TOK_WHILE:
+            sprintf(buffer, "%s", "TOK_WHILE");
+            break;
+        case TOK_FOR:
+            sprintf(buffer, "%s", "TOK_FOR");
+            break;
+        case TOK_MUT:
+            sprintf(buffer, "%s", "TOK_MUT");
+            break;
+        case TOK_PROTOTYPE:
+            sprintf(buffer, "%s", "TOK_PROTOTYPE");
+            break;
+        case TOK_EXTERNAL:
+            sprintf(buffer, "%s", "TOK_EXTERNAL");
+            break;
+        case TOK_MODULE:
+            sprintf(buffer, "%s", "TOK_MODULE");
+            break;
+        case TOK_USE:
+            sprintf(buffer, "%s", "TOK_USE");
+            break;
+        case TOKEN_EOF :
+            sprintf(buffer, "%s", "TOKEN_EOF");
+            break;
+        case TOKEN_ERROR:
+            sprintf(buffer, "%s", "TOKEN_ERROR");
+            break;
+        default:
+            if (char_is_digit_or_letter(token.type)) {
+                sprintf(buffer, "%c", token.type);
+            } else {
+                sprintf(buffer, "%s", "UNKNOWN");
+            }
+            break;
+    }
+}
 
+void print_token_info(token_t token) {
+    char buffer[256];
+    char token_name[100];
+
+    get_token_name((char*)&token_name, token);
+
+    sprintf(buffer, "TOK: %.100s", token_name);
+    log_no_dec(buffer);
+}
+
+void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset) {
     size_t start_line = token.l0 - line_start_offset;
 
     if (start_line > token.l0) {
@@ -349,7 +525,7 @@ void print_token_info(scanner_state_t *state, token_t token, size_t line_start_o
             }
 
             fprintf(stdout, "^");
-            for (size_t j = 0; j < (token_size - 2); j++) {
+            for (size_t j = 0; j < (token_size - 1); j++) {
                 fprintf(stdout, "-");
             }
 
@@ -360,14 +536,17 @@ void print_token_info(scanner_state_t *state, token_t token, size_t line_start_o
 
 void log_info_token(const char *text, scanner_state_t *state, token_t token) {
     log_info(text);
-    print_token_info(state, token, 1, 0);
+    print_token_info(token);
+    print_code_lines(state, token, 1, 0);
 }
 
 void log_warning_token(const char *text, scanner_state_t *state, token_t token) {
     log_warning(text);
-    print_token_info(state, token, 2, 0);
+    print_token_info(token);
+    print_code_lines(state, token, 2, 0);
 }
 void log_error_token(const char *text, scanner_state_t *state, token_t token) {
     log_error(text);
-    print_token_info(state, token, 3, 0);
+    print_token_info(token);
+    print_code_lines(state, token, 3, 0);
 }

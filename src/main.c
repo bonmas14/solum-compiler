@@ -12,7 +12,7 @@ int main(void) {
     token_t token = advance_token(&state);
 
     while (token.type != TOKEN_EOF) {
-        log_info_token("token", &state, token);
+        log_info_token("Main: token.", &state, token);
         token = advance_token(&state);
     }
 
