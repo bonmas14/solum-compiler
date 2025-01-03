@@ -28,8 +28,8 @@ Immutable | error   | ok
 Vert: from
 Hor:  to
                        | Mut ptr x Mut data | Immut ptr x Mut data | Mut ptr x Immut data | Immut ptr x Immut data |
-Mut   ptr x Mut data   | ok                 | ok                   | warn                 | warn                   |
-Immut ptr x Mut data   | error              | ok                   | error                | warn                   |
+Mut   ptr x Mut data   | ok                 | ok                   | error (pointer alias)| error (pointer alias)  |
+Immut ptr x Mut data   | error              | ok                   | error                | error (pointer alias)  |
 Mut   ptr x Immut data | error              | error                | ok                   | ok                     |
 Immut ptr x Immut data | error              | error                | error                | ok                     |
 
@@ -42,6 +42,19 @@ Ownership.
 
 
 Local functions.
+
+
+
+// -----------------
+
+keywords:
+    - external:  for functions and variables (from c or anything) for linking (no definition).
+    - default:   for returning 0 of specified in return/assignment type.
+    - override:  for overriding operators
+    - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
+    - module:    to organize work
+    - use:       for acessing modules
+    - mut:       to make variable mutable
 
 
 ///
@@ -67,9 +80,9 @@ work : (addr : ^s32, count : s32) = {
 
 freq : s32 = 440;
 
-ptr  : ^s32  = @freq;
-ptr2 : ^^s32 = @ptr;
-ptr3 : ^s32  = ^ptr2;
+ptr  : ^s32  = ^freq;
+ptr2 : ^^s32 = ^ptr;
+ptr3 : ^s32  = @ptr2;
 
 if (freq == @@ptr2) {
     print("valid");
@@ -100,13 +113,13 @@ x : mut tuple;
 n.a = 1; // error because it is not mutable;
 m.a = 1; // no error
 
-ptr_n : ^tuple     = @n; 
-ptr_e : ^mut tuple = @n;  // error. cause tuple is immutable
-ptr_m : ^mut tuple = @m; 
+ptr_n : ^tuple     = ^n; 
+ptr_e : ^mut tuple = ^n;  // error. cause tuple is immutable
+ptr_m : ^mut tuple = ^m; 
 
-ptr_x : mut ^mut tuple      = @x;  // mutable pointer to a mutable tuple
-ptr_f : mut ^mut ^mut tuple = @@x; // mutable pointer to a mutable pointer that points to a mutalbe tuple
-ptr_z : mut ^tuple          = @n;  // mutable pointer to an immutable tuple
+ptr_x : mut ^mut tuple      = ^x;  // mutable pointer to a mutable tuple
+ptr_f : mut ^mut ^mut tuple = ^^x; // mutable pointer to a mutable pointer that points to a mutalbe tuple
+ptr_z : mut ^tuple          = ^n;  // mutable pointer to an immutable tuple
 
 ptr_n.a = 1; // error. because ptr_n is not mutable pointer with not mutalbe data
 
@@ -125,16 +138,39 @@ create_tuple : (l : s32, r : s32) -> tuple = {
 
 t := create_tuple(22, 32);
 
-// -----------------
+// ----------------- pointer aliasing
 
-keywords:
-    - external:  for functions and variables (from c or anything) for linking (no definition).
-    - default:   for returning 0 of specified in return/assignment type.
-    - override:  for overriding operators
-    - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
-    - module:    to organize work
-    - use:       for acessing modules
-    - mut:       to make variable mutable
+pointer aliasing can only happen in situaltions:
+
+1. 
+do_stuff : (a : ^mut s32, b : ^mut s32) = {
+    // a can be equal to b.
+    // or changes in a can lead to changes in b
+}
+
+this is because we can promise to a compiler that we wont modify data of pointer.
+
+
+but it wont work when we do stuff like raw pointers that equal to int values:
+example:
+
+a : []s32 = {1, 2};
+
+b : ^s32     = a + 1; // valid. wont change anything 
+
+c : ^mut s32 = a + 1; // wrong and wont compile, because we cant promise
+                      // to pointer 'a' that it's data will remain constant
+
+points_to : mut s32 = a;   // this will drop the promise of 'a' pointer that its data is constant, 
+                           // because dont look at it as a pointer.
+                           // 
+                           // we can do warning here, error, OR be silent until this variable is used
+                           // as in next line. 
+                           // we can scan all places where this variable is used step into functions and try to find
+                           // potential transformation into mutable pointer. 
+
+d : ^mut s32 = points_to;  // this will be normal line of code. but it actually 
+                           // breaks the promise of pointer 'a' that it's data is constant.
 
 // --------------------- generics
 
