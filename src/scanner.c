@@ -38,12 +38,12 @@ bool match_char(scanner_state_t *state, char in) {
 
 // --- Helpers
 
-bool char_is_digit(char in) {
+bool char_is_number(char in) {
     return (in >= '0' && in <= '9');
 }
 
 bool char_is_hex_digit(char in) {
-    return char_is_digit(in) 
+    return char_is_number(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
@@ -54,7 +54,7 @@ bool char_is_bin_digit(char in) {
 
 uint8_t char_hex_to_int(char in) {
     if (!char_is_hex_digit(in)) return 0;
-    if (char_is_digit(in))      return in - '0';
+    if (char_is_number(in))      return in - '0';
     if ((in & 0x20) == 0)  return in - 'A' + 10;
     else                   return in - 'a' + 10;
 }
@@ -66,22 +66,23 @@ uint8_t char_bin_to_int(char in) {
 }
 
 uint8_t char_digit_to_int(char in) {
-    if (!char_is_digit(in)) return 0;
+    if (!char_is_number(in)) return 0;
     else               return in - '0';
 }
 
-bool char_is_letter(char in) {
+bool char_alpha(char in) {
     return (in >= 'A' && in <= 'Z')
         || (in >= 'a' && in <= 'z') 
         || (in == '_');
 }
 
-bool char_is_digit_or_letter(char in) {
-    return char_is_digit(in) || char_is_letter(in);
+bool char_is_number_or_alpha(char in) {
+    return char_is_number(in) || char_alpha(in);
 }
 
 bool char_is_special(char in) {
-    return (in >= 0 && in <= 31) || in == 127 || in == EOF;
+    // null is not a special symbol of ascii, it is OUR null terminator
+    return (in > 0 && in <= 31) || in == 127 || in == EOF;
 }
 
 // --- Scanning
@@ -108,7 +109,7 @@ token_t process_string(scanner_state_t *state) {
             state->had_error = true;
             result.type = TOKEN_EOF;
 
-            log_error_token("Scanner: unexpected End Of Line.", state, result);
+            log_error_token("Scanner: unexpected End Of Line.", state, result, 0);
             break;
         }
 
@@ -121,10 +122,6 @@ token_t process_string(scanner_state_t *state) {
         //
         // we will parse it later
         if (ch == '\\') {
-            if (!match_char(state, '"')) {
-                continue;
-            }
-
             advance_char(state);
         }
     }
@@ -137,7 +134,7 @@ token_t process_string(scanner_state_t *state) {
     return result;
 }
 
-token_type_t is_word_available(string_t word) {
+token_type_t match_with_keyword(string_t word) {
     size_t matches = 0;
 
     bool no_match_flags[_KW_STOP - _KW_START - 1] = { 0 };
@@ -168,103 +165,157 @@ token_type_t is_word_available(string_t word) {
     return TOKEN_IDENT;
 }
 
-token_t process_word(scanner_state_t *state, token_t token) {
+// @todo
+//
+// available variants of ints/floats
+//
+//  ints:
+//      0          123    53439      5469450645
+//      0x0FAA4B   0xFF   0xAFDEBBFF
+//      0b10010111 0b0101
+//      
+//  floats:
+//      0. 0.12 0.325 213.543 
+//      0. 0. 0.123d 9.   
+//
+token_t process_number(scanner_state_t *state) {
+
+    log_info("Scanner: FINISH NUMBER PARSING!", 40);
+
+    token_t token = { 0 };
+
+    token.c0 = state->current_char;
+    token.l0 = state->current_line;
+
+    char ch = peek_char(state);
+
+    size_t index = 0;
+
+    while (ch != 0 && char_is_number(ch)) {
+        token.c1 = state->current_char;
+        token.l1 = state->current_line;
+
+        advance_char(state); // just skip for now
+        ch = peek_char(state);
+    }
+
+    // or TOKEN_CONST_FP
+    token.type = TOKEN_CONST_INT; 
+
+    return token;
+}
+token_t process_word(scanner_state_t *state) {
+    token_t token = { 0 };
+
+    token.c0 = state->current_char;
+    token.l0 = state->current_line;
+
     char buffer[MAX_IDENT_SIZE + 1] = { 0 };
 
     size_t i = 0;
-    buffer[i++] = (char)token.type;
+    buffer[i++] = advance_char(state);
 
     token.c1 = state->current_char;
     token.l1 = state->current_line;
 
-    while (i < MAX_IDENT_SIZE && char_is_digit_or_letter(peek_char(state))) {
+    while (i < MAX_IDENT_SIZE && char_is_number_or_alpha(peek_char(state))) {
         token.c1 = state->current_char;
         token.l1 = state->current_line;
         buffer[i++] = advance_char(state);
     }
 
     if (i == MAX_IDENT_SIZE) {
-        log_error_token("Scanner: Identifier was too big.", state, token);
+        log_error_token("Scanner: Identifier was too big.", state, token, 0);
 
         state->had_error = true;
     } 
 
     buffer[i] = 0;
 
-    string_t str = { .size = i, .data = (char*)&buffer };
+    string_t identifier = { .size = i, .data = (char*)&buffer };
 
     if (state->had_error)
         token.type = TOKEN_ERROR;
     else 
-        token.type = is_word_available(str);
+        token.type = match_with_keyword(identifier);
 
     return token;
+}
+
+void eat_all_spaces(scanner_state_t *state) {
+    char ch = peek_char(state);
+
+    while (ch != 0 && (ch == ' ' || char_is_special(ch))) {
+        advance_char(state); 
+        ch = peek_char(state);
+    }
 }
 
 token_t advance_token(scanner_state_t *state) {
     token_t token = { 0 };
 
-consume:
-    state->had_error = false; 
-    token    = (token_t){ 0 };
+    state->had_error = false; // i dont really know do we need to skip? 
 
-    token.c0 = state->current_char;
-    token.l0 = state->current_line;
+    eat_all_spaces(state);
 
-    char ch = advance_char(state);
-
-    if (ch == 0) {
+    if (match_char(state, 0)) {
         token.type = TOKEN_EOF;
         return token;
     }
 
-    if (char_is_special(ch) || ch == ' ') 
-        goto consume;
+    char ch = peek_char(state);
 
-    token.type = ch;
+
+    if (ch == '/') {
+        if (ch == peek_next_char(state)) {
+            // comment here 
+            
+            while (!(match_char(state, 0) || match_char(state, '\n'))) {
+                advance_char(state);
+            }
+
+            token = advance_token(state);
+            return token;
+        }
+    }
+
+    token.c0 = state->current_char;
+    token.l0 = state->current_line;
 
     switch(ch) {
-        case '+': break;
-        case '*': break;
+        case '+': { token.type = advance_char(state); } break;
+        case '*': { token.type = advance_char(state); } break;
+        case '(': { token.type = advance_char(state); } break;
+        case ')': { token.type = advance_char(state); } break;
+        case '-': { token.type = advance_char(state); } break;
+        case '@': { token.type = advance_char(state); } break;
+        case '/': { token.type = advance_char(state); } break;
 
-        case '(': break;
-        case ')': break;
-
-        case '-': break;
-        case '^': break;
-        case '@': break;
-        case '"': 
+        case '"': {
+            advance_char(state);
             token = process_string(state);
-            break;
+            return token; // @todo error handle errors in process string 
+        } break;
 
-        case '/':
-            if (!match_char(state, '/'))
-                break;
-
-            while (!match_char(state, '\n') && !state->at_the_end)
-                advance_char(state);
-            goto consume;
-
-        default:
-            if (char_is_letter(ch)) {
-                token = process_word(state, token);
-            } else if (char_is_digit(ch)) {
-                // token = process_digit(state);
+        default: {
+            if (char_alpha(ch)) {
+                token = process_word(state);
+            } else if (char_is_number(ch)) {
+                token = process_number(state);
             } else {
+                advance_char(state);
                 token.type = TOKEN_ERROR;
-
-                token.c1 = state->current_char;
-                token.l1 = state->current_line;
-
                 state->had_error = true;
-
-                log_error_token("Scanner: unexpected token.", state, token);
             }
-            break;
+        } break;
     }
 
     token.c1 = state->current_char;
     token.l1 = state->current_line;
+
+    if (state->had_error) {
+        log_error_token("Scanner: error scanning token.", state, token, 0);
+    }
 
     return token;
 }
@@ -285,14 +336,14 @@ token_t peek_token(scanner_state_t *state, size_t offset) {
 }
 */
 
-// --- Reading file 
+// --- Reading file and null terminating it
 
 bool read_file(const char *filename, string_t *output) {
     FILE *file = fopen(filename, "rb");
 
     if (file == NULL) {
-        log_error("Scanner: Could not open file.");
-        log_error(filename); // @cleanup
+        log_error("Scanner: Could not open file.", 0);
+        log_error(filename, 0); // @cleanup
         return false;
     }
 
@@ -303,7 +354,7 @@ bool read_file(const char *filename, string_t *output) {
     output->data = (char*)malloc(file_size + 1);
 
     if (output->data == NULL) {
-        log_error("Scanner: Couldn't allocate memory for a file.");
+        log_error("Scanner: Couldn't allocate memory for a file.", 0);
         return false;
     }
 
@@ -312,8 +363,8 @@ bool read_file(const char *filename, string_t *output) {
     output->data[bytes_read] = 0;
 
     if (bytes_read < file_size) {
-        log_error("Scanner: Could not read file.");
-        log_error(filename); // @cleanup
+        log_error("Scanner: Could not read file.", 0);
+        log_error(filename, 0); // @cleanup
         return false;
     }
 
@@ -329,7 +380,7 @@ bool scan(scanner_state_t *state) {
     size_t init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
     if (!list_create(&state->lines, init_size, sizeof(line_tuple_t))) {
-        log_error("Scanner: Couldn't create list.");
+        log_error("Scanner: Couldn't create list.", 0);
         state->had_error = true;
         return false;
     }
@@ -353,7 +404,7 @@ bool scan(scanner_state_t *state) {
     }
 
     if (state->had_error) {
-        log_error("Scan: couldn't add another line segment to a list.");
+        log_error("Scan: couldn't add another line segment to a list.", 0);
         return false;
     }
 
@@ -362,19 +413,20 @@ bool scan(scanner_state_t *state) {
 
 bool scan_file(const char* filename, scanner_state_t *state) {
     if (!read_file(filename, &state->file)) {
-        log_error("Scanner: couldn't read file.");
+        log_error("Scanner: couldn't read file.", 0);
         state->had_error = true;
         return false;
     }
 
     if (!scan(state)) {
-        log_error("Scanner: couldn't scan file.");
+        log_error("Scanner: couldn't scan file.", 0);
         return false;
     }
 
     return true;
 }
 
+// introspect later
 void get_token_name(char *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_IDENT:
@@ -468,7 +520,7 @@ void get_token_name(char *buffer, token_t token) {
             sprintf(buffer, "%s", "TOKEN_ERROR");
             break;
         default:
-            if (char_is_digit_or_letter(token.type)) {
+            if (char_is_number_or_alpha(token.type)) {
                 sprintf(buffer, "%c", token.type);
             } else {
                 sprintf(buffer, "%s", "UNKNOWN");
@@ -477,17 +529,17 @@ void get_token_name(char *buffer, token_t token) {
     }
 }
 
-void print_token_info(token_t token) {
+void print_token_info(token_t token, size_t left_pad) {
     char buffer[256];
     char token_name[100];
 
     get_token_name((char*)&token_name, token);
 
     sprintf(buffer, "TOK: %.100s", token_name);
-    log_no_dec(buffer);
+    log_no_dec(buffer, left_pad);
 }
 
-void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset) {
+void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset, size_t left_pad) {
     size_t start_line = token.l0 - line_start_offset;
 
     if (start_line > token.l0) {
@@ -501,52 +553,76 @@ void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_o
     }
 
     for (size_t i = start_line; i < stop_line; i++) {
-
         line_tuple_t *line  = (line_tuple_t*)list_get(&state->lines, i);
         size_t        len   = line->stop - line->start + 1;
         char         *start = state->file.data + line->start;
 
+        for (size_t j = 0; j < left_pad; j++) {
+            fprintf(stderr, " ");
+        }
+
         if (i != token.l0) {
-            fprintf(stdout, "    %.3zu |%.*s", i, (int)len, start);
+            fprintf(stderr, "    %.4zu | %.*s", i, (int)len, start);
         } else {
-            fprintf(stdout, " -> %.3zu |%.*s", i, (int)len, start);
+            fprintf(stderr, " -> %.4zu | %.*s", i, (int)len, start);
 
-            fprintf(stdout, "        *");
+            for (size_t j = 0; j < (left_pad + 8); j++) fprintf(stderr, " ");
 
-            for (size_t j = 0; j < token.c0; j++) {
-                fprintf(stdout, " ");
+            fprintf(stderr, " * ");
+
+            for (size_t j = 0; j < token.c0; j++) fprintf(stderr, " ");
+            
+            size_t line_print_size = 0;
+
+            if (token.c1 < token.c0) {
+                size_t token_size = line->stop - token.c0;
+
+                if (token_size != 0) {
+                    line_print_size = token_size - 1;
+                }
+            } else {
+                size_t token_size = token.c1 - token.c0;
+
+                if (token_size != 0) {
+                    line_print_size = token_size - 1;
+                }
             }
 
-            size_t token_size = token.c1 - token.c0;
-
-            if (token_size == 1) {
-                fprintf(stdout, "^\n");
+            if (line_print_size == 0) {
+                fprintf(stderr, "^\n");
                 continue;
             }
 
-            fprintf(stdout, "^");
-            for (size_t j = 0; j < (token_size - 1); j++) {
-                fprintf(stdout, "-");
+            fprintf(stderr, "^");
+            for (size_t j = 0; j < line_print_size; j++) {
+                fprintf(stderr, "-");
             }
 
-            fprintf(stdout, "\n");
+            fprintf(stderr, "\n");
         }
     }
 }
 
-void log_info_token(const char *text, scanner_state_t *state, token_t token) {
-    log_info(text);
-    print_token_info(token);
-    print_code_lines(state, token, 1, 0);
+void log_info_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+    log_info(text, left_pad);
+    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
+    print_code_lines(state, token, 0, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
 }
 
-void log_warning_token(const char *text, scanner_state_t *state, token_t token) {
-    log_warning(text);
-    print_token_info(token);
-    print_code_lines(state, token, 2, 0);
+void log_warning_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+    log_warning(text, left_pad);
+    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
+    print_code_lines(state, token, 2, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
 }
-void log_error_token(const char *text, scanner_state_t *state, token_t token) {
-    log_error(text);
-    print_token_info(token);
-    print_code_lines(state, token, 3, 0);
+
+void log_error_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+    log_error(text, left_pad);
+    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
+    print_code_lines(state, token, 4, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    log_no_dec("", 0);
 }

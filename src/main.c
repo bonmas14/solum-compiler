@@ -1,18 +1,23 @@
 #include "stddefines.h"
 #include "scanner.h"
 
+#ifdef NDEBUG 
+#define log_info_token(a, b, c, d)
+
+#endif
+
 int main(void) {
     scanner_state_t state = { 0 };
 
     if (!scan_file("test", &state)) {
-        log_error("Main: couldn't open file and load it into memory.");
+        log_error("Main: couldn't open file and load it into memory.", 0);
         return -1;
     }
 
     token_t token = advance_token(&state);
 
     while (token.type != TOKEN_EOF) {
-        log_info_token("Main: token.", &state, token);
+        log_info_token("Main: token.", &state, token, 8);
         token = advance_token(&state);
     }
 

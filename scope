@@ -8,6 +8,34 @@ The scope of a project:
 
 
 
+// --- PARSER STUFF
+
+trees in arrays. but that is all for storing 
+
+VALUE
+UNARY
+BINARY
+TERNARY
+LIST
+EOF
+
+Align is 4 
+
+
+    0   1     2
+L|3|U|V|B|V|V|B|B|V|V|V|E|
+
+    0     1       2
+
+L:  u     b       b
+    |    / \     / \
+    v   v   v   b   v
+               / \
+              v   v 
+
+
+1. first is left then right, recursive
+
 // --------------------- behaviour 
 
 1. automatic dereference by '.'
@@ -35,6 +63,12 @@ Immut ptr x Immut data | error              | error                | error      
 
 
 row 1,2 col 3,4 are warnings but not really. because it can be like that :
+
+
+2. We can create preload file that will create standart functions that are used 
+in program. Like current context or standart functions like memset. 
+
+
 
 
 Ownership.
@@ -106,7 +140,7 @@ tuple : struct = {
     b : s32;
 }
 
-n : tuple;
+n : tuple = { .a = 10, .b = 10 };
 m : mut tuple;
 x : mut tuple;
 
@@ -310,3 +344,9 @@ tokens : enum<s32> = {
 
 token := tokens.EOF;
 token : tokens = tokens.Error;
+
+// ------- loops
+
+for 0..10 {
+    print("%\n", it);
+}

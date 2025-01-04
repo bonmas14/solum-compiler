@@ -2,12 +2,12 @@
 
 bool list_create(list_t *container, size_t init_size, size_t element_size) {
     if (init_size == 0) {
-        log_warning("List: init size was 0. defaulting to 1.");
+        log_warning("List: init size was 0. defaulting to 1.", 0);
         init_size = 1;
     }
 
     if (element_size == 0) {
-        log_warning("List: element size was 0. defaulting to 1.");
+        log_warning("List: element size was 0. defaulting to 1.", 0);
         element_size = 1;
     }
 
@@ -18,7 +18,7 @@ bool list_create(list_t *container, size_t init_size, size_t element_size) {
     container->data         = ALLOC(init_size * element_size);
 
     if (container->data == NULL) {
-        log_error("List: Couldn't create list.");
+        log_error("List: Couldn't create list.", 0);
         return false; 
     }
 
@@ -27,12 +27,12 @@ bool list_create(list_t *container, size_t init_size, size_t element_size) {
 
 bool list_delete(list_t *list) {
     if (list == NULL) {
-        log_error("List: Reference to list wasn't valid.");
+        log_error("List: Reference to list wasn't valid.", 0);
         return false;
     }
 
     if (list->data == NULL) {
-        log_error("List: List was already deleted.");
+        log_error("List: List was already deleted.", 0);
         return false;
     }
 
@@ -46,7 +46,7 @@ bool list_grow(list_t *list) {
     void *data = REALLOC(list->data, list->grow_size  *list->element_size);
 
     if (data == NULL) {
-        log_error("List: Couldn't grow list.");
+        log_error("List: Couldn't grow list.", 0);
         return false;
     }
 
@@ -67,7 +67,7 @@ bool list_add(list_t *list, void *data) {
         if (!list_grow(list)) {
 
             // we dont need that log because it can only happen when using list_grow
-            // log_error("List: Couldn't add element to a list.");
+            // log_error("List: Couldn't add element to a list.", 0);
             
             return false;
         }
@@ -87,7 +87,7 @@ bool list_add(list_t *list, void *data) {
 
 void *list_get(list_t *list, size_t index) {
     if (index >= list->count) {
-        log_error("List: Index is greater than count of elements.");
+        log_error("List: Index is greater than count of elements.", 0);
         return NULL;
     }
 
@@ -96,10 +96,10 @@ void *list_get(list_t *list, size_t index) {
 
 /*
 void list_insert_at(list_t *list, size_t index, void *data) {
-    log_error("List: inserting is not supported as I dont need that.");
+    log_error("List: inserting is not supported as I dont need that.", 0);
 }
 
 void list_remove_at(list_t *list, size_t index) {
-    log_error("List: removing elements is not supported as I dont need that.");
+    log_error("List: removing elements is not supported as I dont need that.", 0);
 }
 */

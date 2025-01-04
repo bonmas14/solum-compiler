@@ -7,6 +7,7 @@
 #define APPROX_CHAR_PER_LINE (25)
 #define KEYWORDS_MAX_SIZE (11)
 
+// do we even need this???
 #define MAX_IDENT_SIZE (256)
 
 typedef enum {
@@ -100,8 +101,8 @@ typedef struct {
 
 typedef struct {
     uint32_t type;
-    size_t c0, c1, l0, l1; // address in code. without human readable offsets (add 1 or so on)
-
+    // address in code. without human readable offsets (add 1 or so on)
+    size_t c0, c1, l0, l1;
 } token_t;
 
 bool scan_file(const char* filename, scanner_state_t *state);
@@ -111,7 +112,7 @@ token_t peek_token(scanner_state_t *state, size_t offset);
 
 // --- logging for scanner
 
-void log_info_token(const char *text, scanner_state_t *state, token_t token);
-void log_warning_token(const char *text, scanner_state_t *state, token_t token);
-void log_error_token(const char *text, scanner_state_t *state, token_t token);
+void log_info_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
+void log_warning_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
+void log_error_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
 
