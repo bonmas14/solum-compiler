@@ -16,7 +16,7 @@ char advance_char(scanner_state_t *state) {
     char curr_code = state->file.data[state->file_index++];
     char peek_code = state->file.data[state->file_index];
 
-    if (curr_code == 0 || curr_code == EOF || peek_code == 0 || peek_code == EOF) {
+    if (curr_code == 0 || peek_code == 0) {
         state->at_the_end = true;
     }
 
@@ -36,7 +36,7 @@ char peek_char(scanner_state_t *state) {
 
 char peek_next_char(scanner_state_t *state) {
     if (!state->at_the_end) return state->file.data[state->file_index + 1];
-    else                    return EOF;
+    else                    return 0;
 }
 
 bool match_char(scanner_state_t *state, char in) {
@@ -90,7 +90,7 @@ bool char_is_number_or_letter(char in) {
 
 bool char_is_special(char in) {
     // null is not a special symbol of ascii, it is OUR null terminator
-    return (in > 0 && in <= 31) || in == 127 || in == EOF;
+    return (in > 0 && in <= 31) || in == 127;
 }
 
 // --- Scanning
@@ -113,7 +113,7 @@ token_t process_string(scanner_state_t *state) {
         result.c1 = state->current_char;
         result.l1 = state->current_line;
 
-        if (match_char(state, EOF)) {
+        if (match_char(state, 0)) {
             state->had_error = true;
             result.type = TOKEN_EOF;
 
