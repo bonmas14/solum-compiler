@@ -55,8 +55,9 @@ bool list_grow(list_t *list) {
     size_t size   = (list->grow_size - list->raw_size) * list->element_size;
     size_t offset = list->count  *list->element_size;
 
-    (void)memset(list->data + offset, 0, size);
-
+    // windows copiler need to know what is a type of void
+    (void)memset((uint8_t*)list->data + offset, 0, size);
+    
     list->raw_size  = list->grow_size;
     list->grow_size = list->raw_size * 2;
     return true;
@@ -91,7 +92,10 @@ void *list_get(list_t *list, size_t index) {
         return NULL;
     }
 
-    return &list->data[list->element_size * index];
+    // windows needs explicit type
+    uint8_t* result_data = (uint8_t*)list->data;
+
+    return &result_data[list->element_size * index]; 
 }
 
 /*

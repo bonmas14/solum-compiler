@@ -9,6 +9,7 @@
 
 // do we even need this???
 #define MAX_IDENT_SIZE (256)
+#define MAX_INT_CONST_SIZE (256)
 
 typedef enum {
     TOKEN_IDENT        = 256,
@@ -77,7 +78,7 @@ char keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 #endif
 
 typedef struct {
-    uint32_t size;
+    uint64_t size;
     char    *data;
 } string_t;
 
@@ -103,6 +104,10 @@ typedef struct {
     uint32_t type;
     // address in code. without human readable offsets (add 1 or so on)
     size_t c0, c1, l0, l1;
+    union {
+        uint64_t const_int;
+        double   const_double;
+    } data;
 } token_t;
 
 bool scan_file(const char* filename, scanner_state_t *state);

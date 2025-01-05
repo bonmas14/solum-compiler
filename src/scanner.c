@@ -1,6 +1,13 @@
 #define SCANNER_DEFINITION
 #include "scanner.h"
 
+typedef enum {
+    PARSE_DIGIT_INT,
+    PARSE_HEX_INT,
+    PARSE_BIN_INT,
+} int_parsing_parameters;
+
+
 // --- Processing
 
 char advance_char(scanner_state_t *state) {
@@ -38,12 +45,12 @@ bool match_char(scanner_state_t *state, char in) {
 
 // --- Helpers
 
-bool char_is_number(char in) {
+bool char_is_digit(char in) {
     return (in >= '0' && in <= '9');
 }
 
 bool char_is_hex_digit(char in) {
-    return char_is_number(in) 
+    return char_is_digit(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
@@ -51,33 +58,34 @@ bool char_is_hex_digit(char in) {
 bool char_is_bin_digit(char in) {
     return (in >= '0' && in <= '1');
 }
+// @todo make all of them inline for @speed
 
 uint8_t char_hex_to_int(char in) {
     if (!char_is_hex_digit(in)) return 0;
-    if (char_is_number(in))      return in - '0';
-    if ((in & 0x20) == 0)  return in - 'A' + 10;
-    else                   return in - 'a' + 10;
+    if (char_is_digit(in))     return in - '0';
+    if ((in & 0x20) == 0)       return in - 'A' + 10;
+    else                        return in - 'a' + 10;
 }
 
 uint8_t char_bin_to_int(char in) {
     if (!char_is_bin_digit(in)) return 0;
-    if (in == '1')         return 1;
-    else                   return 0;
+    if (in == '1')              return 1;
+    else                        return 0;
 }
 
 uint8_t char_digit_to_int(char in) {
-    if (!char_is_number(in)) return 0;
-    else               return in - '0';
+    if (!char_is_digit(in)) return 0;
+    else                     return in - '0';
 }
 
-bool char_alpha(char in) {
+bool char_is_letter(char in) {
     return (in >= 'A' && in <= 'Z')
         || (in >= 'a' && in <= 'z') 
         || (in == '_');
 }
 
-bool char_is_number_or_alpha(char in) {
-    return char_is_number(in) || char_alpha(in);
+bool char_is_number_or_letter(char in) {
+    return char_is_digit(in) || char_is_letter(in);
 }
 
 bool char_is_special(char in) {
@@ -165,42 +173,155 @@ token_type_t match_with_keyword(string_t word) {
     return TOKEN_IDENT;
 }
 
-// @todo
-//
-// available variants of ints/floats
-//
-//  ints:
-//      0          123    53439      5469450645
-//      0x0FAA4B   0xFF   0xAFDEBBFF
-//      0b10010111 0b0101
-//      
-//  floats:
-//      0. 0.12 0.325 213.543 
-//      0. 0. 0.123d 9.   
-//
+uint64_t int_pow(uint64_t base, uint64_t value) {
+    uint64_t result = 1;
+    while (value-- > 0) {
+        result *= base;
+    }
+    return result;
+}
+
+uint64_t parse_const_int(string_t buffer, int_parsing_parameters type) {
+    uint64_t result = 0;
+    
+    for (size_t i = 0; i < buffer.size; i++) {
+        uint64_t position = buffer.size - i - 1;
+
+        switch (type) {
+            case PARSE_HEX_INT: 
+                result += int_pow(16, position) * char_hex_to_int(buffer.data[i]);
+                break;
+            case PARSE_DIGIT_INT:
+                result += int_pow(10, position) * char_digit_to_int(buffer.data[i]);
+                break;
+            case PARSE_BIN_INT:
+                result += int_pow(2,  position) * char_bin_to_int(buffer.data[i]);
+                break;
+        }
+    }
+
+    return result;
+}
+
+
+void get_const_int_string(scanner_state_t *state, string_t *buffer, token_t *token, int_parsing_parameters parse_type) {
+    size_t index = 0;
+    char ch      = peek_char(state);
+
+    while (ch != 0) {
+        if (parse_type == PARSE_BIN_INT) {
+            if (!char_is_bin_digit(ch))
+                break;
+        }
+
+        if (parse_type == PARSE_DIGIT_INT) {
+            if (!char_is_digit(ch)) 
+                break;
+        }
+
+        if (parse_type == PARSE_HEX_INT) {
+            if (!char_is_hex_digit(ch))
+                break;
+        }
+
+        token->c1 = state->current_char;
+        token->l1 = state->current_line;
+
+        ch = advance_char(state);
+
+        if (index < (MAX_INT_CONST_SIZE - 1)) {
+            buffer->data[index] = ch; 
+        }
+
+        ch = peek_char(state);
+        index++;
+    }
+
+    if (index >= (MAX_INT_CONST_SIZE - 1)) {
+        log_warning("Scanner: size of a constant is greater than maximum size.", 0);
+        index = (MAX_INT_CONST_SIZE - 1);
+    }
+
+    buffer->size = index;
+}
+
 token_t process_number(scanner_state_t *state) {
-
-    log_info("Scanner: FINISH NUMBER PARSING!", 40);
-
     token_t token = { 0 };
 
     token.c0 = state->current_char;
     token.l0 = state->current_line;
 
-    char ch = peek_char(state);
+    char ch      = peek_char(state);
+    char next_ch = peek_next_char(state);
 
-    size_t index = 0;
 
-    while (ch != 0 && char_is_number(ch)) {
-        token.c1 = state->current_char;
-        token.l1 = state->current_line;
+    char buffer[MAX_INT_CONST_SIZE] = { 0 };
+    string_t not_parsed_constant = { .data = buffer };
 
-        advance_char(state); // just skip for now
-        ch = peek_char(state);
+    uint64_t before_delimeter = 0; 
+    uint64_t after_delimeter  = 0; 
+
+    int_parsing_parameters type = PARSE_DIGIT_INT;
+
+    if (ch == '0') {
+        switch (next_ch) {
+            case 'b':
+                advance_char(state); 
+                advance_char(state); 
+                type = PARSE_BIN_INT;
+                break;
+            case 'x':
+                advance_char(state); 
+                advance_char(state); 
+                type = PARSE_HEX_INT;
+                break;
+            default: 
+                break;
+        }
     }
 
-    // or TOKEN_CONST_FP
-    token.type = TOKEN_CONST_INT; 
+    get_const_int_string(state, &not_parsed_constant, &token, type);
+
+    ch = peek_char(state);
+    
+    if (ch != '.') {
+        token.type = TOKEN_CONST_INT;
+        before_delimeter = parse_const_int(not_parsed_constant, type);
+        token.data.const_int = before_delimeter;
+    } else {
+        if (type != PARSE_DIGIT_INT) {
+            // what is he cooking?? 
+            // 0b0110.0101
+            // damn, this is fire 
+            //
+            // @todo fix it?
+            log_warning("Scanner: what? i allow this.", 0);
+        }
+
+        before_delimeter = parse_const_int(not_parsed_constant, type);
+
+        advance_char(state);
+        get_const_int_string(state, &not_parsed_constant, &token, type);
+        after_delimeter = parse_const_int(not_parsed_constant, type);
+
+        token.type = TOKEN_CONST_FP;
+
+        uint64_t pow_value = 10;
+
+        switch (type) {
+            case PARSE_DIGIT_INT: pow_value = 10; break;
+            case PARSE_HEX_INT:   pow_value = 16; break;
+            case PARSE_BIN_INT:   pow_value = 2;  break;
+        }
+
+        token.data.const_double = (double)before_delimeter + (double)after_delimeter / (double)int_pow(pow_value, not_parsed_constant.size);
+    }
+
+    /*
+    if (state->had_error) {
+        token.type = TOKEN_ERROR;
+    } 
+    */
 
     return token;
 }
@@ -218,7 +339,7 @@ token_t process_word(scanner_state_t *state) {
     token.c1 = state->current_char;
     token.l1 = state->current_line;
 
-    while (i < MAX_IDENT_SIZE && char_is_number_or_alpha(peek_char(state))) {
+    while (i < MAX_IDENT_SIZE && char_is_number_or_letter(peek_char(state))) {
         token.c1 = state->current_char;
         token.l1 = state->current_line;
         buffer[i++] = advance_char(state);
@@ -298,9 +419,9 @@ token_t advance_token(scanner_state_t *state) {
         } break;
 
         default: {
-            if (char_alpha(ch)) {
+            if (char_is_letter(ch)) {
                 token = process_word(state);
-            } else if (char_is_number(ch)) {
+            } else if (char_is_digit(ch)) {
                 token = process_number(state);
             } else {
                 advance_char(state);
@@ -520,7 +641,7 @@ void get_token_name(char *buffer, token_t token) {
             sprintf(buffer, "%s", "TOKEN_ERROR");
             break;
         default:
-            if (char_is_number_or_alpha(token.type)) {
+            if (char_is_number_or_letter((char)token.type)) {
                 sprintf(buffer, "%c", token.type);
             } else {
                 sprintf(buffer, "%s", "UNKNOWN");
@@ -529,13 +650,31 @@ void get_token_name(char *buffer, token_t token) {
     }
 }
 
+void get_token_info(char *buffer, token_t token) {
+    switch (token.type) {
+        case TOKEN_CONST_INT:
+            sprintf(buffer, "%zu", token.data.const_int);
+            break;
+        case TOKEN_CONST_FP:
+            sprintf(buffer, "%f", token.data.const_double);
+            break;
+        case TOKEN_CONST_STRING:
+            sprintf(buffer, "%s", "TOKEN_CONST_STRING");
+            break;
+        default:
+            sprintf(buffer, "NODATA");
+            break;
+    }
+}
 void print_token_info(token_t token, size_t left_pad) {
     char buffer[256];
     char token_name[100];
+    char token_info[100];
 
     get_token_name((char*)&token_name, token);
-
-    sprintf(buffer, "TOK: %.100s", token_name);
+    get_token_info((char*)&token_info, token);
+    
+    sprintf(buffer, "TOK: %.100s. DATA: %.100s", token_name, token_info);
     log_no_dec(buffer, left_pad);
 }
 
