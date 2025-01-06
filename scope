@@ -89,26 +89,22 @@ keywords:
     - module:    to organize work
     - use:       for acessing modules
     - mut:       to make variable mutable
+    - noinit:    so specify explicitly that user doesnt need to initialize this variable
 
 
-///
-
-addr, valid : ^mut s32, bool = allocate<s32>(100);
-if (valid) {
-    work(addr, 100); // here it is not an warning to cast to a immutable data
-    free(addr);
-}
-
-// it makes addr immutable pointer to an immutable addr
-work : (addr : ^s32, count : s32) = {
-
-}
+// --------------------- no initialization
 
 
-///
+freq : float = noinit; // will skip memset to zero for this variable
 
 
-2. 
+test : struct = {
+    hello : s32;
+    world : string;
+};
+
+t : test = noinit; // t has garbage in it
+
 
 // --------------------- pointers
 
