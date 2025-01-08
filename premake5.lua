@@ -19,8 +19,8 @@ workspace "solum"
 
 project "native-solum-compiler"
     kind "ConsoleApp"
-    language "C"
-    cdialect "c11"
+    language "C++"
+    cppdialect "C++14"
 
     defines "BACKEND_NATIVE"
     files { "./src/**.c" }

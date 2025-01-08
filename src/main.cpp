@@ -6,6 +6,11 @@
 
 #endif
 
+// @todo:
+//  add macro that will convert char[] into string
+//  with addition like u8"hello". So we output utf8 by
+//  default also
+
 int main(void) {
     scanner_state_t state = { 0 };
 

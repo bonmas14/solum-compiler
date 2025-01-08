@@ -1,6 +1,6 @@
 #include "logger.h"
 
-void log_no_dec(const char *text, size_t left_pad) {
+void log_no_dec(u8 *text, u64 left_pad) {
     while (left_pad-- > 0) {
         fprintf(stderr, " ");
     }
@@ -8,7 +8,7 @@ void log_no_dec(const char *text, size_t left_pad) {
     fprintf(stderr, "%s\n", text);
 }
 
-void log_info(const char *text, size_t left_pad) {
+void log_info(u8 *text, u64 left_pad) {
     while (left_pad-- > 0) {
         fprintf(stderr, " ");
     }
@@ -16,7 +16,7 @@ void log_info(const char *text, size_t left_pad) {
     fprintf(stderr, "INFO: %s\n", text);
 }
 
-void log_warning(const char *text, size_t left_pad) {
+void log_warning(u8 *text, u64 left_pad) {
     while (left_pad-- > 0) {
         fprintf(stderr, " ");
     }
@@ -24,7 +24,7 @@ void log_warning(const char *text, size_t left_pad) {
     fprintf(stderr, "WARNING: %s\n", text);
 }
 
-void log_error(const char *text, size_t left_pad) {
+void log_error(u8 *text, u64 left_pad) {
     while (left_pad-- > 0) {
         fprintf(stderr, " ");
     }

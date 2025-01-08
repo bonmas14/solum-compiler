@@ -1,23 +1,29 @@
-#pragma once 
+#ifndef PARSER_H
+#define PARSER_H
 
 #include "stddefines.h"
 #include "list.h"
 
-typedef enum {
-    AST_BIN_MATH,
-    AST_UNARY_MATH,
-    AST_ERROR = 2048,
-} ast_types_t;
+enum ast_types_t {
+    AST_UNARY,
+    AST_BIN,
+    AST_TERNARY,
+    AST_LIST,
+    AST_ERROR = -1,
+};
 
-// typedef struct {
-// } ast_node_t;
+struct ast_node_t {
+    s32 type;
+};
 
-typedef struct {
-    bool had_error;
+typedef struct parser_state_t {
+    b32 had_error;
 
-    size_t token_index;
+    s64 token_index;
 
     // tree here
-} parser_state_t;
+    list_t elements;
+};
 
 
+#endif // PARSER_H

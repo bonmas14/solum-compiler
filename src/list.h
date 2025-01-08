@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LIST_H
+#define LIST_H
 
 #include "stddefines.h"
 #include "logger.h"
@@ -12,22 +13,25 @@
 
 #endif
 
-typedef struct list_t {
-    size_t count;
+struct list_t {
+    u64 count;
     void *data;
 
-    size_t element_size;
-    size_t raw_size;
-    size_t grow_size;
-} list_t;
+    u64 element_size;
+    u64 raw_size;
+    u64 grow_size;
+};
 
 
-bool list_create(list_t *container, size_t init_size, size_t element_size);
-bool list_delete(list_t *arr);
+b32 list_create(list_t *container, u64 init_size, u64 element_size);
+b32 list_delete(list_t *arr);
 
-bool  list_add(list_t *arr, void *data);
-void* list_get(list_t *arr, size_t index);
+b32  list_add(list_t *arr, void *data);
+void* list_get(list_t *arr, u64 index);
+
 /*
-void  list_insert_at(list_t *arr, size_t index, void *data);
-void  list_remove_at(list_t *arr, size_t index);
+void  list_insert_at(list_t *arr, u64 index, void *data);
+void  list_remove_at(list_t *arr, u64 index);
 */
+
+#endif // LIST_H

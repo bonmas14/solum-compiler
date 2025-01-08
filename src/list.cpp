@@ -1,6 +1,6 @@
 #include "list.h" 
 
-bool list_create(list_t *container, size_t init_size, size_t element_size) {
+b32 list_create(list_t *container, u64 init_size, u64 element_size) {
     if (init_size == 0) {
         log_warning("List: init size was 0. defaulting to 1.", 0);
         init_size = 1;
@@ -25,7 +25,7 @@ bool list_create(list_t *container, size_t init_size, size_t element_size) {
     return true;
 }
 
-bool list_delete(list_t *list) {
+b32 list_delete(list_t *list) {
     if (list == NULL) {
         log_error("List: Reference to list wasn't valid.", 0);
         return false;
@@ -42,7 +42,7 @@ bool list_delete(list_t *list) {
     return true;
 }
 
-bool list_grow(list_t *list) {
+b32 list_grow(list_t *list) {
     void *data = REALLOC(list->data, list->grow_size  *list->element_size);
 
     if (data == NULL) {
@@ -52,18 +52,18 @@ bool list_grow(list_t *list) {
 
     list->data = data;
 
-    size_t size   = (list->grow_size - list->raw_size) * list->element_size;
-    size_t offset = list->count  *list->element_size;
+    u64 size   = (list->grow_size - list->raw_size) * list->element_size;
+    u64 offset = list->count  *list->element_size;
 
     // windows copiler need to know what is a type of void
-    (void)memset((uint8_t*)list->data + offset, 0, size);
+    (void)memset((u8*)list->data + offset, 0, size);
     
     list->raw_size  = list->grow_size;
     list->grow_size = list->raw_size * 2;
     return true;
 }
 
-bool list_add(list_t *list, void *data) {
+b32 list_add(list_t *list, void *data) {
     if (list->count >= list->raw_size) {
         if (!list_grow(list)) {
 
@@ -74,10 +74,10 @@ bool list_add(list_t *list, void *data) {
         }
     }
     
-    uint8_t *arr = (uint8_t*)list->data;
+    u8 *arr = (u8*)list->data;
 
-    for (size_t i = 0; i < list->element_size; i++) {
-        uint8_t *casted = (uint8_t*)data;
+    for (u64 i = 0; i < list->element_size; i++) {
+        u8 *casted = (u8*)data;
         arr[list->element_size  *list->count + i] = casted[i];
     }
 
@@ -86,24 +86,24 @@ bool list_add(list_t *list, void *data) {
     return true;
 }
 
-void *list_get(list_t *list, size_t index) {
+void *list_get(list_t *list, u64 index) {
     if (index >= list->count) {
         log_error("List: Index is greater than count of elements.", 0);
         return NULL;
     }
 
     // windows needs explicit type
-    uint8_t* result_data = (uint8_t*)list->data;
+    u8* result_data = list->data;
 
     return &result_data[list->element_size * index]; 
 }
 
 /*
-void list_insert_at(list_t *list, size_t index, void *data) {
+void list_insert_at(list_t *list, u64 index, void *data) {
     log_error("List: inserting is not supported as I dont need that.", 0);
 }
 
-void list_remove_at(list_t *list, size_t index) {
+void list_remove_at(list_t *list, u64 index) {
     log_error("List: removing elements is not supported as I dont need that.", 0);
 }
 */

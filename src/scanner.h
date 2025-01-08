@@ -1,4 +1,5 @@
-#pragma once 
+#ifndef SCANNER_H
+#define SCANNER_H
 
 #include "stddefines.h"
 #include "logger.h"
@@ -11,7 +12,7 @@
 #define MAX_IDENT_SIZE (256)
 #define MAX_INT_CONST_SIZE (256)
 
-typedef enum {
+enum token_type_t {
     TOKEN_IDENT        = 256,
     TOKEN_CONST_INT    = 257,
     TOKEN_CONST_FP     = 258,
@@ -57,17 +58,17 @@ typedef enum {
 
     TOKEN_EOF   = 2047,
     TOKEN_ERROR = 2048,
-} token_type_t;
+};
 
 #ifdef SCANNER_DEFINITION
-char keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
+u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "struct", "union",
 
     "u8", "u16", "u32", "u64",
-    "s8", "s16", "s32", "s64", 
+    "s8", "s16", "s32", "u64", 
     "f32", "f64",
 
-    "bool", "null", "default",
+    "b32", "null", "default",
 
     "if", "else", "while", "for",
 
@@ -77,47 +78,48 @@ char keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 };
 #endif
 
-typedef struct {
-    uint64_t size;
-    char    *data;
-} string_t;
+struct string_t {
+    u64 size;
+    u8    *data;
+};
 
-typedef struct  {
-    size_t start;
-    size_t stop;
-} line_tuple_t;
+struct line_tuple_t {
+    u64 start;
+    u64 stop;
+};
 
-typedef struct {
-    bool had_error;
-    bool at_the_end;
+struct scanner_state_t {
+    b32 had_error;
+    b32 at_the_end;
 
-    size_t file_index;
-    size_t current_line;
-    size_t current_char;
+    u64 file_index;
+    u64 current_line;
+    u64 current_char;
 
     // list of line_tuple_t
     list_t   lines; 
     string_t file;
-} scanner_state_t; 
+}; 
 
-typedef struct {
-    uint32_t type;
+struct token_t {
+    u32 type;
     // address in code. without human readable offsets (add 1 or so on)
-    size_t c0, c1, l0, l1;
+    u64 c0, c1, l0, l1;
     union {
-        uint64_t const_int;
-        double   const_double;
+        u64 const_int;
+        f64 const_double;
     } data;
-} token_t;
+};
 
-bool scan_file(const char* filename, scanner_state_t *state);
+b32 scan_file(u8* filename, scanner_state_t *state);
 
 token_t advance_token(scanner_state_t *state);
-token_t peek_token(scanner_state_t *state, size_t offset);
+token_t peek_token(scanner_state_t *state, u64 offset);
 
 // --- logging for scanner
 
-void log_info_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
-void log_warning_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
-void log_error_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad);
+void log_info_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
 
+#endif // SCANNER_H

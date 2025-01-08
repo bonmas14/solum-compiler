@@ -7,14 +7,13 @@ typedef enum {
     PARSE_BIN_INT,
 } int_parsing_parameters;
 
-
 // --- Processing
 
-char advance_char(scanner_state_t *state) {
+u8 advance_char(scanner_state_t *state) {
     if (state->at_the_end) return 0; 
 
-    char curr_code = state->file.data[state->file_index++];
-    char peek_code = state->file.data[state->file_index];
+    u8 curr_code = state->file.data[state->file_index++];
+    u8 peek_code = state->file.data[state->file_index];
 
     if (curr_code == 0 || peek_code == 0) {
         state->at_the_end = true;
@@ -30,73 +29,73 @@ char advance_char(scanner_state_t *state) {
     return curr_code;
 }
 
-char peek_char(scanner_state_t *state) {
+u8 peek_char(scanner_state_t *state) {
     return state->file.data[state->file_index];
 }
 
-char peek_next_char(scanner_state_t *state) {
+u8 peek_next_char(scanner_state_t *state) {
     if (!state->at_the_end) return state->file.data[state->file_index + 1];
     else                    return 0;
 }
 
-bool match_char(scanner_state_t *state, char in) {
+bool match_char(scanner_state_t *state, u8 in) {
     return peek_char(state) == in;
 }
 
 // --- Helpers
 
-bool char_is_digit(char in) {
+bool char_is_digit(u8 in) {
     return (in >= '0' && in <= '9');
 }
 
-bool char_is_hex_digit(char in) {
+bool char_is_hex_digit(u8 in) {
     return char_is_digit(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
 
-bool char_is_bin_digit(char in) {
+bool char_is_bin_digit(u8 in) {
     return (in >= '0' && in <= '1');
 }
 // @todo make all of them inline for @speed
 
-uint8_t char_hex_to_int(char in) {
+uint8_t char_hex_to_int(u8 in) {
     if (!char_is_hex_digit(in)) return 0;
     if (char_is_digit(in))     return in - '0';
     if ((in & 0x20) == 0)       return in - 'A' + 10;
     else                        return in - 'a' + 10;
 }
 
-uint8_t char_bin_to_int(char in) {
+uint8_t char_bin_to_int(u8 in) {
     if (!char_is_bin_digit(in)) return 0;
     if (in == '1')              return 1;
     else                        return 0;
 }
 
-uint8_t char_digit_to_int(char in) {
+uint8_t char_digit_to_int(u8 in) {
     if (!char_is_digit(in)) return 0;
     else                     return in - '0';
 }
 
-bool char_is_letter(char in) {
+bool char_is_letter(u8 in) {
     return (in >= 'A' && in <= 'Z')
         || (in >= 'a' && in <= 'z') 
         || (in == '_');
 }
 
-bool char_is_number_or_letter(char in) {
+bool char_is_number_or_letter(u8 in) {
     return char_is_digit(in) || char_is_letter(in);
 }
 
-bool char_is_special(char in) {
+bool char_is_special(u8 in) {
     // null is not a special symbol of ascii, it is OUR null terminator
     return (in > 0 && in <= 31) || in == 127;
 }
 
 // --- Scanning
 /*
-token_t create_token_at(scanner_state_t *state, size_t index) {
-    size_t local_index = index;
+token_t create_token_at(scanner_state_t *state, u64 index) {
+    u64 local_index = index;
     
 }
 */
@@ -121,7 +120,7 @@ token_t process_string(scanner_state_t *state) {
             break;
         }
 
-        char ch = advance_char(state);
+        u8 ch = advance_char(state);
 
         // case where we just ignore \"
         // we need to parse string instead
@@ -143,7 +142,7 @@ token_t process_string(scanner_state_t *state) {
 }
 
 token_type_t match_with_keyword(string_t word) {
-    size_t matches = 0;
+    u64 matches = 0;
 
     bool no_match_flags[_KW_STOP - _KW_START - 1] = { 0 };
 
@@ -151,11 +150,11 @@ token_type_t match_with_keyword(string_t word) {
         return TOKEN_IDENT;
     }
 
-    for (size_t i = 0; i < (word.size + 1); i++) {
+    for (u64 i = 0; i < (word.size + 1); i++) {
         matches = 0;
-        char current = word.data[i];
+        u8 current = word.data[i];
 
-        for (size_t kw = 0; kw < (_KW_STOP - _KW_START - 1); kw++) {
+        for (u64 kw = 0; kw < (_KW_STOP - _KW_START - 1); kw++) {
             if (!no_match_flags[kw] && keywords[kw][i] == current) {
                 if (current == 0) {
                     return kw + _KW_START + 1;
@@ -184,7 +183,7 @@ uint64_t int_pow(uint64_t base, uint64_t value) {
 uint64_t parse_const_int(string_t buffer, int_parsing_parameters type) {
     uint64_t result = 0;
     
-    for (size_t i = 0; i < buffer.size; i++) {
+    for (u64 i = 0; i < buffer.size; i++) {
         uint64_t position = buffer.size - i - 1;
 
         switch (type) {
@@ -205,8 +204,8 @@ uint64_t parse_const_int(string_t buffer, int_parsing_parameters type) {
 
 
 void get_const_int_string(scanner_state_t *state, string_t *buffer, token_t *token, int_parsing_parameters parse_type) {
-    size_t index = 0;
-    char ch      = peek_char(state);
+    u64 index = 0;
+    u8 ch      = peek_char(state);
 
     while (ch != 0) {
         if (parse_type == PARSE_BIN_INT) {
@@ -251,11 +250,10 @@ token_t process_number(scanner_state_t *state) {
     token.c0 = state->current_char;
     token.l0 = state->current_line;
 
-    char ch      = peek_char(state);
-    char next_ch = peek_next_char(state);
+    u8 ch      = peek_char(state);
+    u8 next_ch = peek_next_char(state);
 
-
-    char buffer[MAX_INT_CONST_SIZE] = { 0 };
+    u8 buffer[MAX_INT_CONST_SIZE] = { 0 };
     string_t not_parsed_constant = { .data = buffer };
 
     uint64_t before_delimeter = 0; 
@@ -331,9 +329,9 @@ token_t process_word(scanner_state_t *state) {
     token.c0 = state->current_char;
     token.l0 = state->current_line;
 
-    char buffer[MAX_IDENT_SIZE + 1] = { 0 };
+    u8 buffer[MAX_IDENT_SIZE + 1] = { 0 };
 
-    size_t i = 0;
+    u64 i = 0;
     buffer[i++] = advance_char(state);
 
     token.c1 = state->current_char;
@@ -353,7 +351,7 @@ token_t process_word(scanner_state_t *state) {
 
     buffer[i] = 0;
 
-    string_t identifier = { .size = i, .data = (char*)&buffer };
+    string_t identifier = { .size = i, .data = &buffer };
 
     if (state->had_error)
         token.type = TOKEN_ERROR;
@@ -364,7 +362,7 @@ token_t process_word(scanner_state_t *state) {
 }
 
 void eat_all_spaces(scanner_state_t *state) {
-    char ch = peek_char(state);
+    u8 ch = peek_char(state);
 
     while (ch != 0 && (ch == ' ' || char_is_special(ch))) {
         advance_char(state); 
@@ -384,7 +382,7 @@ token_t advance_token(scanner_state_t *state) {
         return token;
     }
 
-    char ch = peek_char(state);
+    u8 ch = peek_char(state);
 
 
     if (ch == '/') {
@@ -443,11 +441,11 @@ token_t advance_token(scanner_state_t *state) {
 
 /*
 // use peek_token(state, 0); to peek token that is at current index
-token_t peek_token(scanner_state_t *state, size_t offset) {
+token_t peek_token(scanner_state_t *state, u64 offset) {
     token_t peeked = create_token_at(state, state->file_index);
 
-    size_t file_offset = 0;
-    for (size_t i = 0; i < offset; i++) {
+    u64 file_offset = 0;
+    for (u64 i = 0; i < offset; i++) {
         file_offset += peeked.c1 - peeked.c0;
 
         token_t peeked = create_token_at(state, state->file_index + file_offset);
@@ -459,7 +457,7 @@ token_t peek_token(scanner_state_t *state, size_t offset) {
 
 // --- Reading file and null terminating it
 
-bool read_file(const char *filename, string_t *output) {
+bool read_file(const u8 *filename, string_t *output) {
     FILE *file = fopen(filename, "rb");
 
     if (file == NULL) {
@@ -469,17 +467,17 @@ bool read_file(const char *filename, string_t *output) {
     }
 
     fseek(file, 0L, SEEK_END);
-    size_t file_size = ftell(file);
+    u64 file_size = ftell(file);
     rewind(file);
 
-    output->data = (char*)malloc(file_size + 1);
+    output->data = (u8*)malloc(file_size + 1);
 
     if (output->data == NULL) {
         log_error("Scanner: Couldn't allocate memory for a file.", 0);
         return false;
     }
 
-    size_t bytes_read = fread(output->data, sizeof(char), file_size, file);
+    u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
     output->data[bytes_read] = 0;
 
@@ -498,7 +496,7 @@ bool read_file(const char *filename, string_t *output) {
 bool scan(scanner_state_t *state) {
     state->lines = (list_t){ 0 };
 
-    size_t init_size = state->file.size / APPROX_CHAR_PER_LINE;
+    u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
     if (!list_create(&state->lines, init_size, sizeof(line_tuple_t))) {
         log_error("Scanner: Couldn't create list.", 0);
@@ -509,7 +507,7 @@ bool scan(scanner_state_t *state) {
     line_tuple_t line = { 0 };
     line.start        = 0;
 
-    for (size_t i = 0; i < state->file.size; i++) {
+    for (u64 i = 0; i < state->file.size; i++) {
         if (state->file.data[i] != '\n') {
             continue;
         }
@@ -532,7 +530,7 @@ bool scan(scanner_state_t *state) {
     return true;
 }
 
-bool scan_file(const char* filename, scanner_state_t *state) {
+bool scan_file(u8* filename, scanner_state_t *state) {
     if (!read_file(filename, &state->file)) {
         log_error("Scanner: couldn't read file.", 0);
         state->had_error = true;
@@ -548,7 +546,7 @@ bool scan_file(const char* filename, scanner_state_t *state) {
 }
 
 // introspect later
-void get_token_name(char *buffer, token_t token) {
+void get_token_name(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_IDENT:
             sprintf(buffer, "%s", "TOKEN_IDENT");
@@ -641,7 +639,7 @@ void get_token_name(char *buffer, token_t token) {
             sprintf(buffer, "%s", "TOKEN_ERROR");
             break;
         default:
-            if (char_is_number_or_letter((char)token.type)) {
+            if (char_is_number_or_letter((u8)token.type)) {
                 sprintf(buffer, "%c", token.type);
             } else {
                 sprintf(buffer, "%s", "UNKNOWN");
@@ -650,7 +648,7 @@ void get_token_name(char *buffer, token_t token) {
     }
 }
 
-void get_token_info(char *buffer, token_t token) {
+void get_token_info(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_CONST_INT:
             sprintf(buffer, "%zu", token.data.const_int);
@@ -666,37 +664,39 @@ void get_token_info(char *buffer, token_t token) {
             break;
     }
 }
-void print_token_info(token_t token, size_t left_pad) {
-    char buffer[256];
-    char token_name[100];
-    char token_info[100];
 
-    get_token_name((char*)&token_name, token);
-    get_token_info((char*)&token_info, token);
+void print_token_info(token_t token, u64 left_pad) {
+    u8 buffer[256];
+    u8 token_name[100];
+    u8 token_info[100];
+
+    get_token_name((&token_name, token);
+    get_token_info((&token_info, token);
     
     sprintf(buffer, "TOK: %.100s. DATA: %.100s", token_name, token_info);
     log_no_dec(buffer, left_pad);
 }
 
-void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_offset, size_t line_stop_offset, size_t left_pad) {
-    size_t start_line = token.l0 - line_start_offset;
+void print_code_lines(scanner_state_t *state, token_t token, u64 line_start_offset, u64 line_stop_offset, u64 left_pad) {
+    u64 start_line = token.l0 - line_start_offset;
 
     if (start_line > token.l0) {
         start_line = 0;
     }
 
-    size_t stop_line = token.l1 + line_stop_offset + 1; 
+    u64 stop_line = token.l1 + line_stop_offset + 1; 
 
     if (stop_line > state->lines.count) {
         stop_line = state->lines.count;
     }
 
-    for (size_t i = start_line; i < stop_line; i++) {
-        line_tuple_t *line  = (line_tuple_t*)list_get(&state->lines, i);
-        size_t        len   = line->stop - line->start + 1;
-        char         *start = state->file.data + line->start;
+    for (u64 i = start_line; i < stop_line; i++) {
+        line_tuple_t *line = (line_tuple_t*)list_get(&state->lines, i);
 
-        for (size_t j = 0; j < left_pad; j++) {
+        u64 len    = line->stop - line->start + 1;
+        u8  *start = state->file.data + line->start;
+
+        for (u64 j = 0; j < left_pad; j++) {
             fprintf(stderr, " ");
         }
 
@@ -705,22 +705,22 @@ void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_o
         } else {
             fprintf(stderr, " -> %.4zu | %.*s", i, (int)len, start);
 
-            for (size_t j = 0; j < (left_pad + 8); j++) fprintf(stderr, " ");
+            for (u64 j = 0; j < (left_pad + 8); j++) fprintf(stderr, " ");
 
             fprintf(stderr, " * ");
 
-            for (size_t j = 0; j < token.c0; j++) fprintf(stderr, " ");
+            for (u64 j = 0; j < token.c0; j++) fprintf(stderr, " ");
             
-            size_t line_print_size = 0;
+            u64 line_print_size = 0;
 
             if (token.c1 < token.c0) {
-                size_t token_size = line->stop - token.c0;
+                u64 token_size = line->stop - token.c0;
 
                 if (token_size != 0) {
                     line_print_size = token_size - 1;
                 }
             } else {
-                size_t token_size = token.c1 - token.c0;
+                u64 token_size = token.c1 - token.c0;
 
                 if (token_size != 0) {
                     line_print_size = token_size - 1;
@@ -733,7 +733,7 @@ void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_o
             }
 
             fprintf(stderr, "^");
-            for (size_t j = 0; j < line_print_size; j++) {
+            for (u64 j = 0; j < line_print_size; j++) {
                 fprintf(stderr, "-");
             }
 
@@ -742,7 +742,7 @@ void print_code_lines(scanner_state_t *state, token_t token, size_t line_start_o
     }
 }
 
-void log_info_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+void log_info_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_info(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec("", 0);
@@ -750,7 +750,7 @@ void log_info_token(const char *text, scanner_state_t *state, token_t token, siz
     log_no_dec("", 0);
 }
 
-void log_warning_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+void log_warning_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_warning(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec("", 0);
@@ -758,7 +758,7 @@ void log_warning_token(const char *text, scanner_state_t *state, token_t token, 
     log_no_dec("", 0);
 }
 
-void log_error_token(const char *text, scanner_state_t *state, token_t token, size_t left_pad) {
+void log_error_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_error(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec("", 0);
