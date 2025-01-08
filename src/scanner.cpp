@@ -38,56 +38,56 @@ u8 peek_next_char(scanner_state_t *state) {
     else                    return 0;
 }
 
-bool match_char(scanner_state_t *state, u8 in) {
+b32 match_char(scanner_state_t *state, u8 in) {
     return peek_char(state) == in;
 }
 
 // --- Helpers
 
-bool char_is_digit(u8 in) {
+b32 char_is_digit(u8 in) {
     return (in >= '0' && in <= '9');
 }
 
-bool char_is_hex_digit(u8 in) {
+b32 char_is_hex_digit(u8 in) {
     return char_is_digit(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
 
-bool char_is_bin_digit(u8 in) {
+b32 char_is_bin_digit(u8 in) {
     return (in >= '0' && in <= '1');
 }
 // @todo make all of them inline for @speed
 
-uint8_t char_hex_to_int(u8 in) {
+u8 char_hex_to_int(u8 in) {
     if (!char_is_hex_digit(in)) return 0;
     if (char_is_digit(in))     return in - '0';
     if ((in & 0x20) == 0)       return in - 'A' + 10;
     else                        return in - 'a' + 10;
 }
 
-uint8_t char_bin_to_int(u8 in) {
+u8 char_bin_to_int(u8 in) {
     if (!char_is_bin_digit(in)) return 0;
     if (in == '1')              return 1;
     else                        return 0;
 }
 
-uint8_t char_digit_to_int(u8 in) {
+u8 char_digit_to_int(u8 in) {
     if (!char_is_digit(in)) return 0;
     else                     return in - '0';
 }
 
-bool char_is_letter(u8 in) {
+b32 char_is_letter(u8 in) {
     return (in >= 'A' && in <= 'Z')
         || (in >= 'a' && in <= 'z') 
         || (in == '_');
 }
 
-bool char_is_number_or_letter(u8 in) {
+b32 char_is_number_or_letter(u8 in) {
     return char_is_digit(in) || char_is_letter(in);
 }
 
-bool char_is_special(u8 in) {
+b32 char_is_special(u8 in) {
     // null is not a special symbol of ascii, it is OUR null terminator
     return (in > 0 && in <= 31) || in == 127;
 }
@@ -144,7 +144,7 @@ token_t process_string(scanner_state_t *state) {
 token_type_t match_with_keyword(string_t word) {
     u64 matches = 0;
 
-    bool no_match_flags[_KW_STOP - _KW_START - 1] = { 0 };
+    b32 no_match_flags[_KW_STOP - _KW_START - 1] = { 0 };
 
     if (word.size >= KEYWORDS_MAX_SIZE) {
         return TOKEN_IDENT;
@@ -457,7 +457,7 @@ token_t peek_token(scanner_state_t *state, u64 offset) {
 
 // --- Reading file and null terminating it
 
-bool read_file(const u8 *filename, string_t *output) {
+b32 read_file(const u8 *filename, string_t *output) {
     FILE *file = fopen(filename, "rb");
 
     if (file == NULL) {
@@ -493,7 +493,7 @@ bool read_file(const u8 *filename, string_t *output) {
     return true;
 }
 
-bool scan(scanner_state_t *state) {
+b32 scan(scanner_state_t *state) {
     state->lines = (list_t){ 0 };
 
     u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
@@ -530,7 +530,7 @@ bool scan(scanner_state_t *state) {
     return true;
 }
 
-bool scan_file(u8* filename, scanner_state_t *state) {
+b32 scan_file(u8* filename, scanner_state_t *state) {
     if (!read_file(filename, &state->file)) {
         log_error("Scanner: couldn't read file.", 0);
         state->had_error = true;
