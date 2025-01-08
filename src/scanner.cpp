@@ -102,7 +102,7 @@ token_t create_token_at(scanner_state_t *state, u64 index) {
 
 // @todo we need to support escape codes
 token_t process_string(scanner_state_t *state) {
-    token_t result = { 0 };
+    token_t result = {};
 
     result.type = TOKEN_CONST_STRING;
     result.c0 = state->current_char;  // it is already after "
@@ -245,7 +245,7 @@ void get_const_int_string(scanner_state_t *state, string_t *buffer, token_t *tok
 }
 
 token_t process_number(scanner_state_t *state) {
-    token_t token = { 0 };
+    token_t token = {};
 
     token.c0 = state->current_char;
     token.l0 = state->current_line;
@@ -326,7 +326,7 @@ token_t process_number(scanner_state_t *state) {
     return token;
 }
 token_t process_word(scanner_state_t *state) {
-    token_t token = { 0 };
+    token_t token = {};
 
     token.c0 = state->current_char;
     token.l0 = state->current_line;
@@ -375,7 +375,7 @@ void eat_all_spaces(scanner_state_t *state) {
 }
 
 token_t advance_token(scanner_state_t *state) {
-    token_t token = { 0 };
+    token_t token = {};
 
     state->had_error = false; // i dont really know do we need to skip? 
 
@@ -467,7 +467,7 @@ token_t peek_token(scanner_state_t *state, u64 offset) {
 
 // --- Reading file and null terminating it
 
-b32 read_file(u8 *filename, string_t *output) {
+b32 read_file(const u8 *filename, string_t *output) {
     FILE *file = fopen((char*)filename, "rb");
 
     if (file == NULL) {
@@ -518,7 +518,7 @@ b32 scan(scanner_state_t *state) {
         return false;
     }
 
-    line_tuple_t line = { 0 };
+    line_tuple_t line = {};
     line.start        = 0;
 
     for (u64 i = 0; i < state->file.size; i++) {
@@ -544,7 +544,7 @@ b32 scan(scanner_state_t *state) {
     return true;
 }
 
-b32 scan_file(u8* filename, scanner_state_t *state) {
+b32 scan_file(const u8* filename, scanner_state_t *state) {
     if (!read_file(filename, &state->file)) {
         log_error(STR("Scanner: couldn't read file."), 0);
         state->had_error = true;
@@ -560,7 +560,7 @@ b32 scan_file(u8* filename, scanner_state_t *state) {
 }
 
 // introspect later
-void get_token_name(u8 *buffer, token_t token) {
+void get_token_name(const u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_IDENT:
             sprintf((char*)buffer, "%s", "TOKEN_IDENT");
@@ -662,7 +662,7 @@ void get_token_name(u8 *buffer, token_t token) {
     }
 }
 
-void get_token_info(u8 *buffer, token_t token) {
+void get_token_info(const u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_CONST_INT:
             sprintf((char*)buffer, "%zu", token.data.const_int);
@@ -756,7 +756,7 @@ void print_code_lines(scanner_state_t *state, token_t token, u64 line_start_offs
     }
 }
 
-void log_info_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
+void log_info_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_info(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec(STR(""), 0);
@@ -764,7 +764,7 @@ void log_info_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pa
     log_no_dec(STR(""), 0);
 }
 
-void log_warning_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
+void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_warning(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec(STR(""), 0);
@@ -772,7 +772,7 @@ void log_warning_token(u8 *text, scanner_state_t *state, token_t token, u64 left
     log_no_dec(STR(""), 0);
 }
 
-void log_error_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
+void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_error(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
     log_no_dec(STR(""), 0);

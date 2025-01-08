@@ -113,14 +113,14 @@ struct token_t {
     } data;
 };
 
-b32 scan_file(u8* filename, scanner_state_t *state);
+b32 scan_file(const u8* filename, scanner_state_t *state);
 
 token_t advance_token(scanner_state_t *state);
 token_t peek_token(scanner_state_t *state); // todo add offset
 
 // --- logging for scanner
 
-void log_info_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
-void log_warning_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
-void log_error_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_info_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
 #endif // SCANNER_H

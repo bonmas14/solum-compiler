@@ -50,24 +50,24 @@ ast_node_t parse_unary(local_state_t *state) {
     result.token = token;
 
     switch (token.type) {
-        case '-':
+        case '-': {
             advance_token(state->scanner);
             ast_node_t child = parse_primary(state);
             list_add(&state->parser->nodes, (void*)&child);
             result.left_index = state->parser->nodes.count - 1;
-            break;
+        } break;
         case TOKEN_IDENT:
         case TOKEN_CONST_INT:
-        case TOKEN_CONST_FP:
+        case TOKEN_CONST_FP: {
             // ignore
             result = parse_primary(state);
-            break;
-        default:
+        } break;
+        default: {
             advance_token(state->scanner);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: expected '-' in expression"),
                             state->scanner, token, 0);
-            break;
+        } break;
     }
 
     return result;

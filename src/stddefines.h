@@ -23,6 +23,6 @@ typedef double f64;
 
 typedef uint32_t b32;
 
-#define STR(s) reinterpret_cast<u8*>(s)
+#define STR(s) reinterpret_cast<const u8*>(s)
 
 #endif // USER_DEFINES
