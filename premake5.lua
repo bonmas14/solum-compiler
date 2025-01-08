@@ -23,7 +23,7 @@ project "native-solum-compiler"
     cppdialect "C++14"
 
     defines "BACKEND_NATIVE"
-    files { "./src/**.c" }
+    files { "./src/**.cpp" }
 
     filter "configurations:Debug"
         targetdir "bin"
@@ -60,7 +60,7 @@ project "llvm-solum-compiler"
     cdialect "c11"
 
     defines "BACKEND_LLVM"
-    files { "./src/**.c" }
+    files { "./src/**.cpp" }
 
     filter "configurations:Debug"
         targetdir "bin"

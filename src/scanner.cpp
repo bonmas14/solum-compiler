@@ -116,7 +116,7 @@ token_t process_string(scanner_state_t *state) {
             state->had_error = true;
             result.type = TOKEN_EOF;
 
-            log_error_token("Scanner: unexpected End Of Line.", state, result, 0);
+            log_error_token(STR("Scanner: unexpected End Of Line."), state, result, 0);
             break;
         }
 
@@ -157,7 +157,7 @@ token_type_t match_with_keyword(string_t word) {
         for (u64 kw = 0; kw < (_KW_STOP - _KW_START - 1); kw++) {
             if (!no_match_flags[kw] && keywords[kw][i] == current) {
                 if (current == 0) {
-                    return kw + _KW_START + 1;
+                    return (token_type_t)(kw + _KW_START + 1);
                 }
                 matches++;
             } else {
@@ -237,7 +237,7 @@ void get_const_int_string(scanner_state_t *state, string_t *buffer, token_t *tok
     }
 
     if (index >= (MAX_INT_CONST_SIZE - 1)) {
-        log_warning("Scanner: size of a constant is greater than maximum size.", 0);
+        log_warning(STR("Scanner: size of a constant is greater than maximum size."), 0);
         index = (MAX_INT_CONST_SIZE - 1);
     }
 
@@ -253,8 +253,10 @@ token_t process_number(scanner_state_t *state) {
     u8 ch      = peek_char(state);
     u8 next_ch = peek_next_char(state);
 
-    u8 buffer[MAX_INT_CONST_SIZE] = { 0 };
-    string_t not_parsed_constant = { .data = buffer };
+    u8 buffer[MAX_INT_CONST_SIZE] = {};
+    string_t not_parsed_constant  = {};
+
+    not_parsed_constant.data = (u8*)buffer;
 
     uint64_t before_delimeter = 0; 
     uint64_t after_delimeter  = 0; 
@@ -293,7 +295,7 @@ token_t process_number(scanner_state_t *state) {
             // damn, this is fire 
             //
             // @todo fix it?
-            log_warning("Scanner: what? i allow this.", 0);
+            log_warning(STR("Scanner: what? i allow this."), 0);
         }
 
         before_delimeter = parse_const_int(not_parsed_constant, type);
@@ -344,14 +346,16 @@ token_t process_word(scanner_state_t *state) {
     }
 
     if (i == MAX_IDENT_SIZE) {
-        log_error_token("Scanner: Identifier was too big.", state, token, 0);
+        log_error_token(STR("Scanner: Identifier was too big."), state, token, 0);
 
         state->had_error = true;
     } 
 
     buffer[i] = 0;
 
-    string_t identifier = { .size = i, .data = &buffer };
+    string_t identifier = {};
+    identifier.size     = i;
+    identifier.data     = (u8*)buffer;
 
     if (state->had_error)
         token.type = TOKEN_ERROR;
@@ -433,10 +437,16 @@ token_t advance_token(scanner_state_t *state) {
     token.l1 = state->current_line;
 
     if (state->had_error) {
-        log_error_token("Scanner: error scanning token.", state, token, 0);
+        log_error_token(STR("Scanner: error scanning token."), state, token, 0);
     }
 
     return token;
+}
+
+// @todo: add caching instead of just cleaning this up 
+token_t peek_token(scanner_state_t *state) {
+    scanner_state_t peek_state = *state;
+    return advance_token(&peek_state);
 }
 
 /*
@@ -457,11 +467,11 @@ token_t peek_token(scanner_state_t *state, u64 offset) {
 
 // --- Reading file and null terminating it
 
-b32 read_file(const u8 *filename, string_t *output) {
-    FILE *file = fopen(filename, "rb");
+b32 read_file(u8 *filename, string_t *output) {
+    FILE *file = fopen((char*)filename, "rb");
 
     if (file == NULL) {
-        log_error("Scanner: Could not open file.", 0);
+        log_error(STR("Scanner: Could not open file."), 0);
         log_error(filename, 0); // @cleanup
         return false;
     }
@@ -473,7 +483,7 @@ b32 read_file(const u8 *filename, string_t *output) {
     output->data = (u8*)malloc(file_size + 1);
 
     if (output->data == NULL) {
-        log_error("Scanner: Couldn't allocate memory for a file.", 0);
+        log_error(STR("Scanner: Couldn't allocate memory for a file."), 0);
         return false;
     }
 
@@ -482,7 +492,7 @@ b32 read_file(const u8 *filename, string_t *output) {
     output->data[bytes_read] = 0;
 
     if (bytes_read < file_size) {
-        log_error("Scanner: Could not read file.", 0);
+        log_error(STR("Scanner: Could not read file."), 0);
         log_error(filename, 0); // @cleanup
         return false;
     }
@@ -494,12 +504,16 @@ b32 read_file(const u8 *filename, string_t *output) {
 }
 
 b32 scan(scanner_state_t *state) {
-    state->lines = (list_t){ 0 };
+    state->lines = {};
 
     u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
+    if (init_size == 0) {
+        init_size = MINIMAL_SIZE;
+    }
+
     if (!list_create(&state->lines, init_size, sizeof(line_tuple_t))) {
-        log_error("Scanner: Couldn't create list.", 0);
+        log_error(STR("Scanner: Couldn't create list."), 0);
         state->had_error = true;
         return false;
     }
@@ -523,7 +537,7 @@ b32 scan(scanner_state_t *state) {
     }
 
     if (state->had_error) {
-        log_error("Scan: couldn't add another line segment to a list.", 0);
+        log_error(STR("Scan: couldn't add another line segment to a list."), 0);
         return false;
     }
 
@@ -532,13 +546,13 @@ b32 scan(scanner_state_t *state) {
 
 b32 scan_file(u8* filename, scanner_state_t *state) {
     if (!read_file(filename, &state->file)) {
-        log_error("Scanner: couldn't read file.", 0);
+        log_error(STR("Scanner: couldn't read file."), 0);
         state->had_error = true;
         return false;
     }
 
     if (!scan(state)) {
-        log_error("Scanner: couldn't scan file.", 0);
+        log_error(STR("Scanner: couldn't scan file."), 0);
         return false;
     }
 
@@ -549,100 +563,100 @@ b32 scan_file(u8* filename, scanner_state_t *state) {
 void get_token_name(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_IDENT:
-            sprintf(buffer, "%s", "TOKEN_IDENT");
+            sprintf((char*)buffer, "%s", "TOKEN_IDENT");
             break;
         case TOKEN_CONST_INT:
-            sprintf(buffer, "%s", "TOKEN_CONST_INT");
+            sprintf((char*)buffer, "%s", "TOKEN_CONST_INT");
             break;
         case TOKEN_CONST_FP:
-            sprintf(buffer, "%s", "TOKEN_CONST_FP");
+            sprintf((char*)buffer, "%s", "TOKEN_CONST_FP");
             break;
         case TOKEN_CONST_STRING:
-            sprintf(buffer, "%s", "TOKEN_CONST_STRING");
+            sprintf((char*)buffer, "%s", "TOKEN_CONST_STRING");
             break;
         case TOK_STRUCT:
-            sprintf(buffer, "%s", "TOK_STRUCT");
+            sprintf((char*)buffer, "%s", "TOK_STRUCT");
             break;
         case TOK_UNION:
-            sprintf(buffer, "%s", "TOK_UNION");
+            sprintf((char*)buffer, "%s", "TOK_UNION");
             break;
         case TOK_U8:
-            sprintf(buffer, "%s", "TOK_U8");
+            sprintf((char*)buffer, "%s", "TOK_U8");
             break;
         case TOK_U16:
-            sprintf(buffer, "%s", "TOK_U16");
+            sprintf((char*)buffer, "%s", "TOK_U16");
             break;
         case TOK_U32:
-            sprintf(buffer, "%s", "TOK_U32");
+            sprintf((char*)buffer, "%s", "TOK_U32");
             break;
         case TOK_U64:
-            sprintf(buffer, "%s", "TOK_U64");
+            sprintf((char*)buffer, "%s", "TOK_U64");
             break;
         case TOK_S8:
-            sprintf(buffer, "%s", "TOK_S8");
+            sprintf((char*)buffer, "%s", "TOK_S8");
             break;
         case TOK_S16:
-            sprintf(buffer, "%s", "TOK_S16");
+            sprintf((char*)buffer, "%s", "TOK_S16");
             break;
         case TOK_S32:
-            sprintf(buffer, "%s", "TOK_S32");
+            sprintf((char*)buffer, "%s", "TOK_S32");
             break;
         case TOK_S64:
-            sprintf(buffer, "%s", "TOK_S64");
+            sprintf((char*)buffer, "%s", "TOK_S64");
             break;
         case TOK_F32:
-            sprintf(buffer, "%s", "TOK_F32");
+            sprintf((char*)buffer, "%s", "TOK_F32");
             break;
         case TOK_F64:
-            sprintf(buffer, "%s", "TOK_F64");
+            sprintf((char*)buffer, "%s", "TOK_F64");
             break;
         case TOK_BOOL:
-            sprintf(buffer, "%s", "TOK_BOOL");
+            sprintf((char*)buffer, "%s", "TOK_BOOL");
             break;
         case TOK_NULL:
-            sprintf(buffer, "%s", "TOK_NULL");
+            sprintf((char*)buffer, "%s", "TOK_NULL");
             break;
         case TOK_DEFAULT:
-            sprintf(buffer, "%s", "TOK_DEFAULT");
+            sprintf((char*)buffer, "%s", "TOK_DEFAULT");
             break;
         case TOK_IF:
-            sprintf(buffer, "%s", "TOK_IF");
+            sprintf((char*)buffer, "%s", "TOK_IF");
             break;
         case TOK_ELSE:
-            sprintf(buffer, "%s", "TOK_ELSE");
+            sprintf((char*)buffer, "%s", "TOK_ELSE");
             break;
         case TOK_WHILE:
-            sprintf(buffer, "%s", "TOK_WHILE");
+            sprintf((char*)buffer, "%s", "TOK_WHILE");
             break;
         case TOK_FOR:
-            sprintf(buffer, "%s", "TOK_FOR");
+            sprintf((char*)buffer, "%s", "TOK_FOR");
             break;
         case TOK_MUT:
-            sprintf(buffer, "%s", "TOK_MUT");
+            sprintf((char*)buffer, "%s", "TOK_MUT");
             break;
         case TOK_PROTOTYPE:
-            sprintf(buffer, "%s", "TOK_PROTOTYPE");
+            sprintf((char*)buffer, "%s", "TOK_PROTOTYPE");
             break;
         case TOK_EXTERNAL:
-            sprintf(buffer, "%s", "TOK_EXTERNAL");
+            sprintf((char*)buffer, "%s", "TOK_EXTERNAL");
             break;
         case TOK_MODULE:
-            sprintf(buffer, "%s", "TOK_MODULE");
+            sprintf((char*)buffer, "%s", "TOK_MODULE");
             break;
         case TOK_USE:
-            sprintf(buffer, "%s", "TOK_USE");
+            sprintf((char*)buffer, "%s", "TOK_USE");
             break;
         case TOKEN_EOF :
-            sprintf(buffer, "%s", "TOKEN_EOF");
+            sprintf((char*)buffer, "%s", "TOKEN_EOF");
             break;
         case TOKEN_ERROR:
-            sprintf(buffer, "%s", "TOKEN_ERROR");
+            sprintf((char*)buffer, "%s", "TOKEN_ERROR");
             break;
         default:
             if (char_is_number_or_letter((u8)token.type)) {
-                sprintf(buffer, "%c", token.type);
+                sprintf((char*)buffer, "%c", token.type);
             } else {
-                sprintf(buffer, "%s", "UNKNOWN");
+                sprintf((char*)buffer, "%s", "UNKNOWN");
             }
             break;
     }
@@ -651,16 +665,16 @@ void get_token_name(u8 *buffer, token_t token) {
 void get_token_info(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_CONST_INT:
-            sprintf(buffer, "%zu", token.data.const_int);
+            sprintf((char*)buffer, "%zu", token.data.const_int);
             break;
         case TOKEN_CONST_FP:
-            sprintf(buffer, "%f", token.data.const_double);
+            sprintf((char*)buffer, "%f", token.data.const_double);
             break;
         case TOKEN_CONST_STRING:
-            sprintf(buffer, "%s", "TOKEN_CONST_STRING");
+            sprintf((char*)buffer, "%s", "TOKEN_CONST_STRING");
             break;
         default:
-            sprintf(buffer, "NODATA");
+            sprintf((char*)buffer, "NODATA");
             break;
     }
 }
@@ -670,10 +684,10 @@ void print_token_info(token_t token, u64 left_pad) {
     u8 token_name[100];
     u8 token_info[100];
 
-    get_token_name((&token_name, token);
-    get_token_info((&token_info, token);
+    get_token_name(STR(& token_name), token);
+    get_token_info(STR(& token_info), token);
     
-    sprintf(buffer, "TOK: %.100s. DATA: %.100s", token_name, token_info);
+    sprintf((char*)buffer, "TOK: %.100s. DATA: %.100s", token_name, token_info);
     log_no_dec(buffer, left_pad);
 }
 
@@ -745,23 +759,23 @@ void print_code_lines(scanner_state_t *state, token_t token, u64 line_start_offs
 void log_info_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_info(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
     print_code_lines(state, token, 0, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
 }
 
 void log_warning_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_warning(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
     print_code_lines(state, token, 2, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
 }
 
 void log_error_token(u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_error(text, left_pad);
     print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
     print_code_lines(state, token, 4, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
-    log_no_dec("", 0);
+    log_no_dec(STR(""), 0);
 }

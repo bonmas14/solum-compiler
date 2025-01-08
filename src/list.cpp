@@ -2,12 +2,12 @@
 
 b32 list_create(list_t *container, u64 init_size, u64 element_size) {
     if (init_size == 0) {
-        log_warning("List: init size was 0. defaulting to 1.", 0);
+        log_warning(STR("List: init size was 0. defaulting to 1."), 0);
         init_size = 1;
     }
 
     if (element_size == 0) {
-        log_warning("List: element size was 0. defaulting to 1.", 0);
+        log_warning(STR("List: element size was 0. defaulting to 1."), 0);
         element_size = 1;
     }
 
@@ -18,7 +18,7 @@ b32 list_create(list_t *container, u64 init_size, u64 element_size) {
     container->data         = ALLOC(init_size * element_size);
 
     if (container->data == NULL) {
-        log_error("List: Couldn't create list.", 0);
+        log_error(STR("List: Couldn't create list."), 0);
         return false; 
     }
 
@@ -27,12 +27,12 @@ b32 list_create(list_t *container, u64 init_size, u64 element_size) {
 
 b32 list_delete(list_t *list) {
     if (list == NULL) {
-        log_error("List: Reference to list wasn't valid.", 0);
+        log_error(STR("List: Reference to list wasn't valid."), 0);
         return false;
     }
 
     if (list->data == NULL) {
-        log_error("List: List was already deleted.", 0);
+        log_error(STR("List: List was already deleted."), 0);
         return false;
     }
 
@@ -43,14 +43,14 @@ b32 list_delete(list_t *list) {
 }
 
 b32 list_grow(list_t *list) {
-    void *data = REALLOC(list->data, list->grow_size  *list->element_size);
+    void *data = REALLOC(list->data, list->grow_size * list->element_size);
 
     if (data == NULL) {
-        log_error("List: Couldn't grow list.", 0);
+        log_error(STR("List: Couldn't grow list."), 0);
         return false;
     }
 
-    list->data = data;
+    list->data = (u8*)data;
 
     u64 size   = (list->grow_size - list->raw_size) * list->element_size;
     u64 offset = list->count  *list->element_size;
@@ -68,7 +68,7 @@ b32 list_add(list_t *list, void *data) {
         if (!list_grow(list)) {
 
             // we dont need that log because it can only happen when using list_grow
-            // log_error("List: Couldn't add element to a list.", 0);
+            // log_error(STR("List: Couldn't add element to a list."), 0);
             
             return false;
         }
@@ -88,22 +88,22 @@ b32 list_add(list_t *list, void *data) {
 
 void *list_get(list_t *list, u64 index) {
     if (index >= list->count) {
-        log_error("List: Index is greater than count of elements.", 0);
+        log_error(STR("List: Index is greater than count of elements."), 0);
         return NULL;
     }
 
     // windows needs explicit type
-    u8* result_data = list->data;
+    u8* result_data = (u8*)list->data;
 
     return &result_data[list->element_size * index]; 
 }
 
 /*
 void list_insert_at(list_t *list, u64 index, void *data) {
-    log_error("List: inserting is not supported as I dont need that.", 0);
+    log_error(STR("List: inserting is not supported as I dont need that."), 0);
 }
 
 void list_remove_at(list_t *list, u64 index) {
-    log_error("List: removing elements is not supported as I dont need that.", 0);
+    log_error(STR("List: removing elements is not supported as I dont need that."), 0);
 }
 */

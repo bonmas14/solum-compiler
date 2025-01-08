@@ -1,5 +1,6 @@
 #include "stddefines.h"
 #include "scanner.h"
+#include "parser.h"
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c, d)
@@ -12,21 +13,26 @@
 //  default also
 
 int main(void) {
-    scanner_state_t state = { 0 };
+    scanner_state_t scanner = {};
 
-    if (!scan_file("test", &state)) {
-        log_error("Main: couldn't open file and load it into memory.", 0);
+    if (!scan_file(STR("test"), &scanner)) {
+        log_error(STR("Main: couldn't open file and load it into memory."), 0);
         return -1;
     }
+    parser_state_t parser = {};
 
-    token_t token = advance_token(&state);
+    parse(&scanner, &parser);
+
+    /*
+    token_t token = advance_token(&scanner);
 
     while (token.type != TOKEN_EOF) {
-        log_info_token("Main: token.", &state, token, 8);
-        token = advance_token(&state);
+        log_info_token("Main: token.", &scanner, token, 8);
+        token = advance_token(&scanner);
     }
+    */
 
-    // fprintf(stdout, "%s", state.file.data);
+    // fprintf(stdout, "%s", scanner.file.data);
 
     /* 
     // create context, module and builder

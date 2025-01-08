@@ -18,8 +18,8 @@ struct list_t {
     void *data;
 
     u64 element_size;
-    u64 raw_size;
-    u64 grow_size;
+    u64 raw_size;    // In elements
+    u64 grow_size;   // In elements
 };
 
 
