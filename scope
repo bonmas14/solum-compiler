@@ -7,6 +7,39 @@ The scope of a project:
    - or hydraulic erosion simulation
 
 
+BASIC POINTERS ARE NOT ARRAYS BY DEFAUT!
+But they can be accessed with []. But we also can override it!
+
+
+LOCAL SCOPE:
+
+1. Minimal language:
+
+- variables, arrays and pointers (all mut/const stuff should work here)
+- scopes
+- math
+- function defines/calls (internal)
+
+2. Expanding functionality:
+
+- strings
+- structs
+- enums
+- dynamic arrays
+- iterators
+- contexts (Jai)
+- varargs or function overloading, params and so on
+
+3. Extra:
+
+- prototype functions (internal callbacks)
+- compile time
+- metaprogramming
+- clojures?
+- operator overloading 
+- type extension functions ("hello world".self_print())
+- SIMD
+
 
 // --- PARSER STUFF
 
@@ -82,7 +115,7 @@ Local functions.
 // -----------------
 
 keywords:
-    - external:  for functions and variables (from c or anything) for linking (no definition).
+    - external:  for functions and variables (from c or anything) for linking (no definition, but specifiers like __stdcall, __fastcall).
     - default:   for returning 0 of specified in return/assignment type.
     - override:  for overriding operators
     - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
@@ -90,6 +123,8 @@ keywords:
     - use:       for acessing modules
     - mut:       to make variable mutable
     - noinit:    so specify explicitly that user doesnt need to initialize this variable
+
+    - export:    for exporting fuctions to a global export table (we will need to add different things like __stdcall __fastcall and so on)
 
 
 // --------------------- no initialization
@@ -250,6 +285,28 @@ result : s32 = sum<s32>(arr, 4);
 result : s32;
 result = sum(arr, 4);
 
+// 
+<any_type, struct struct_type, prototype function_type, native from_u8_to_f64>
+
+tuple : struct<A, B> = {
+    A a;
+    B b;
+}
+
+// only last can be variable
+var_t : struct<V...> {
+    V arg; // this is base name
+}
+
+
+a : var_t<s32, u64>; 
+
+a.arg0 = (s32) 23;
+
+a.arg1 = (u64) type;
+
+
+
 // --------------------- function pointers
 
 result := { print("hello!"); };
@@ -277,7 +334,7 @@ InitWindow();
 
 // ------------- operator overrides
 
-override + : (a : vec2, b : vec2) -> vec2 {
+override + : (a : vec2, b : vec2) -> vec2 = {
     sum : vec2;
 
     sum.x = a.x + b.x;
@@ -285,6 +342,44 @@ override + : (a : vec2, b : vec2) -> vec2 {
 
     return sum;
 }
+
+val : s32 = 5;
+s32 bit0 = val[0]; // gets first bit of s32
+
+// overrides array get expression for signed integer
+override [] : (on_type : s32, u64 index) -> s32 {
+    if index > 32 {
+        print("too much for an int");
+        return 0;
+    }
+    
+    if on_type & (1 << index) {
+        return 1;
+    } 
+    
+    return 0;
+}
+
+override [,] : (type : ^s32, index1 : u32, index2 : u32) {
+    // 2d arrays?
+    // we can actually pass additional parameter and it wouldnt be index! 
+    // so maybe you pass size of pointer as a first parameter?
+}
+
+overrride [] : (type : Dictionary<string, T>, key : string) -> pair<string, T> {
+    
+}
+
+// some wild stuff!
+override [,] : (type : List, command : string, index : u64) {
+    if (command == "delete") {
+        type.delete_element_at(index);
+    }
+    else if (command == "add") {
+
+    }
+}
+
 
 // -------------
 
@@ -346,3 +441,4 @@ token : tokens = tokens.Error;
 for 0..10 {
     print("%\n", it);
 }
+
