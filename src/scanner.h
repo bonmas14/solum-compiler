@@ -14,6 +14,9 @@
 #define MAX_INT_CONST_SIZE (256)
 
 enum token_type_t {
+    TOKEN_OPEN_BRACE   = '(',
+    TOKEN_CLOSE_BRACE  = ')',
+
     TOKEN_IDENT        = 256,
     TOKEN_CONST_INT    = 257,
     TOKEN_CONST_FP     = 258,
@@ -116,7 +119,8 @@ struct token_t {
 b32 scan_file(const u8* filename, scanner_state_t *state);
 
 token_t advance_token(scanner_state_t *state);
-token_t peek_token(scanner_state_t *state); // todo add offset
+b32     consume_token(u32 token_type, scanner_state_t *state);
+token_t peek_token(scanner_state_t *state);
 
 // --- logging for scanner
 

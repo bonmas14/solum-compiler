@@ -1,6 +1,5 @@
 #include "parser.h"
 
-
 // @todo
 //
 // 1. parse this file
@@ -19,6 +18,9 @@ struct local_state_t {
 
 /* parsing */
 
+
+ast_node_t parse_expression(local_state_t *state);
+
 ast_node_t parse_primary(local_state_t *state) {
     token_t token = advance_token(state->scanner);
 
@@ -30,6 +32,18 @@ ast_node_t parse_primary(local_state_t *state) {
     switch (token.type) {
         case TOKEN_CONST_FP:
         case TOKEN_CONST_INT:
+            break;
+        case TOKEN_OPEN_BRACE:
+            advance_token(state->scanner);
+            result = parse_expression(state);
+
+            if (consume_token(TOKEN_CLOSE_BRACE, state->scanner)) {
+                result.braced = true;
+            } else {
+                result.type = AST_ERROR;
+
+                log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, peek_token(state->scanner), 0);
+            }
             break;
         default:
             result.type = AST_ERROR;
@@ -65,7 +79,7 @@ ast_node_t parse_unary(local_state_t *state) {
         default: {
             advance_token(state->scanner);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: expected '-' in expression"),
+            log_error_token(STR("Parser: wrong unary expression operator"),
                             state->scanner, token, 0);
         } break;
     }
@@ -93,6 +107,16 @@ ast_node_t parse_expression(local_state_t *state) {
     */
 }
 
+void print_node(local_state_t *local, ast_node_t* node, u32 depth) {
+    log_info_token(STR("node"), local->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
+
+    if (node->type == AST_UNARY) {
+        ast_node_t* child = (ast_node_t*)list_get(&local->parser->nodes, node->left_index);
+
+        print_node(local, child, depth + 1);
+    }
+}
+
 b32 parse(scanner_state_t *scanner, parser_state_t* state) {
     local_state_t local = {};
 
@@ -113,19 +137,14 @@ b32 parse(scanner_state_t *scanner, parser_state_t* state) {
 
         if (!list_add(&local.parser->nodes, (void*)&node)) {
             log_error(STR("Parser: Couldn't add node to a list."), 0);
-            valid_parse = false;
+            valid_parse = false; 
+        } else {
+            // @todo just logs for tests
+            print_node(&local, &node, 0);
         }
 
         curr = peek_token(local.scanner);
     }
 
-    for (u64 i = 0; i < local.parser->nodes.count; i++) {
-        ast_node_t* node = (ast_node_t*)list_get(&local.parser->nodes, i);
-
-        log_info_token(STR("debug"), local.scanner, node->token, 4);
-    }
-    
     return valid_parse;
 }
-
-

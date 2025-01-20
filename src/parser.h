@@ -20,6 +20,8 @@ struct ast_node_t {
     s32     type;
     token_t token;
 
+    b32 braced; // @todo change name to something normal
+
     u64 left_index;
     u64 right_index;
 

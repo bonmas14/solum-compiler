@@ -42,32 +42,36 @@ b32 match_char(scanner_state_t *state, u8 in) {
     return peek_char(state) == in;
 }
 
+b32 match_next_char(scanner_state_t *state, u8 in) {
+    return peek_next_char(state) == in;
+}
+
 // --- Helpers
 
 b32 char_is_digit(u8 in) {
     return (in >= '0' && in <= '9');
 }
 
-b32 char_is_hex_digit(u8 in) {
+b32 char_is_hex(u8 in) {
     return char_is_digit(in) 
         || (in >= 'A' && in <= 'F')
         || (in >= 'a' && in <= 'f');
 }
 
-b32 char_is_bin_digit(u8 in) {
+b32 char_is_bin(u8 in) {
     return (in >= '0' && in <= '1');
 }
 // @todo make all of them inline for @speed
 
 u8 char_hex_to_int(u8 in) {
-    if (!char_is_hex_digit(in)) return 0;
+    if (!char_is_hex(in)) return 0;
     if (char_is_digit(in))     return in - '0';
     if ((in & 0x20) == 0)       return in - 'A' + 10;
     else                        return in - 'a' + 10;
 }
 
 u8 char_bin_to_int(u8 in) {
-    if (!char_is_bin_digit(in)) return 0;
+    if (!char_is_bin(in)) return 0;
     if (in == '1')              return 1;
     else                        return 0;
 }
@@ -203,25 +207,26 @@ uint64_t parse_const_int(string_t buffer, int_parsing_parameters type) {
 }
 
 
-void get_const_int_string(scanner_state_t *state, string_t *buffer, token_t *token, int_parsing_parameters parse_type) {
+b32 char_is_typed_digit(int_parsing_parameters parse_type, u8 ch) {
+    switch (parse_type) {
+        case PARSE_BIN_INT:
+            return char_is_bin(ch);
+        case PARSE_DIGIT_INT:
+            return char_is_digit(ch);
+        case PARSE_HEX_INT:
+            return char_is_hex(ch);
+        default:
+            return false;
+    }
+}
+
+void parse_const_int_to_string(scanner_state_t *state, string_t *buffer, token_t *token, int_parsing_parameters parse_type) {
     u64 index = 0;
     u8 ch      = peek_char(state);
 
     while (ch != 0) {
-        if (parse_type == PARSE_BIN_INT) {
-            if (!char_is_bin_digit(ch))
-                break;
-        }
-
-        if (parse_type == PARSE_DIGIT_INT) {
-            if (!char_is_digit(ch)) 
-                break;
-        }
-
-        if (parse_type == PARSE_HEX_INT) {
-            if (!char_is_hex_digit(ch))
-                break;
-        }
+        if (!char_is_typed_digit(parse_type, ch))
+            break;
 
         token->c1 = state->current_char;
         token->l1 = state->current_line;
@@ -280,7 +285,7 @@ token_t process_number(scanner_state_t *state) {
         }
     }
 
-    get_const_int_string(state, &not_parsed_constant, &token, type);
+    parse_const_int_to_string(state, &not_parsed_constant, &token, type);
 
     ch = peek_char(state);
     
@@ -288,7 +293,7 @@ token_t process_number(scanner_state_t *state) {
         token.type = TOKEN_CONST_INT;
         before_delimeter = parse_const_int(not_parsed_constant, type);
         token.data.const_int = before_delimeter;
-    } else {
+    } else if (char_is_typed_digit(type, peek_next_char(state))) {
         if (type != PARSE_DIGIT_INT) {
             // what is he cooking?? 
             // 0b0110.0101
@@ -301,7 +306,7 @@ token_t process_number(scanner_state_t *state) {
         before_delimeter = parse_const_int(not_parsed_constant, type);
 
         advance_char(state);
-        get_const_int_string(state, &not_parsed_constant, &token, type);
+        parse_const_int_to_string(state, &not_parsed_constant, &token, type);
         after_delimeter = parse_const_int(not_parsed_constant, type);
 
         token.type = TOKEN_CONST_FP;
@@ -449,21 +454,17 @@ token_t peek_token(scanner_state_t *state) {
     return advance_token(&peek_state);
 }
 
-/*
-// use peek_token(state, 0); to peek token that is at current index
-token_t peek_token(scanner_state_t *state, u64 offset) {
-    token_t peeked = create_token_at(state, state->file_index);
+b32 consume_token(u32 token_type, scanner_state_t *state) {
+    scanner_state_t peek_state = *state;
+    token_t token = advance_token(&peek_state);
 
-    u64 file_offset = 0;
-    for (u64 i = 0; i < offset; i++) {
-        file_offset += peeked.c1 - peeked.c0;
-
-        token_t peeked = create_token_at(state, state->file_index + file_offset);
+    if (token.type != token_type) {
+        return false;
     }
 
-    return peeked;
+    *state = peek_state;
+    return true;
 }
-*/
 
 // --- Reading file and null terminating it
 
@@ -687,7 +688,7 @@ void print_token_info(token_t token, u64 left_pad) {
     get_token_name(STR(& token_name), token);
     get_token_info(STR(& token_info), token);
     
-    sprintf((char*)buffer, "TOK: %.100s. DATA: %.100s", token_name, token_info);
+    sprintf((char*)buffer, "Token: %.100s. Data: %.100s", token_name, token_info);
     log_no_dec(buffer, left_pad);
 }
 
@@ -758,24 +759,24 @@ void print_code_lines(scanner_state_t *state, token_t token, u64 line_start_offs
 
 void log_info_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_info(text, left_pad);
-    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_token_info(token, left_pad);
     log_no_dec(STR(""), 0);
-    print_code_lines(state, token, 0, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_code_lines(state, token, 0, 0, left_pad);
     log_no_dec(STR(""), 0);
 }
 
 void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_warning(text, left_pad);
-    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_token_info(token, left_pad);
     log_no_dec(STR(""), 0);
-    print_code_lines(state, token, 2, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_code_lines(state, token, 2, 0, left_pad);
     log_no_dec(STR(""), 0);
 }
 
 void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad) {
     log_error(text, left_pad);
-    print_token_info(token, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_token_info(token, left_pad);
     log_no_dec(STR(""), 0);
-    print_code_lines(state, token, 4, 0, left_pad + LEFT_PAD_STANDART_OFFSET);
+    print_code_lines(state, token, 4, 0, left_pad);
     log_no_dec(STR(""), 0);
 }
