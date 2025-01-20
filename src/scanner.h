@@ -124,7 +124,7 @@ token_t peek_token(scanner_state_t *state);
 
 // --- logging for scanner
 
-void log_info_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_info_token(scanner_state_t *state, token_t token, u64 left_pad);
 void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
 void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
 #endif // SCANNER_H

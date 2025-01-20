@@ -34,7 +34,6 @@ ast_node_t parse_primary(local_state_t *state) {
         case TOKEN_CONST_INT:
             break;
         case TOKEN_OPEN_BRACE:
-            advance_token(state->scanner);
             result = parse_expression(state);
 
             if (consume_token(TOKEN_CLOSE_BRACE, state->scanner)) {
@@ -66,21 +65,17 @@ ast_node_t parse_unary(local_state_t *state) {
     switch (token.type) {
         case '-': {
             advance_token(state->scanner);
-            ast_node_t child = parse_primary(state);
+            ast_node_t child = parse_unary(state);
             list_add(&state->parser->nodes, (void*)&child);
             result.left_index = state->parser->nodes.count - 1;
         } break;
-        case TOKEN_IDENT:
-        case TOKEN_CONST_INT:
-        case TOKEN_CONST_FP: {
-            // ignore
-            result = parse_primary(state);
-        } break;
-        default: {
+        case TOKEN_ERROR: {
             advance_token(state->scanner);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: wrong unary expression operator"),
-                            state->scanner, token, 0);
+            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
+        } break;
+        default: {
+            result = parse_primary(state);
         } break;
     }
 
@@ -108,7 +103,7 @@ ast_node_t parse_expression(local_state_t *state) {
 }
 
 void print_node(local_state_t *local, ast_node_t* node, u32 depth) {
-    log_info_token(STR("node"), local->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
+    log_info_token(local->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
 
     if (node->type == AST_UNARY) {
         ast_node_t* child = (ast_node_t*)list_get(&local->parser->nodes, node->left_index);
@@ -134,6 +129,11 @@ b32 parse(scanner_state_t *scanner, parser_state_t* state) {
 
     while (curr.type != TOKEN_EOF && curr.type != TOKEN_ERROR) {
         ast_node_t node = parse_expression(&local);
+
+        if (node.type == AST_ERROR) {
+            valid_parse = false; 
+            break;
+        }
 
         if (!list_add(&local.parser->nodes, (void*)&node)) {
             log_error(STR("Parser: Couldn't add node to a list."), 0);
