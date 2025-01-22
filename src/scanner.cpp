@@ -410,13 +410,81 @@ token_t advance_token(scanner_state_t *state) {
     token.l0 = state->current_line;
 
     switch(ch) {
+        case '.': {  } break;
+
         case '+': { token.type = advance_char(state); } break;
         case '*': { token.type = advance_char(state); } break;
+        case '/': { token.type = advance_char(state); } break;
+        case '%': { token.type = advance_char(state); } break;
+
         case '(': { token.type = advance_char(state); } break;
         case ')': { token.type = advance_char(state); } break;
-        case '-': { token.type = advance_char(state); } break;
         case '@': { token.type = advance_char(state); } break;
-        case '/': { token.type = advance_char(state); } break;
+        case '^': { token.type = advance_char(state); } break;
+
+        case '&': {
+            token.type = advance_char(state); 
+            if (match_char(state, '&')) {
+                advance_char(state);
+                token.type = TOKEN_LOGIC_AND;
+            }
+        } break;
+        case '|': {
+            token.type = advance_char(state); 
+            if (match_char(state, '|')) {
+                advance_char(state);
+                token.type = TOKEN_LOGIC_OR;
+            }
+        } break;
+
+
+        case '-': {
+            token.type = advance_char(state); 
+
+            if (match_char(state, '>')) {
+                advance_char(state);
+                token.type = TOKEN_RET;
+            }
+        } break;
+        case '!': { 
+            token.type = advance_char(state); 
+
+            if (match_char(state, '=')) {
+                advance_char(state);
+                token.type = TOKEN_NEQ;
+            }
+        } break;
+        case '=': {
+            token.type = advance_char(state); 
+
+            if (match_char(state, '=')) {
+                advance_char(state);
+                token.type = TOKEN_EQ;
+            }
+        } break;
+
+        case '<': {
+            token.type = advance_char(state); 
+
+            if (match_char(state, '=')) {
+                advance_char(state);
+                token.type = TOKEN_LEQ;
+            } else if (match_char(state, '<')) {
+                advance_char(state);
+                token.type = TOKEN_LSHIFT;
+            }
+        } break;
+        case '>': {
+            token.type = advance_char(state); 
+
+            if (match_char(state, '=')) {
+                advance_char(state);
+                token.type = TOKEN_GEQ;
+            } else if (match_char(state, '>')) {
+                advance_char(state);
+                token.type = TOKEN_RSHIFT;
+            }
+        } break;
 
         case '"': {
             advance_char(state);
@@ -450,6 +518,12 @@ token_t advance_token(scanner_state_t *state) {
 // @todo: add caching instead of just cleaning this up 
 token_t peek_token(scanner_state_t *state) {
     scanner_state_t peek_state = *state;
+    return advance_token(&peek_state);
+}
+
+token_t peek_next_token(scanner_state_t *state) {
+    scanner_state_t peek_state = *state;
+    (void)advance_token(&peek_state);
     return advance_token(&peek_state);
 }
 
@@ -574,6 +648,30 @@ void get_token_name(const u8 *buffer, token_t token) {
         case TOKEN_CONST_STRING:
             sprintf((char*)buffer, "%s", "constant string");
             break;
+
+        case TOKEN_EQ:
+            sprintf((char*)buffer, "%s", "==");
+            break;
+        case TOKEN_NEQ:
+            sprintf((char*)buffer, "%s", "!=");
+            break;
+        case TOKEN_GEQ:
+            sprintf((char*)buffer, "%s", ">=");
+            break;
+        case TOKEN_LEQ:
+            sprintf((char*)buffer, "%s", "<=");
+            break;
+        case TOKEN_RET:
+            sprintf((char*)buffer, "%s", "->");
+            break;
+
+        case TOKEN_LOGIC_AND:
+            sprintf((char*)buffer, "%s", "&&");
+            break;
+        case TOKEN_LOGIC_OR:
+            sprintf((char*)buffer, "%s", "||");
+            break;
+
         case TOK_STRUCT:
             sprintf((char*)buffer, "%s", "keyword struct");
             break;
@@ -687,7 +785,7 @@ void print_token_info(token_t token, u64 left_pad) {
     get_token_name(STR(& token_name), token);
     get_token_info(STR(& token_info), token);
     
-    sprintf((char*)buffer, "Token: %.100s. Data: %.100s", token_name, token_info);
+    sprintf((char*)buffer, "Token: '%.100s'. Data: %.100s", token_name, token_info);
     set_console_color(255, 255, 255);
     log_no_dec(buffer, left_pad);
 }

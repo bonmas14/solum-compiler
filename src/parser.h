@@ -16,11 +16,23 @@ enum ast_types_t {
     AST_ERROR = -1,
 };
 
+enum ast_subtype_t {
+    AST_COMP_EQ, // ==
+    AST_COMP_NEQ, // !=
+    AST_COMP_GEQ, // >=
+    AST_COMP_LEQ, // <=
+    AST_COMP_GR, // >
+    AST_COMP_LS, // <
+
+    AST_BLOCK_IMPERATIVE,
+};
+
 struct ast_node_t {
     s32     type;
+    //s32     subtype;
     token_t token;
 
-    b32 braced; // @todo change name to something normal
+    b32 braced; // @todo change name to something normal. if it even needed
 
     u64 left_index;
     u64 right_index;

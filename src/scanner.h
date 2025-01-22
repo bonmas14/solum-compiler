@@ -14,6 +14,9 @@
 #define MAX_INT_CONST_SIZE (256)
 
 enum token_type_t {
+    TOKEN_GR = '>',
+    TOKEN_LS = '<',
+
     TOKEN_OPEN_BRACE   = '(',
     TOKEN_CLOSE_BRACE  = ')',
 
@@ -21,6 +24,18 @@ enum token_type_t {
     TOKEN_CONST_INT    = 257,
     TOKEN_CONST_FP     = 258,
     TOKEN_CONST_STRING = 259,
+
+    TOKEN_EQ  = 300, // ==
+    TOKEN_NEQ = 301, // != 
+    TOKEN_GEQ = 302, // >=
+    TOKEN_LEQ = 303, // <=
+
+    TOKEN_LOGIC_AND = 304, // &&
+    TOKEN_LOGIC_OR  = 305, // ||
+    TOKEN_LSHIFT    = 306, // <<
+    TOKEN_RSHIFT    = 307, // >>
+
+    TOKEN_RET = 400, // ->
 
     _KW_START = 1024,
 
