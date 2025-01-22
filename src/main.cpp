@@ -1,10 +1,28 @@
 #include "stddefines.h"
 #include "scanner.h"
 #include "parser.h"
+#include "backend.h"
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c, d)
 #endif
+
+
+void print_node(scanner_state_t *scanner, parser_state_t *parser, ast_node_t* node, u32 depth) {
+    log_info_token(scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
+
+    ast_node_t* child;
+    if (node->type == AST_UNARY) {
+        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        print_node(scanner, parser, child, depth + 1);
+    } else if (node->type == AST_BIN) {
+        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        print_node(scanner, parser, child, depth + 1);
+
+        child = (ast_node_t*)list_get(&parser->nodes, node->right_index);
+        print_node(scanner, parser, child, depth + 1);
+    }
+}
 
 int main(void) {
     scanner_state_t scanner = {};
@@ -15,19 +33,16 @@ int main(void) {
     }
 
     parser_state_t parser = {};
+
     parse(&scanner, &parser);
 
-    /*
-    token_t token = advance_token(&scanner);
+    for (u64 i = 0; i < (parser.root_indices.count - 1); i++) {
+        ast_node_t *root = (ast_node_t*)list_get(&parser.nodes, *(u64*)list_get(&parser.root_indices, i));
 
-    while (token.type != TOKEN_EOF) {
-        log_info_token("Main: token.", &scanner, token, 8);
-        token = advance_token(&scanner);
+        print_node(&scanner, &parser, root, 0);
     }
-    */
 
-    // fprintf(stdout, "%s", scanner.file.data);
-
+    generate_code();
     /* 
     // create context, module and builder
     LLVMContextRef context = LLVMContextCreate();

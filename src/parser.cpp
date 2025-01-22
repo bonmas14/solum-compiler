@@ -454,25 +454,6 @@ ast_node_t parse_expression(local_state_t *state) {
     // and then do 
 // }
 
-void print_node(local_state_t *local, ast_node_t* node, u32 depth) {
-    log_info_token(local->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
-
-    ast_node_t* child;
-    if (node->type == AST_UNARY) {
-        child = (ast_node_t*)list_get(&local->parser->nodes, node->left_index);
-
-        print_node(local, child, depth + 1);
-    } else if (node->type == AST_BIN) {
-        child = (ast_node_t*)list_get(&local->parser->nodes, node->left_index);
-
-        print_node(local, child, depth + 1);
-
-        child = (ast_node_t*)list_get(&local->parser->nodes, node->right_index);
-
-        print_node(local, child, depth + 1);
-    }
-}
-
 b32 parse(scanner_state_t *scanner, parser_state_t* state) {
     local_state_t local = {};
 
@@ -484,12 +465,17 @@ b32 parse(scanner_state_t *scanner, parser_state_t* state) {
         return false;
     }
 
+    if (!list_create(&state->root_indices, INIT_NODES_SIZE, sizeof(u64))) {
+        log_error(STR("Parser: Couldn't create root indices list."), 0);
+        return false;
+    }
+
     b32 valid_parse = true;
     
     token_t curr = peek_token(local.scanner);
 
     while (curr.type != TOKEN_EOF && curr.type != TOKEN_ERROR) {
-        ast_node_t node = parse_expression(&local);
+        ast_node_t node = parse_expression(&local); // another root
 
         if (node.type == AST_ERROR) {
             valid_parse = false; 
@@ -499,10 +485,11 @@ b32 parse(scanner_state_t *scanner, parser_state_t* state) {
         if (!list_add(&local.parser->nodes, (void*)&node)) {
             log_error(STR("Parser: Couldn't add node to a list."), 0);
             valid_parse = false; 
-        } else {
-            // @todo just logs for tests
-            print_node(&local, &node, 0);
-        }
+            break;
+        } 
+
+        u64 root_index = local.parser->nodes.count - 1;
+        list_add(&local.parser->root_indices, (void*)&root_index);
 
         curr = peek_token(local.scanner);
     }

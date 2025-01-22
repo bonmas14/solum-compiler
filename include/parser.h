@@ -29,7 +29,6 @@ enum ast_subtype_t {
 
 struct ast_node_t {
     s32     type;
-    //s32     subtype;
     token_t token;
 
     b32 braced; // @todo change name to something normal. if it even needed
@@ -44,9 +43,8 @@ struct ast_node_t {
 struct parser_state_t {
     b32 had_error;
 
-    // tree here
-    ast_node_t root_node;
-    list_t     nodes;
+    list_t nodes;
+    list_t root_indices; // u64
 };
 
 b32 parse(scanner_state_t *scanner, parser_state_t *state);

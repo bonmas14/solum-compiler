@@ -1,0 +1,97 @@
+#include "backend.h"
+
+#include <stdlib.h>
+#include "llvm/IR/Type.h"
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
+
+
+struct codegen_state_t {
+    llvm::LLVMContext context;
+    llvm::Module      module;
+    llvm::IRBuilder<> builder;
+};
+
+void init_codegen(void) {
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+}
+
+void generate_code(void) {
+    init_codegen();
+
+    // Create an LLVM context
+    llvm::LLVMContext context;
+
+    // Create a module
+    std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("my_module", context);
+
+    // Create an IR builder
+    llvm::IRBuilder<> builder(context);
+
+    // Define a function
+    llvm::FunctionType *funcType = llvm::FunctionType::get(builder.getInt32Ty(), false);
+    llvm::Function *mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", module.get());
+
+    // Create a basic block
+    llvm::BasicBlock *entry = llvm::BasicBlock::Create(context, "entry", mainFunc);
+    builder.SetInsertPoint(entry);
+
+    // Generate IR instructions
+    llvm::Value *retVal = builder.getInt32(42);
+    builder.CreateRet(retVal);
+
+    // Verify the generated IR
+    verifyFunction(*mainFunc);
+
+    // Emit the code to an object file
+
+    auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+    std::string Error;
+    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+    // Print an error and exit if we couldn't find the requested target.
+    // This generally occurs if we've forgotten to initialise the
+    // TargetRegistry or we have a bogus target triple.
+    if (!Target) {
+        llvm::errs() << Error;
+      return 1;
+    }
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    llvm::TargetOptions opt;
+    auto TargetMachine = llvm::Target->createTargetMachine(TargetTriple, CPU, Features, opt, Reloc::PIC_);
+
+    TheModule->setDataLayout(TargetMachine->createDataLayout());
+    TheModule->setTargetTriple(TargetTriple);
+
+    auto Filename = "output.o";
+    std::error_code EC;
+    llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
+
+    if (EC) {
+        llvm::errs() << "Could not open file: " << EC.message();
+        return 1;
+    }
+
+    std::error_code EC;
+
+    llvm::raw_fd_ostream dest("output.o", EC, llvm::sys::fs::OF_None);
+    if (EC) {
+        llvm::errs() << "Could not open file: " << EC.message();
+        return;
+    }
+
+    dest.flush();
+}

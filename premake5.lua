@@ -23,7 +23,9 @@ project "native-solum-compiler"
     cppdialect "C++14"
 
     defines "BACKEND_NATIVE"
-    files { "./src/**.cpp" }
+
+    files { "./src/**.cpp", "./native/win32-x86_64-impl.cpp" }
+    includedirs { "./include" }
 
     filter "configurations:Debug"
         targetdir "bin"
@@ -56,11 +58,12 @@ project "native-solum-compiler"
 
 project "llvm-solum-compiler"
     kind "ConsoleApp"
-    language "C"
-    cdialect "c11"
+    language "C++"
+    cppdialect "C++17"
+    disablewarnings { "no-unused-parameters" }
 
     defines "BACKEND_LLVM"
-    files { "./src/**.cpp" }
+    files { "./src/**.cpp", "./llvm/impl.cpp" }
 
     filter "configurations:Debug"
         targetdir "bin"
@@ -79,13 +82,13 @@ project "llvm-solum-compiler"
     filter "system:windows"
         flags { "MultiProcessorCompile" }
         defines "_CRT_SECURE_NO_WARNINGS"
-        includedirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
+        includedirs { "./include", "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
         libdirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
-        links { "LLVM-C" }
+        links { "LLVMCore" }
     filter {}
 
     filter "system:linux"
-        includedirs { "/usr/lib/llvm-14/include/" } 
+        includedirs { "./include", "/usr/lib/llvm-14/include" } 
         libdirs { "/usr/lib/llvm-14/lib/" }
         links { "LLVMCore" }
     filter {}
