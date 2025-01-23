@@ -2,6 +2,7 @@
 #include "scanner.h"
 #include "parser.h"
 #include "backend.h"
+#include "hashmap.h"
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c)
@@ -25,6 +26,8 @@ void print_node(scanner_state_t *scanner, parser_state_t *parser, ast_node_t* no
 }
 
 int main(void) {
+    hashmap_tests();
+
     scanner_state_t scanner = {};
 
     if (!scan_file(STR("test"), &scanner)) {

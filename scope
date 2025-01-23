@@ -15,7 +15,7 @@ LOCAL SCOPE:
 
 1. Minimal language:
 
-- variables, arrays and pointers (all mut/const stuff should work here)
+- variables, arrays and pointers (all const stuff should work here)
 - scopes
 - math
 - function defines/calls (internal)
@@ -72,43 +72,32 @@ L:  u     b       b
 // --------------------- behaviour 
 
 1. automatic dereference by '.'
-Variables are immutabe by default.
-thus they are referenced instead of copyed.
-But return works only as copy, there is no return by reference.
-
-
-This is relationships of states:
-
-Vert: from
-Hor:  to
-
-          | Mutable | Immutable
-Mutable   | ok      | ok
-Immutable | error   | ok
-
-Vert: from
-Hor:  to
-                       | Mut ptr x Mut data | Immut ptr x Mut data | Mut ptr x Immut data | Immut ptr x Immut data |
-Mut   ptr x Mut data   | ok                 | ok                   | error (pointer alias)| error (pointer alias)  |
-Immut ptr x Mut data   | error              | ok                   | error                | error (pointer alias)  |
-Mut   ptr x Immut data | error              | error                | ok                   | ok                     |
-Immut ptr x Immut data | error              | error                | error                | ok                     |
-
-
-row 1,2 col 3,4 are warnings but not really. because it can be like that :
-
 
 2. We can create preload file that will create standart functions that are used 
 in program. Like current context or standart functions like memset. 
 
+3. VarArgs are bad they do bad stuff like: where are start and where are they end? 
+we can just use arrays
+
+
+a : s32;
+b : f32 = 1.0;
+c : addition = { return a + b; };
+d : struct = { a : s32; b : s32; c : u64; };
+
+addition : (f32 a, f32 b) -> f32 = prototype;
+
+e : enum(u64) = { INVALID = 0, VALID = 0x8000 };
+
+
+use "system";
 
 
 
-Ownership.
+
+// -----------------
 
 
-
-Local functions.
 
 
 
@@ -121,7 +110,6 @@ keywords:
     - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
     - module:    to organize work
     - use:       for acessing modules
-    - mut:       to make variable mutable
     - noinit:    so specify explicitly that user doesnt need to initialize this variable
 
     - export:    for exporting fuctions to a global export table (we will need to add different things like __stdcall __fastcall and so on)
@@ -152,90 +140,6 @@ ptr3 : ^s32  = @ptr2;
 if (freq == @@ptr2) {
     print("valid");
 }
-
-// --------------------- references
-
-freq : s32;
-test : mut s32 = 10;
-
-modulate(freq); // passed by reference by default
-square(freq);   // passed by reference but wont compile because freq is not mutable
-squre(test);    // passed by reference and mutated
-
-modulate : (freq : s32) = { }
-
-square : (val : mut s32) = { val *= val; }
-
-tuple : struct = {
-    a : s32;
-    b : s32;
-}
-
-n : tuple = { .a = 10, .b = 10 };
-m : mut tuple;
-x : mut tuple;
-
-n.a = 1; // error because it is not mutable;
-m.a = 1; // no error
-
-ptr_n : ^tuple     = ^n; 
-ptr_e : ^mut tuple = ^n;  // error. cause tuple is immutable
-ptr_m : ^mut tuple = ^m; 
-
-ptr_x : mut ^mut tuple      = ^x;  // mutable pointer to a mutable tuple
-ptr_f : mut ^mut ^mut tuple = ^^x; // mutable pointer to a mutable pointer that points to a mutalbe tuple
-ptr_z : mut ^tuple          = ^n;  // mutable pointer to an immutable tuple
-
-ptr_n.a = 1; // error. because ptr_n is not mutable pointer with not mutalbe data
-
-ptr_m.a = 1; // no error
-ptr_m   = x; // error because pointer is not mutable
-ptr_x   = m; // no error because pointer is mutable
-
-create_tuple : (l : s32, r : s32) -> tuple = {
-    res : mut tuple;
-
-    res.a = l;
-    res.b = r;
-
-    return res;
-}
-
-t := create_tuple(22, 32);
-
-// ----------------- pointer aliasing
-
-pointer aliasing can only happen in situaltions:
-
-1. 
-do_stuff : (a : ^mut s32, b : ^mut s32) = {
-    // a can be equal to b.
-    // or changes in a can lead to changes in b
-}
-
-this is because we can promise to a compiler that we wont modify data of pointer.
-
-
-but it wont work when we do stuff like raw pointers that equal to int values:
-example:
-
-a : []s32 = {1, 2};
-
-b : ^s32     = a + 1; // valid. wont change anything 
-
-c : ^mut s32 = a + 1; // wrong and wont compile, because we cant promise
-                      // to pointer 'a' that it's data will remain constant
-
-points_to : mut s32 = a;   // this will drop the promise of 'a' pointer that its data is constant, 
-                           // because dont look at it as a pointer.
-                           // 
-                           // we can do warning here, error, OR be silent until this variable is used
-                           // as in next line. 
-                           // we can scan all places where this variable is used step into functions and try to find
-                           // potential transformation into mutable pointer. 
-
-d : ^mut s32 = points_to;  // this will be normal line of code. but it actually 
-                           // breaks the promise of pointer 'a' that it's data is constant.
 
 // --------------------- generics
 
@@ -286,7 +190,7 @@ result : s32;
 result = sum(arr, 4);
 
 // 
-<any_type, struct struct_type, prototype function_type, native from_u8_to_f64>
+<any_type, struct struct_type, prototype function_type, simple from_u8_to_f64>
 
 tuple : struct<A, B> = {
     A a;
@@ -294,16 +198,15 @@ tuple : struct<A, B> = {
 }
 
 // only last can be variable
-var_t : struct<V...> {
-    V arg; // this is base name
+var_t : struct<V[]> {
+    V[] args;
 }
 
 
-a : var_t<s32, u64>; 
+a : var_t<s32[10]>; 
 
-a.arg0 = (s32) 23;
-
-a.arg1 = (u64) type;
+a.arg[0] = 23;
+a.arg[1] = 1000;
 
 
 
@@ -386,22 +289,22 @@ override [,] : (type : List, command : string, index : u64) {
 list : struct<T> = {
     count : u64;
     size  : u64;
-    data  : ^mut T;
+    data  : ^T;
 }
 
 
-create : <T>(prealloc : u64) -> mut list<T>, bool = {
+create : <T>(prealloc : u64) -> list<T>, bool = {
     if (prealloc == 0) {
         return default, false;
     }
 
-    data : ^mut T = allocate<T>(prealloc);
+    data : ^ T = allocate<T>(prealloc);
 
     if (data == null) {
         return default, false;
     }
 
-    output : mut list<T> = default; 
+    output : list<T> = default; 
 
     output.size = size;
     output.data = data;
@@ -409,7 +312,7 @@ create : <T>(prealloc : u64) -> mut list<T>, bool = {
     return output, true;
 }
 
-add : <T>(context : mut list<T>, value : T) -> bool = {
+add : <T>(context : list<T>, value : T) -> bool = {
 }
 
 // start of file main.slm

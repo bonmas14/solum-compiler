@@ -23,6 +23,22 @@ typedef double f64;
 
 typedef uint32_t b32;
 
+struct string_t {
+    u64 size;
+    u8 *data;
+};
+
 #define STR(s) reinterpret_cast<const u8*>(s)
+
+// @nocheckin
+#define STRING(s) (string_t) { .size = sizeof(s), .data = reinterpret_cast<const u8*>(s) }
+
+#define assert(result, message) { \
+    if ((result) == false) { \
+        log_error(STR("assertion failed."), 0);\
+        log_error(STR(message), 0); \
+    } \
+}
+
 
 #endif // USER_DEFINES

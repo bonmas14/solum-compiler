@@ -98,11 +98,6 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 #endif
 
 // @todo: we need to move it away from scanner
-struct string_t {
-    u64 size;
-    u8 *data;
-};
-
 struct line_tuple_t {
     u64 start;
     u64 stop;
