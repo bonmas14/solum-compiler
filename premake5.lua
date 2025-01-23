@@ -60,7 +60,7 @@ project "llvm-solum-compiler"
     kind "ConsoleApp"
     language "C++"
     cppdialect "C++17"
-    disablewarnings { "no-unused-parameters" }
+    disablewarnings { "unused-parameter" }
 
     defines "BACKEND_LLVM"
     files { "./src/**.cpp", "./llvm/impl.cpp" }
@@ -90,5 +90,5 @@ project "llvm-solum-compiler"
     filter "system:linux"
         includedirs { "./include", "/usr/lib/llvm-14/include" } 
         libdirs { "/usr/lib/llvm-14/lib/" }
-        links { "LLVMCore" }
+        links { "LLVM" }
     filter {}

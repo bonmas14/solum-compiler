@@ -6,6 +6,8 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/TargetParser/Host.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetSelect.h>
@@ -57,33 +59,24 @@ void generate_code(void) {
 
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
     std::string Error;
-    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+    auto target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
 
     // Print an error and exit if we couldn't find the requested target.
     // This generally occurs if we've forgotten to initialise the
     // TargetRegistry or we have a bogus target triple.
-    if (!Target) {
+    if (!target) {
         llvm::errs() << Error;
-      return 1;
+      return;
     }
 
     auto CPU = "generic";
     auto Features = "";
 
     llvm::TargetOptions opt;
-    auto TargetMachine = llvm::Target->createTargetMachine(TargetTriple, CPU, Features, opt, Reloc::PIC_);
+    auto TargetMachine = target->createTargetMachine(TargetTriple, CPU, Features, opt, llvm::Reloc::PIC_);
 
-    TheModule->setDataLayout(TargetMachine->createDataLayout());
-    TheModule->setTargetTriple(TargetTriple);
-
-    auto Filename = "output.o";
-    std::error_code EC;
-    llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
-
-    if (EC) {
-        llvm::errs() << "Could not open file: " << EC.message();
-        return 1;
-    }
+    module->setDataLayout(TargetMachine->createDataLayout());
+    module->setTargetTriple(TargetTriple);
 
     std::error_code EC;
 
