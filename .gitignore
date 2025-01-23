@@ -10,3 +10,7 @@ obj
 *.filters
 *.user
 /*.sln
+
+*.o
+*.exe
+*.out
