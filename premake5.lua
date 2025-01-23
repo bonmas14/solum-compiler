@@ -60,7 +60,7 @@ project "llvm-solum-compiler"
     kind "ConsoleApp"
     language "C++"
     cppdialect "C++17"
-    disablewarnings { "unused-parameter" }
+    -- disablewarnings { "unused-parameter" }
 
     defines "BACKEND_LLVM"
     files { "./src/**.cpp", "./llvm/impl.cpp" }
@@ -68,14 +68,14 @@ project "llvm-solum-compiler"
     filter "configurations:Debug"
         targetdir "bin"
         targetsuffix "-d"
-        staticruntime "on"
-        runtime "Debug"
+        staticruntime "off"
+        runtime "Release"
     filter {}
 
     filter "configurations:Release"
         targetdir "bin"
         targetsuffix "-r"
-        staticruntime "on"
+        staticruntime "off"
         runtime "Release"
     filter {}
 
@@ -84,7 +84,186 @@ project "llvm-solum-compiler"
         defines "_CRT_SECURE_NO_WARNINGS"
         includedirs { "./include", "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
         libdirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
-        links { "LLVMCore" }
+        links { "Ws2_32",
+                "LLVMAArch64AsmParser",
+                "LLVMAArch64CodeGen",
+                "LLVMAArch64Desc",
+                "LLVMAArch64Disassembler",
+                "LLVMAArch64Info",
+                "LLVMAArch64Utils",
+
+                "LLVMAggressiveInstCombine",
+
+                "LLVMAMDGPUAsmParser",
+                "LLVMAMDGPUDesc",
+                "LLVMAMDGPUInfo",
+                "LLVMAMDGPUUtils",
+
+                "LLVMAnalysis",
+
+                "LLVMARMAsmParser",
+                "LLVMARMCodeGen",
+                "LLVMARMDesc",
+                "LLVMARMDisassembler",
+                "LLVMARMInfo",
+                "LLVMARMUtils",
+
+                "LLVMAsmParser",
+                "LLVMAsmPrinter",
+
+                "LLVMAVRCodeGen",
+                "LLVMAVRDisassembler",
+
+                "LLVMBinaryFormat",
+                "LLVMBitReader",
+                "LLVMBitstreamReader",
+                "LLVMBitWriter",
+
+                "LLVMBPFAsmParser",
+                "LLVMBPFDesc",
+                "LLVMBPFInfo",
+
+                "LLVMCFGuard",
+                "LLVMCFIVerify",
+                "LLVMCodeGen",
+                "LLVMCodeGenTypes",
+                "LLVMCore",
+                "LLVMCoroutines",
+                "LLVMCoverage",
+                "LLVMDebugInfoBTF",
+                "LLVMDebugInfoCodeView",
+                "LLVMDebuginfod",
+                "LLVMDebugInfoDWARF",
+                "LLVMDebugInfoGSYM",
+                "LLVMDebugInfoLogicalView",
+                "LLVMDebugInfoMSF",
+                "LLVMDebugInfoPDB",
+                "LLVMDemangle",
+                "LLVMDiff",
+                "LLVMDlltoolDriver",
+
+                "LLVMDWARFLinker",
+                "LLVMDWARFLinkerClassic",
+                "LLVMDWARFLinkerParallel",
+                "LLVMDWP",
+
+                "LLVMExecutionEngine",
+                "LLVMExegesis",
+                "LLVMExegesisAArch64",
+                "LLVMExegesisMips",
+                "LLVMExegesisX86",
+                "LLVMExtensions",
+
+                "LLVMFileCheck",
+
+                "LLVMFrontendDriver",
+                "LLVMFrontendHLSL",
+                "LLVMFrontendOffloading",
+                "LLVMFrontendOpenACC",
+                "LLVMFrontendOpenMP",
+
+                "LLVMFuzzerCLI",
+                "LLVMFuzzMutate",
+                "LLVMGlobalISel",
+                "LLVMHexagonAsmParser",
+                "LLVMHexagonDesc",
+                "LLVMHexagonInfo",
+
+                "LLVMHipStdPar",
+
+                "LLVMInstCombine",
+                "LLVMInstrumentation",
+                "LLVMInterfaceStub",
+                "LLVMInterpreter",
+
+                "LLVMipo",
+
+                "LLVMIRPrinter",
+                "LLVMIRReader",
+
+                "LLVMJITLink",
+
+                "LLVMLanaiCodeGen",
+                "LLVMLanaiDisassembler",
+
+                "LLVMLibDriver",
+                "LLVMLineEditor",
+                "LLVMLinker",
+
+                "LLVMLoongArchAsmParser",
+                "LLVMLoongArchDesc",
+                "LLVMLoongArchInfo",
+
+                "LLVMLTO",
+                "LLVMMC",
+                "LLVMMCA",
+                "LLVMMCDisassembler",
+                "LLVMMCJIT",
+                "LLVMMCParser",
+                "LLVMMipsCodeGen",
+                "LLVMMipsDisassembler",
+                "LLVMMIRParser",
+                "LLVMMSP430AsmParser",
+                "LLVMMSP430Desc",
+                "LLVMMSP430Info",
+                "LLVMNVPTXDesc",
+                "LLVMObjCARCOpts",
+                "LLVMObjCopy",
+                "LLVMObject",
+                "LLVMObjectYAML",
+                "LLVMOption",
+                "LLVMOrcDebugging",
+                "LLVMOrcJIT",
+                "LLVMOrcShared",
+                "LLVMOrcTargetProcess",
+                "LLVMPasses",
+                "LLVMPowerPCCodeGen",
+                "LLVMPowerPCDisassembler",
+                "LLVMProfileData",
+                "LLVMRemarks",
+                "LLVMRISCVAsmParser",
+                "LLVMRISCVDesc",
+                "LLVMRISCVInfo",
+                "LLVMRuntimeDyld",
+                "LLVMScalarOpts",
+                "LLVMSelectionDAG",
+                "LLVMSparcCodeGen",
+                "LLVMSparcDisassembler",
+                "LLVMSupport",
+                "LLVMSymbolize",
+                "LLVMSystemZAsmParser",
+                "LLVMSystemZDesc",
+                "LLVMSystemZInfo",
+                "LLVMTableGen",
+                "LLVMTableGenCommon",
+                "LLVMTableGenGlobalISel",
+                "LLVMTarget",
+                "LLVMTargetParser",
+                "LLVMTextAPI",
+                "LLVMTextAPIBinaryReader",
+                "LLVMTransformUtils",
+                "LLVMVECodeGen",
+                "LLVMVectorize",
+                "LLVMVEDisassembler",
+
+                "LLVMWebAssemblyAsmParser",
+                "LLVMWebAssemblyDesc",
+                "LLVMWebAssemblyInfo",
+
+                "LLVMWindowsDriver",
+                "LLVMWindowsManifest",
+
+                "LLVMX86AsmParser",
+                "LLVMX86CodeGen",
+                "LLVMX86Desc",
+                "LLVMX86Disassembler",
+                "LLVMX86Info",
+                "LLVMX86TargetMCA",
+
+                "LLVMXCoreCodeGen",
+                "LLVMXCoreDisassembler",
+                "LLVMXRay", }
+
     filter {}
 
     filter "system:linux"

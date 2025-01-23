@@ -4,7 +4,7 @@
 #include "backend.h"
 
 #ifdef NDEBUG 
-#define log_info_token(a, b, c, d)
+#define log_info_token(a, b, c)
 #endif
 
 
