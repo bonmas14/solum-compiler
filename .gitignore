@@ -2,6 +2,7 @@ _build
 _bin
 .vs
 /bin
+/temp
 /build
 Makefile
 *.make

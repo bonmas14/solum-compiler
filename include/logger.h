@@ -11,4 +11,5 @@ void log_info(const u8 *text, u64 left_pad);
 void log_warning(const u8 *text, u64 left_pad);
 void log_error(const u8 *text, u64 left_pad);
 
+// @todo log_token also should be here
 #endif // LOGGER_H

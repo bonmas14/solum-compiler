@@ -35,14 +35,14 @@ void generate_code(void) {
     llvm::LLVMContext context;
 
     // Create a module
-    std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("my_module", context);
+    llvm::Module module("my_module", context);
 
     // Create an IR builder
     llvm::IRBuilder<> builder(context);
 
     // Define a function
     llvm::FunctionType *funcType = llvm::FunctionType::get(builder.getInt32Ty(), false);
-    llvm::Function *mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", module.get());
+    llvm::Function *mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", &module);
 
     // Create a basic block
     llvm::BasicBlock *entry = llvm::BasicBlock::Create(context, "entry", mainFunc);
@@ -53,8 +53,20 @@ void generate_code(void) {
     builder.CreateRet(retVal);
 
     // Verify the generated IR
-    verifyFunction(*mainFunc);
+    llvm::verifyFunction(*mainFunc);
 
+    std::error_code EC;
+    llvm::raw_fd_ostream output("./temp/output.ir", EC, llvm::sys::fs::OF_None);
+
+
+    module.print(output, NULL);
+    output.close();
+
+
+
+
+
+    /*
     // Emit the code to an object file
 
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
@@ -78,7 +90,7 @@ void generate_code(void) {
     module->setDataLayout(TargetMachine->createDataLayout());
     module->setTargetTriple(TargetTriple);
 
-    std::error_code EC;
+
 
     llvm::raw_fd_ostream dest("output.o", EC, llvm::sys::fs::OF_None);
     if (EC) {
@@ -86,5 +98,17 @@ void generate_code(void) {
         return;
     }
 
+
+    llvm::legacy::PassManager pass;
+    auto FileType = llvm::CodeGenFileType::ObjectFile;
+
+    if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+        errs() << "TheTargetMachine can't emit a file of this type";
+        return 1;
+    }
+
+    pass.run(*TheModule);
+
     dest.flush();
+    */
 }

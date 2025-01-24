@@ -10,8 +10,8 @@
 
 
 struct local_state_t {
-    scanner_state_t *scanner;
-    parser_state_t  *parser;
+    scanner_t *scanner;
+    parser_t  *parser;
 };
 
 /* helpers */
@@ -454,7 +454,7 @@ ast_node_t parse_expression(local_state_t *state) {
     // and then do 
 // }
 
-b32 parse(scanner_state_t *scanner, parser_state_t* state) {
+b32 parse(scanner_t *scanner, parser_t* state) {
     local_state_t local = {};
 
     local.scanner = scanner;

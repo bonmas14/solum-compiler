@@ -33,12 +33,16 @@ struct string_t {
 // @nocheckin
 #define STRING(s) (string_t) { .size = sizeof(s), .data = reinterpret_cast<const u8*>(s) }
 
+#ifdef DEBUG
 #define assert(result, message) { \
     if ((result) == false) { \
         log_error(STR("assertion failed."), 0);\
         log_error(STR(message), 0); \
     } \
 }
+#else 
+#define assert(result, message)
+#endif
 
 
 #endif // USER_DEFINES

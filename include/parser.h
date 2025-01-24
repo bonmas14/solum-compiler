@@ -40,13 +40,13 @@ struct ast_node_t {
     u64 child_count;
 };
 
-struct parser_state_t {
+struct parser_t {
     b32 had_error;
 
     list_t nodes;
     list_t root_indices; // u64
 };
 
-b32 parse(scanner_state_t *scanner, parser_state_t *state);
+b32 parse(scanner_t *scanner, parser_t *state);
 
 #endif // PARSER_H

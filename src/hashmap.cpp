@@ -28,19 +28,8 @@ b32 compare_strings(string_t a, string_t b) {
 }
 
 b32 hashmap_create(hashmap_t *map, u64 size, u64 element_size) {
-    if (size < 256) {
-        log_warning(STR("Hashmap: init size was less than 256. defaulting to 256."), 0);
-        size = 256;
-    }
-
-    // @todo asserts for element size!!
-    //
-
-    if (element_size == 0) {
-        log_warning(STR("Hashmap: element size was zero."), 0);
-        return false;
-    }
-
+    assert(element_size > 0, "element size was 0");
+    assert(size > 0, "size of map was 0");
 
     map->capacity     = size;
     map->element_size = element_size;

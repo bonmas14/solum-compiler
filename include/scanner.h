@@ -103,10 +103,7 @@ struct line_tuple_t {
     u64 stop;
 };
 
-struct scanner_state_t {
-    b32 had_error;
-    b32 at_the_end;
-
+struct scanner_t {
     u64 file_index;
     u64 current_line;
     u64 current_char;
@@ -126,15 +123,16 @@ struct token_t {
     } data;
 };
 
-b32 scan_file(const u8* filename, scanner_state_t *state);
+b32 scanner_create(const u8* filename, scanner_t *state);
+void scanner_delete(scanner_t *state);
 
-token_t advance_token(scanner_state_t *state);
-b32     consume_token(u32 token_type, scanner_state_t *state);
-token_t peek_token(scanner_state_t *state);
+token_t advance_token(scanner_t *state);
+b32     consume_token(u32 token_type, scanner_t *state);
+token_t peek_token(scanner_t *state);
 
 // --- logging for scanner
 
-void log_info_token(scanner_state_t *state, token_t token, u64 left_pad);
-void log_warning_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
-void log_error_token(const u8 *text, scanner_state_t *state, token_t token, u64 left_pad);
+void log_info_token(scanner_t *state, token_t token, u64 left_pad);
+void log_warning_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad);
+void log_error_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad);
 #endif // SCANNER_H
