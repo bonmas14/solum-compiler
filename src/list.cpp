@@ -43,6 +43,7 @@ b32 list_delete(list_t *list) {
 }
 
 b32 list_grow(list_t *list) {
+    assert(list != 0, "list was null");
     void *data = REALLOC(list->data, list->grow_size * list->element_size);
 
     if (data == NULL) {
@@ -63,47 +64,67 @@ b32 list_grow(list_t *list) {
     return true;
 }
 
-b32 list_add(list_t *list, void *data) {
-    if (list->count >= list->raw_size) {
-        if (!list_grow(list)) {
+b32 list_grow_fit(list_t *list, u64 fit_elements) {
+    assert(fit_elements > 0, "trying to fit 0 elements, it will be always true.");
 
-            // we dont need that log because it can only happen when using list_grow
-            // log_error(STR("List: Couldn't add element to a list."), 0);
-            
-            return false;
+    if ((list->count + fit_elements - 1) < list->raw_size) {
+        return true;
+    } else {
+        while ((list->count + fit_elements) >= list->raw_size) {
+            if (!list_grow(list)) {
+                return false;
+            }
         }
     }
-    
-    u8 *arr = (u8*)list->data;
 
-    for (u64 i = 0; i < list->element_size; i++) {
-        u8 *casted = (u8*)data;
-        arr[list->element_size  *list->count + i] = casted[i];
+    return true;
+}
+
+// @todo with templates we can just delete this
+// and rawdog it on data pointer in list
+b32 list_add(list_t *list, void *data) {
+    assert(list != 0, "list was null");
+    assert(data != 0, "data pointer was null");
+
+    u64 index = 0;
+    if (!list_allocate(list, 1, &index)) {
+        return false;
     }
 
-    list->count++;
+    u8 *dest = (u8*)list->data + list->element_size * index;
+    memcpy(dest, data, list->element_size);
+
+    return true;
+}
+
+b32 list_allocate(list_t *list, u64 elements_amount, u64 *start_index) {
+    assert(list != 0, "list was null");
+    assert(elements_amount > 0, "allocation amount is zero");
+
+    u64 new_count = list->count + elements_amount;
+
+    if (!list_grow_fit(list, elements_amount)) {
+        return false;
+    }
+    
+    *start_index = list->count;
+    list->count = new_count;
 
     return true;
 }
 
 void *list_get(list_t *list, u64 index) {
+    assert(list != 0, "list was null");
+    assert(index < list->count, "index was bigger that count of elements");
+
     if (index >= list->count) {
         log_error(STR("List: Index is greater than count of elements."), 0);
         return NULL;
     }
 
-    // windows needs explicit type
     u8* result_data = (u8*)list->data;
 
     return &result_data[list->element_size * index]; 
 }
 
-/*
-void list_insert_at(list_t *list, u64 index, void *data) {
-    log_error(STR("List: inserting is not supported as I dont need that."), 0);
-}
 
-void list_remove_at(list_t *list, u64 index) {
-    log_error(STR("List: removing elements is not supported as I dont need that."), 0);
-}
-*/

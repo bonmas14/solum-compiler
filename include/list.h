@@ -24,14 +24,11 @@ struct list_t {
 
 
 b32 list_create(list_t *container, u64 init_size, u64 element_size);
-b32 list_delete(list_t *arr);
+b32 list_delete(list_t *list);
 
-b32  list_add(list_t *arr, void *data);
-void* list_get(list_t *arr, u64 index);
+b32   list_add(list_t *list, void *data);
+void* list_get(list_t *list, u64 index);
 
-/*
-void  list_insert_at(list_t *arr, u64 index, void *data);
-void  list_remove_at(list_t *arr, u64 index);
-*/
+b32 list_allocate(list_t *list, u64 elements_amount, u64 *start_index);
 
 #endif // LIST_H
