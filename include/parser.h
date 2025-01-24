@@ -2,7 +2,7 @@
 #define PARSER_H
 
 #include "stddefines.h"
-#include "list.h"
+#include "area_alloc.h"
 #include "scanner.h"
 #include "logger.h"
 
@@ -43,8 +43,8 @@ struct ast_node_t {
 struct parser_t {
     b32 had_error;
 
-    list_t nodes;
-    list_t root_indices; // u64
+    area_t nodes;
+    area_t root_indices; // u64
 };
 
 b32 parse(scanner_t *scanner, parser_t *state);

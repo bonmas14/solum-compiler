@@ -562,7 +562,7 @@ b32 scan_lines(scanner_t *state) {
         init_size = MINIMAL_SIZE;
     }
 
-    if (!list_create(&state->lines, init_size, sizeof(line_tuple_t))) {
+    if (!area_create(&state->lines, init_size, sizeof(line_tuple_t))) {
         log_error(STR("Scanner: Couldn't create list."), 0);
         return false;
     }
@@ -577,7 +577,7 @@ b32 scan_lines(scanner_t *state) {
 
         line.stop  = i;
 
-        if (!list_add(&state->lines, (void*)&line)) {
+        if (!area_add(&state->lines, (void*)&line)) {
             // @todo error handle
             break;
         }
@@ -786,7 +786,7 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
     }
 
     for (u64 i = start_line; i < stop_line; i++) {
-        line_tuple_t *line = (line_tuple_t*)list_get(&state->lines, i);
+        line_tuple_t *line = (line_tuple_t*)area_get(&state->lines, i);
 
         u64 len    = line->stop - line->start + 1;
         u8  *start = state->file.data + line->start;

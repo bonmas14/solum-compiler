@@ -3,7 +3,7 @@
 
 #include "stddefines.h"
 #include "logger.h"
-#include "list.h"
+#include "area_alloc.h"
 
 #define APPROX_CHAR_PER_LINE (25)
 #define MINIMAL_SIZE (50)
@@ -108,8 +108,8 @@ struct scanner_t {
     u64 current_line;
     u64 current_char;
 
-    // list of line_tuple_t
-    list_t   lines; 
+    // area of line_tuple_t
+    area_t   lines; 
     string_t file;
 }; 
 

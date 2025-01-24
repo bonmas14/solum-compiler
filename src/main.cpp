@@ -8,19 +8,18 @@
 #define log_info_token(a, b, c)
 #endif
 
-
 void print_node(scanner_t *scanner, parser_t *parser, ast_node_t* node, u32 depth) {
     log_info_token(scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
 
     ast_node_t* child;
     if (node->type == AST_UNARY) {
-        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->left_index);
         print_node(scanner, parser, child, depth + 1);
     } else if (node->type == AST_BIN) {
-        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->left_index);
         print_node(scanner, parser, child, depth + 1);
 
-        child = (ast_node_t*)list_get(&parser->nodes, node->right_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->right_index);
         print_node(scanner, parser, child, depth + 1);
     }
 }
@@ -61,7 +60,7 @@ interop_state_t interop_node(parser_t *parser, ast_node_t *node) {
         }
 
     } else if (node->type == AST_UNARY) {
-        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->left_index);
         interop_state_t ret = interop_node(parser, child);
 
         switch (node->token.type) {
@@ -97,10 +96,10 @@ interop_state_t interop_node(parser_t *parser, ast_node_t *node) {
                 break;
         }
     } else if (node->type == AST_BIN) {
-        child = (ast_node_t*)list_get(&parser->nodes, node->left_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->left_index);
         interop_state_t left  = interop_node(parser, child);
 
-        child = (ast_node_t*)list_get(&parser->nodes, node->right_index);
+        child = (ast_node_t*)area_get(&parser->nodes, node->right_index);
         interop_state_t right = interop_node(parser, child);
 
         switch (node->token.type) {
@@ -142,6 +141,7 @@ interop_state_t interop_node(parser_t *parser, ast_node_t *node) {
 
 int main(void) {
     hashmap_tests();
+    area_tests();
 
     scanner_t scanner = {};
 
@@ -155,7 +155,7 @@ int main(void) {
     parse(&scanner, &parser);
 
     for (u64 i = 0; i < parser.root_indices.count; i++) {
-        ast_node_t *root = (ast_node_t*)list_get(&parser.nodes, *(u64*)list_get(&parser.root_indices, i));
+        ast_node_t *root = (ast_node_t*)area_get(&parser.nodes, *(u64*)area_get(&parser.root_indices, i));
 
         print_node(&scanner, &parser, root, 0);
         interop_state_t res = interop_node(&parser, root);

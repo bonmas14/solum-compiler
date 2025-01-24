@@ -73,7 +73,7 @@ ast_node_t parse_unary(local_state_t *state) {
         case '!': {
             advance_token(state->scanner);
             ast_node_t child = parse_unary(state);
-            list_add(&state->parser->nodes, (void*)&child);
+            area_add(&state->parser->nodes, (void*)&child);
             result.left_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -104,11 +104,11 @@ ast_node_t parse_shift(local_state_t *state) {
         case TOKEN_RSHIFT: {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_shift(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -138,11 +138,11 @@ ast_node_t parse_and(local_state_t *state) {
         case '&': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_and(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -172,11 +172,11 @@ ast_node_t parse_or(local_state_t *state) {
         case '|': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_or(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -206,11 +206,11 @@ ast_node_t parse_xor(local_state_t *state) {
         case '^': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_xor(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -243,11 +243,11 @@ ast_node_t parse_mul(local_state_t *state) {
         case '%': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_mul(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -278,11 +278,11 @@ ast_node_t parse_add(local_state_t *state) {
         case '-': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_add(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -316,11 +316,11 @@ ast_node_t parse_compare_expression(local_state_t *state) {
         case TOKEN_EQ:
         case TOKEN_NEQ: {
             advance_token(state->scanner);
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_compare_expression(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -350,11 +350,11 @@ ast_node_t parse_logic_and_expression(local_state_t *state) {
         case TOKEN_LOGIC_AND: {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_logic_and_expression(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -384,11 +384,11 @@ ast_node_t parse_logic_or_expression(local_state_t *state) {
         case TOKEN_LOGIC_OR: {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_logic_or_expression(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -418,11 +418,11 @@ ast_node_t parse_assing_expression(local_state_t *state) {
         case '=': {
             advance_token(state->scanner);
 
-            list_add(&state->parser->nodes, (void*)&left);
+            area_add(&state->parser->nodes, (void*)&left);
             result.left_index = state->parser->nodes.count - 1;
 
             right = parse_assing_expression(state);
-            list_add(&state->parser->nodes, (void*)&right);
+            area_add(&state->parser->nodes, (void*)&right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
         case TOKEN_ERROR: {
@@ -460,12 +460,12 @@ b32 parse(scanner_t *scanner, parser_t* state) {
     local.scanner = scanner;
     local.parser  = state;
 
-    if (!list_create(&state->nodes, INIT_NODES_SIZE, sizeof(ast_node_t))) {
+    if (!area_create(&state->nodes, INIT_NODES_SIZE, sizeof(ast_node_t))) {
         log_error(STR("Parser: Couldn't create nodes list."), 0);
         return false;
     }
 
-    if (!list_create(&state->root_indices, INIT_NODES_SIZE, sizeof(u64))) {
+    if (!area_create(&state->root_indices, INIT_NODES_SIZE, sizeof(u64))) {
         log_error(STR("Parser: Couldn't create root indices list."), 0);
         return false;
     }
@@ -482,14 +482,14 @@ b32 parse(scanner_t *scanner, parser_t* state) {
             break;
         }
 
-        if (!list_add(&local.parser->nodes, (void*)&node)) {
+        if (!area_add(&local.parser->nodes, (void*)&node)) {
             log_error(STR("Parser: Couldn't add node to a list."), 0);
             valid_parse = false; 
             break;
         } 
 
         u64 root_index = local.parser->nodes.count - 1;
-        list_add(&local.parser->root_indices, (void*)&root_index);
+        area_add(&local.parser->root_indices, (void*)&root_index);
 
         curr = peek_token(local.scanner);
     }
