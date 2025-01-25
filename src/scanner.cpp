@@ -10,8 +10,8 @@ typedef enum {
 // --- Processing
 
 static inline u8 advance_char(scanner_t *state) {
-    assert(state->file.size > 0, "Scanner file size was zero");
-    assert(state->file.data != 0, "Scanner file was zero");
+    assert(state->file.size > 0);
+    assert(state->file.data != 0);
     if (state->file_index >= state->file.size) return 0; 
 
     u8 curr_code = state->file.data[state->file_index++];
@@ -26,16 +26,16 @@ static inline u8 advance_char(scanner_t *state) {
 }
 
 static inline u8 peek_char(scanner_t *state) {
-    assert(state->file.size > 0, "Scanner file size was zero");
-    assert(state->file.data != 0, "Scanner file was zero");
+    assert(state->file.size > 0);
+    assert(state->file.data != 0);
     if (state->file_index >= state->file.size) return 0; 
 
     return state->file.data[state->file_index];
 }
 
 static inline u8 peek_next_char(scanner_t *state) {
-    assert(state->file.size > 0, "Scanner file size was zero");
-    assert(state->file.data != 0, "Scanner file was zero");
+    assert(state->file.size > 0);
+    assert(state->file.data != 0);
     if (state->file_index >= (state->file.size - 1)) return 0; 
 
     return state->file.data[state->file_index + 1];
@@ -562,7 +562,7 @@ b32 scan_lines(scanner_t *state) {
         init_size = MINIMAL_SIZE;
     }
 
-    if (!area_create(&state->lines, init_size, sizeof(line_tuple_t))) {
+    if (!area_create(&state->lines, init_size)) {
         log_error(STR("Scanner: Couldn't create list."), 0);
         return false;
     }
@@ -577,7 +577,7 @@ b32 scan_lines(scanner_t *state) {
 
         line.stop  = i;
 
-        if (!area_add(&state->lines, (void*)&line)) {
+        if (!area_add(&state->lines, &line)) {
             // @todo error handle
             break;
         }
@@ -786,7 +786,7 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
     }
 
     for (u64 i = start_line; i < stop_line; i++) {
-        line_tuple_t *line = (line_tuple_t*)area_get(&state->lines, i);
+        line_tuple_t *line = area_get(&state->lines, i);
 
         u64 len    = line->stop - line->start + 1;
         u8  *start = state->file.data + line->start;

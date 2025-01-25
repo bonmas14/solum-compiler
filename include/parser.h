@@ -43,8 +43,8 @@ struct ast_node_t {
 struct parser_t {
     b32 had_error;
 
-    area_t nodes;
-    area_t root_indices; // u64
+    area_t<ast_node_t> nodes;
+    area_t<u64> root_indices; 
 };
 
 b32 parse(scanner_t *scanner, parser_t *state);

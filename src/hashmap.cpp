@@ -28,8 +28,8 @@ b32 compare_strings(string_t a, string_t b) {
 }
 
 b32 hashmap_create(hashmap_t *map, u64 size, u64 element_size) {
-    assert(element_size > 0, "element size was 0");
-    assert(size > 0, "size of map was 0");
+    assert(element_size > 0);
+    assert(size > 0);
 
     map->capacity     = size;
     map->element_size = element_size;
@@ -171,7 +171,7 @@ void hashmap_tests(void) {
 
     b32 result = hashmap_create(&map, 256, sizeof(u32));
 
-    assert(result, "hashmap couldnt create itself.");
+    assert(result);
     map.capacity = 3;
 
     u8 name1[] = { "hashmap1" };
@@ -184,30 +184,30 @@ void hashmap_tests(void) {
     string_t key2 = (string_t){ .size = size, .data = name2 };
 
     ref = hashmap_get(&map, key1);
-    assert(ref == NULL, "hashmap returned valid address even without elements");
+    assert(ref == NULL);
     
-    assert(hashmap_add(&map, key1, &size), "adding new key failed (1)");
+    assert(hashmap_add(&map, key1, &size));
     ref = hashmap_get(&map, key1);
-    assert(ref != NULL, "hashmap didn't return valid address of element");
+    assert(ref != NULL);
 
-    assert(hashmap_add(&map, key2, &size), "adding new key failed (2)");
+    assert(hashmap_add(&map, key2, &size));
 
     ref = hashmap_get(&map, key2);
-    assert(ref != NULL, "hashmap didn't return valid address of second element");
+    assert(ref != NULL);
 
-    assert(!hashmap_add(&map, key2, &size), "adding key (2) should fail");
+    assert(!hashmap_add(&map, key2, &size));
 
-    assert(hashmap_contains(&map, key1), "hash map should contain key (1)");
-    assert(hashmap_contains(&map, key2), "hash map should contain key (2)");
+    assert(hashmap_contains(&map, key1));
+    assert(hashmap_contains(&map, key2));
 
-    assert(hashmap_remove(&map, key1), "hash map should remove key (1)");
-    assert(!hashmap_contains(&map, key1), "hash map shouldn't contain key (1)");
+    assert(hashmap_remove(&map, key1));
+    assert(!hashmap_contains(&map, key1));
 
-    assert(hashmap_remove(&map, key2), "hash map should remove key (2)");
-    assert(!hashmap_contains(&map, key2), "hash map shouldn't contain key (2)");
+    assert(hashmap_remove(&map, key2));
+    assert(!hashmap_contains(&map, key2));
 
-    assert(hashmap_add(&map, key1, &size), "adding new key failed after deleting (1)");
-    assert(hashmap_contains(&map, key1), "hash map should contain key (1)");
+    assert(hashmap_add(&map, key1, &size));
+    assert(hashmap_contains(&map, key1));
 
     hashmap_delete(&map);
 

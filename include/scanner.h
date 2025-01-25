@@ -108,8 +108,7 @@ struct scanner_t {
     u64 current_line;
     u64 current_char;
 
-    // area of line_tuple_t
-    area_t   lines; 
+    area_t<line_tuple_t> lines; 
     string_t file;
 }; 
 
