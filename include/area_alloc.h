@@ -33,7 +33,7 @@
 //   b32 area_delete(area_t *container, u64 size)
 //
 //   b32 area_add(area_t *container, T element)
-//   T   area_get(area_t *container, u64 index)
+//   T * area_get(area_t *container, u64 index)
 //   b32 area_allocate(area_t *container, u64 elements, u64 *start_index)
 //
 // -------------------- 
@@ -47,9 +47,39 @@ struct area_t {
     u64 grow_size;
 };
 
-// -------------------- Functions
+// ----------- Initialization 
+
+template<typename DataType>
+b32 area_create(area_t<DataType> *container, u64 init_size);
+template<typename DataType>
+b32 area_delete(area_t<DataType> *area);
+
+// --------- Control
+
+// reserve some amount of memory in area
+// return index of a first element
+template<typename DataType>
+b32 area_allocate(area_t<DataType> *area, u64 elements_amount, u64 *start_index);
+
+// add element to an area, and advance
+template<typename DataType>
+b32 area_add(area_t<DataType> *area, void *data);
+
+// get element by index
+template<typename DataType>
+DataType *area_get(area_t<DataType> *area, u64 index);
+
+// ----------- Helpers
 
 void area_tests(void);
+
+template<typename DataType>
+b32 area_grow(area_t<DataType> *area);
+
+template<typename DataType>
+b32 area_grow_fit(area_t<DataType> *area);
+
+// ----------- Implementation
 
 template<typename DataType>
 b32 area_create(area_t<DataType> *container, u64 init_size) {
@@ -85,12 +115,6 @@ b32 area_delete(area_t<DataType> *area) {
     return true;
 }
 
-template<typename DataType>
-b32 area_grow(area_t<DataType> *area);
-template<typename DataType>
-b32 area_grow_fit(area_t<DataType> *area);
-
-// ------------------------- Useful functions
 
 // reserve some amount of memory in area
 // return index of a first element

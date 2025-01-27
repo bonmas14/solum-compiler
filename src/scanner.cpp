@@ -25,6 +25,20 @@ static inline u8 advance_char(scanner_t *state) {
     return curr_code;
 }
 
+static inline void stepback_char(scanner_t *state) {
+    assert(state->file.size > 0);
+    assert(state->file.data != 0);
+    assert(state->file_index > 0);
+
+    state->file_index--;
+
+    if (state->current_char == 0) {
+        state->current_char = area_get(&state->lines, --state->current_line)->stop;
+    } else {
+        state->current_char--;
+    }
+}
+
 static inline u8 peek_char(scanner_t *state) {
     assert(state->file.size > 0);
     assert(state->file.data != 0);
@@ -64,7 +78,6 @@ static inline b32 char_is_hex(u8 in) {
 static inline b32 char_is_bin(u8 in) {
     return (in >= '0' && in <= '1');
 }
-// @todo make all of them inline for @speed
 
 static inline u8 char_hex_to_int(u8 in) {
     if (!char_is_hex(in)) return 0;
@@ -133,6 +146,26 @@ static b32 process_string(scanner_t *state, token_t *token) {
     token->l1 = state->current_line;
 
     advance_char(state);
+
+
+    // @todo: add same stuff as in process_word if we would even need that here
+    // we just need to add identifier (string_t)
+   
+    /*
+    u64 index = 0;
+
+    if (!area_allocate(&state->symbols, identifier.size, &index)) {
+        log_error_token(STR("Scanner: couldn't allocate space for symbol"), state, *token, 0);
+        token->type = TOKEN_ERROR;
+        return false;
+    }
+
+    u8* dest = area_get(&state->symbols, index);
+    memcpy(dest, identifier.data, identifier.size);
+
+    token->data.symbol = identifier;
+    token->data.symbol.table_index = index;
+     */
 
     return true;
 }
@@ -324,7 +357,6 @@ static b32 process_word(scanner_t *state, token_t *token) {
     u8 buffer[MAX_IDENT_SIZE + 1] = { 0 };
 
     u64 i = 0;
-    buffer[i++] = (u8)token->type;
 
     token->c1 = state->current_char;
     token->l1 = state->current_line;
@@ -349,8 +381,19 @@ static b32 process_word(scanner_t *state, token_t *token) {
 
     token->type = match_with_keyword(identifier);
 
-    // @todo identifiers data is lost...
-    // so we need to recompute it whe we need identifier
+    u64 index = 0;
+    if (!area_allocate(&state->symbols, identifier.size, &index)) {
+        log_error_token(STR("Scanner: couldn't allocate space for symbol"), state, *token, 0);
+        token->type = TOKEN_ERROR;
+        return false;
+    }
+
+    u8* dest = area_get(&state->symbols, index);
+    memcpy(dest, identifier.data, identifier.size);
+
+    token->data.symbol.size = identifier.size;
+    token->data.symbol.table_index = index;
+
     return true;
 }
 
@@ -390,29 +433,30 @@ token_t advance_token(scanner_t *state) {
 
     token.c0 = state->current_char;
     token.l0 = state->current_line;
+    token.type = advance_char(state); 
 
     switch(ch) {
-        case '.': {  } break;
+        case '.': 
+        case ';':
 
-        case '+': { token.type = advance_char(state); } break;
-        case '*': { token.type = advance_char(state); } break;
-        case '/': { token.type = advance_char(state); } break;
-        case '%': { token.type = advance_char(state); } break;
+        case '+': 
+        case '*':
+        case '/': 
+        case '%':
 
-        case '(': { token.type = advance_char(state); } break;
-        case ')': { token.type = advance_char(state); } break;
-        case '@': { token.type = advance_char(state); } break;
-        case '^': { token.type = advance_char(state); } break;
+        case '(':
+        case ')':
+        case '@': 
+        case '^':
+            break;
 
         case '&': {
-            token.type = advance_char(state); 
             if (match_char(state, '&')) {
                 advance_char(state);
                 token.type = TOKEN_LOGIC_AND;
             }
         } break;
         case '|': {
-            token.type = advance_char(state); 
             if (match_char(state, '|')) {
                 advance_char(state);
                 token.type = TOKEN_LOGIC_OR;
@@ -421,24 +465,18 @@ token_t advance_token(scanner_t *state) {
 
 
         case '-': {
-            token.type = advance_char(state); 
-
             if (match_char(state, '>')) {
                 advance_char(state);
                 token.type = TOKEN_RET;
             }
         } break;
         case '!': { 
-            token.type = advance_char(state); 
-
             if (match_char(state, '=')) {
                 advance_char(state);
                 token.type = TOKEN_NEQ;
             }
         } break;
         case '=': {
-            token.type = advance_char(state); 
-
             if (match_char(state, '=')) {
                 advance_char(state);
                 token.type = TOKEN_EQ;
@@ -446,8 +484,6 @@ token_t advance_token(scanner_t *state) {
         } break;
 
         case '<': {
-            token.type = advance_char(state); 
-
             if (match_char(state, '=')) {
                 advance_char(state);
                 token.type = TOKEN_LEQ;
@@ -457,8 +493,6 @@ token_t advance_token(scanner_t *state) {
             }
         } break;
         case '>': {
-            token.type = advance_char(state); 
-
             if (match_char(state, '=')) {
                 advance_char(state);
                 token.type = TOKEN_GEQ;
@@ -469,7 +503,6 @@ token_t advance_token(scanner_t *state) {
         } break;
 
         case '"': {
-            advance_char(state); // @todo remove that in all of the cases
             process_string(state, &token); // @todo. do we need to check the value? 
                                            // right now we just ignore the result
                                            // because in failure it returns only TOKEN_EOF
@@ -478,12 +511,12 @@ token_t advance_token(scanner_t *state) {
 
         default: {
             if (char_is_letter(ch)) {
+                stepback_char(state);
                 process_word(state, &token); // @todo add handlers for false case
-
             } else if (char_is_digit(ch)) {
+                stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
             } else {
-                advance_char(state);
                 token.type = TOKEN_ERROR;
             }
         } break;
@@ -498,7 +531,16 @@ token_t advance_token(scanner_t *state) {
 // @todo: add caching instead of just cleaning this up 
 token_t peek_token(scanner_t *state) {
     scanner_t peek_state = *state;
-    return advance_token(&peek_state);
+    token_t token = advance_token(&peek_state);
+
+    // this is because it is possible that symbols array will get
+    // reallocated and because of that we will get memory leak if 
+    // we dont change it in original
+    if (peek_state.symbols.data != state->symbols.data) {
+        state->symbols.data = peek_state.symbols.data;
+    }
+
+    return token;
 }
 
 token_t peek_next_token(scanner_t *state) {
@@ -606,6 +648,11 @@ b32 scanner_create(const u8* filename, scanner_t *state) {
         return false;
     }
 
+    if (!area_create(&state->symbols, 256)) {
+        log_error(STR("Scanner: Couldn't symbols list."), 0);
+        return false;
+    }
+
     return true;
 }
 
@@ -684,7 +731,7 @@ void get_token_name(const u8 *buffer, token_t token) {
         case TOK_F64:
             sprintf((char*)buffer, "%s", "keyword f64");
             break;
-        case TOK_BOOL:
+        case TOK_BOOL32:
             sprintf((char*)buffer, "%s", "keyword bool");
             break;
         case TOK_NULL:
@@ -704,9 +751,6 @@ void get_token_name(const u8 *buffer, token_t token) {
             break;
         case TOK_FOR:
             sprintf((char*)buffer, "%s", "keyword for");
-            break;
-        case TOK_MUT:
-            sprintf((char*)buffer, "%s", "keyword mut");
             break;
         case TOK_PROTOTYPE:
             sprintf((char*)buffer, "%s", "keyword prototype");

@@ -41,6 +41,7 @@ enum token_type_t {
 
     TOK_STRUCT,
     TOK_UNION,
+    TOK_ENUM,
 
     TOK_U8,
     TOK_U16,
@@ -55,7 +56,7 @@ enum token_type_t {
     TOK_F32,
     TOK_F64,
 
-    TOK_BOOL,
+    TOK_BOOL32,
     TOK_NULL,
     TOK_DEFAULT,
 
@@ -63,8 +64,6 @@ enum token_type_t {
     TOK_ELSE,
     TOK_WHILE,
     TOK_FOR,
-
-    TOK_MUT,
 
     TOK_PROTOTYPE,
     TOK_EXTERNAL,
@@ -81,17 +80,17 @@ enum token_type_t {
 
 #ifdef SCANNER_DEFINITION
 u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
-    "struct", "union",
+    "struct", "union", "enum",
 
     "u8", "u16", "u32", "u64",
-    "s8", "s16", "s32", "u64", 
+    "s8", "s16", "s32", "s64", 
     "f32", "f64",
 
     "b32", "null", "default",
 
     "if", "else", "while", "for",
 
-    "mut", "prototype", "external",
+    "prototype", "external",
 
     "module", "use"
 };
@@ -109,16 +108,22 @@ struct scanner_t {
     u64 current_char;
 
     area_t<line_tuple_t> lines; 
+    area_t<u8> symbols;
     string_t file;
 }; 
 
+struct symbol_t {
+    u64 size;
+    u64 table_index;
+};
+
 struct token_t {
     u32 type;
-    // address in code. without human readable offsets (add 1 or so on)
-    u64 c0, c1, l0, l1;
+    u64 c0, c1, l0, l1; //  without human readable offsets
     union {
         u64 const_int;
         f64 const_double;
+        symbol_t symbol;
     } data;
 };
 
@@ -128,6 +133,7 @@ void scanner_delete(scanner_t *state);
 token_t advance_token(scanner_t *state);
 b32     consume_token(u32 token_type, scanner_t *state);
 token_t peek_token(scanner_t *state);
+token_t peek_next_token(scanner_t *state);
 
 // --- logging for scanner
 

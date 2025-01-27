@@ -27,18 +27,18 @@ ast_node_t parse_primary(local_state_t *state) {
 
     result.type  = AST_LEAF;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_CONST_FP:
         case TOKEN_CONST_INT:
+        case TOKEN_CONST_STRING:
         case TOKEN_IDENT:
             break;
         case TOKEN_OPEN_BRACE:
             result = parse_expression(state);
 
-            if (consume_token(TOKEN_CLOSE_BRACE, state->scanner)) {
-                result.braced = true;
-            } else {
+            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner)) {
                 result.type = AST_ERROR;
 
                 log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, peek_token(state->scanner), 0);
@@ -65,6 +65,7 @@ ast_node_t parse_unary(local_state_t *state) {
 
     result.type  = AST_UNARY;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '@':
@@ -98,6 +99,7 @@ ast_node_t parse_shift(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LSHIFT: 
@@ -133,6 +135,7 @@ ast_node_t parse_and(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '&': {
@@ -167,6 +170,7 @@ ast_node_t parse_or(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '|': {
@@ -201,6 +205,7 @@ ast_node_t parse_xor(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '^': {
@@ -236,6 +241,7 @@ ast_node_t parse_mul(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '*':
@@ -272,6 +278,7 @@ ast_node_t parse_add(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '+':
@@ -307,6 +314,7 @@ ast_node_t parse_compare_expression(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_GR: 
@@ -345,6 +353,7 @@ ast_node_t parse_logic_and_expression(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LOGIC_AND: {
@@ -379,6 +388,7 @@ ast_node_t parse_logic_or_expression(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LOGIC_OR: {
@@ -413,6 +423,7 @@ ast_node_t parse_assing_expression(local_state_t *state) {
 
     result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '=': {
@@ -453,6 +464,122 @@ ast_node_t parse_expression(local_state_t *state) {
     // check for open brace and closing one
     // and then do 
 // }
+//
+
+
+ast_node_t parse_global_statement(local_state_t *state) {
+    ast_node_t node = {};
+
+    node.type = AST_ERROR;
+
+    token_t name = peek_token(state->scanner);
+    token_t next = peek_next_token(state->scanner);
+
+    if (name.type == TOKEN_IDENT && next.type == ':') {
+        consume_token(TOKEN_IDENT, state->scanner);
+        consume_token(':', state->scanner);
+
+        next = peek_token(state->scanner);
+
+        switch(next.type) {
+            case TOKEN_IDENT: {
+                // prototype function definition
+            } break;
+
+            case TOK_UNION: 
+            case TOK_STRUCT: {
+                // SUBTYPE_AST_AST_TYPE_DEFINITION
+            } break;
+
+            case TOK_ENUM: {
+            } break;
+
+            case '<':       // <T>(a : T) -> T   = {}
+            case '(': {     // (a : s32)  -> s32 = {}
+                // FUNC_GENERIC
+                // SUBTYPE_AST_TYPE_DEFINITION
+                // function/prototype definition
+                //
+                // @todo we can do generic prototypes btw.
+                // but this could slow down compilation a bit
+                //
+                // t : <T>(a : T, b : T) -> T = prototype;
+                //
+                // f : t = {
+                //     return a + b;
+                // }
+                // 
+                // mul_by_2 : <B>(a : t<B>, b : B) = {
+                //     a(b, b);
+                // }
+            } break;
+
+
+            case TOK_BOOL32:
+
+            case TOK_U8:
+            case TOK_U16:
+            case TOK_U32:
+            case TOK_U64:
+
+            case TOK_S8:
+            case TOK_S16:
+            case TOK_S32:
+            case TOK_S64:
+
+            case TOK_F32:
+            case TOK_F64: {
+                node.token   = advance_token(state->scanner);
+
+                if (consume_token(';', state->scanner)) {
+                    // name
+                    node.type = AST_BIN; 
+                } else {
+                    node.type = AST_TERN; 
+                }
+
+                node.subtype = SUBTYPE_AST_EXPR;
+
+                // @todo we cant just string from token... 
+                // because it is in symbols table.
+                // 
+                // how to solve:
+                //  create scope_t and use it instead of bare hashmaps
+                //  so we could do extra dereference
+                //
+                //  scope_add(string_t symbol);
+
+                // parser->
+                // = name.data.symbol.table_index;
+            } break;
+
+            default: {
+                         // @todo log error here
+            } break;
+        }
+
+        // @nocheckin 
+        node = parse_expression(state);
+
+    } else {
+        // this is where expression is, we care only now.
+        // we will delete top level statements
+        // @todo log error here
+        node = parse_expression(state);
+    }
+
+
+    // @todo we dont need semicolon everywhere
+    if (!consume_token(';', state->scanner)) {
+        node.type = AST_ERROR;
+
+        log_error_token(STR("Missing semicolon after expression."), state->scanner, node.token, 0);
+    }
+
+
+    return node;
+
+}
 
 b32 parse(scanner_t *scanner, parser_t* state) {
     local_state_t local = {};
@@ -470,12 +597,22 @@ b32 parse(scanner_t *scanner, parser_t* state) {
         return false;
     }
 
+    if (!area_create(&state->scopes, INIT_NODES_SIZE)) {
+        log_error(STR("Parser: Couldn't create scope indices list."), 0);
+        return false;
+    }
+
+    // @todo
+    // hashmap_t<u32> global_scope;
+    // hashmap_create();
+    // area_add(&state->scopes, );
+
     b32 valid_parse = true;
     
     token_t curr = peek_token(local.scanner);
 
     while (curr.type != TOKEN_EOF && curr.type != TOKEN_ERROR) {
-        ast_node_t node = parse_expression(&local);
+        ast_node_t node = parse_global_statement(&local);
 
         if (node.type == AST_ERROR) {
             valid_parse = false; 

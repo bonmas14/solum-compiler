@@ -198,15 +198,37 @@ tuple : struct<A, B> = {
 }
 
 // only last can be variable
-var_t : struct<V[]> {
-    V[] args;
+var_t : struct<V> = {
+    V args;
 }
 
 
 a : var_t<s32[10]>; 
 
-a.arg[0] = 23;
-a.arg[1] = 1000;
+a.args[0] = 23;
+a.args[1] = 1000;
+
+
+
+// variable type count???
+
+
+// --------------------- anonymous struct/union members
+
+some : struct<T> = { // this is type definition. this is why it cant be anon
+      test : u32;
+
+      named_union : union = { // this is member definition
+          test : s32;
+          struct = { // anon member definition
+              same_test : s32;
+          };
+
+          buffer : u8[T];
+      };
+ }
+
+
 
 
 
@@ -231,9 +253,17 @@ res, valid : s32, bool = get_callback().(4, 2);        // <<<<<<<
 
 // ------------- external functions
 
-InitWindow := external;
+InitWindow : () = external(__fastcall);
 
 InitWindow();
+
+
+callback : () = prototype;
+
+my : callback = {
+};
+
+
 
 // ------------- operator overrides
 
