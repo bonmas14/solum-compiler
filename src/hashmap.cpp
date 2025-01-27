@@ -1,15 +1,21 @@
 #include "hashmap.h"
 
-// @todo if you need make hashmap not depend on string_t
-u32 get_string_hash(string_t string) {
+static inline u32 get_hash(u64 size, void *data) {
+    assert(size > 0);
+    assert(data != 0);
     u32 hash = 216613261u;
 
-    for (u64 i = 0; i < string.size; i++) {
-        hash ^= (u8)string.data[i];
+    u8* arr = (u8*)data;
+    for (u64 i = 0; i < size; i++) {
+        hash ^= arr[i];
         hash *= 0x1000193;
     }
 
     return hash;
+}
+
+inline u32 get_string_hash(string_t string) {
+    return get_hash(string.size, string.data);
 }
 
 b32 compare_strings(string_t a, string_t b) {
@@ -27,156 +33,17 @@ b32 compare_strings(string_t a, string_t b) {
     return true;
 }
 
-b32 hashmap_create(hashmap_t *map, u64 size, u64 element_size) {
-    assert(element_size > 0);
-    assert(size > 0);
-
-    map->capacity     = size;
-    map->element_size = element_size;
-
-    map->entries = (hash_entry_t*)ALLOC(sizeof(hash_entry_t) * size);
-    map->values  = ALLOC(element_size * size);
-
-    if (map->entries == NULL) {
-        log_warning(STR("Hashmap: Couldn't initialize map"), 0);
-        if (map->values) FREE(map->values);
-        return false;
-    }
-
-    if (map->values == NULL) {
-        log_warning(STR("Hashmap: Couldn't initialize map"), 0);
-        if (map->entries) FREE(map->entries);
-        return false;
-    }
-
-    return true;
-}
-
-void hashmap_delete(hashmap_t *map) {
-    FREE(map->values);
-    FREE(map->entries);
-}
-
-b32 rebuild_map(hashmap_t *map) {
-    hashmap_t old_map = *map;
-
-    if (!hashmap_create(map, map->capacity * 2, map->element_size)) {
-        return false;
-    }
-
-    for (u64 i = 0; i < old_map.capacity; i++) {
-        if (!map->entries[i].occupied) continue;
-        if (map->entries[i].deleted)   continue;
-
-        hashmap_add(map, old_map.entries[i].name, (u8*)old_map.values + i * map->element_size);
-    }
-
-    hashmap_delete(&old_map);
-    return true;
-}
-
-b32 hashmap_add(hashmap_t *map, string_t key, void *value) {
-    if (map->load > (map->capacity * MAX_HASHMAP_LOAD)) {
-        if (!rebuild_map(map)) {
-            log_error(STR("Map is full, couldn't insert element, attempted to but we resize it and still failed."), 0);
-        }
-    }
-
-    u32 hash = get_string_hash(key);
-    u32 index = hash % map->capacity;
-
-    for (u64 offset = 0; offset < map->capacity; offset++) {
-        u32 lookup = (index + offset) % map->capacity;
-
-        if (!map->entries[lookup].occupied || map->entries[lookup].deleted) { 
-            
-            memcpy((u8*)map->values + map->element_size * lookup, value, map->element_size);
-
-            map->entries[lookup].name     = key;
-            map->entries[lookup].deleted  = false;
-            map->entries[lookup].occupied = true;
-            map->load++;
-
-            return true;
-        } else if (compare_strings(key, map->entries[lookup].name)) {
-            return false;
-        }
-    }
-
-    return false;
-}
-
-b32 hashmap_contains(hashmap_t *map, string_t key) {
-    u32 hash = get_string_hash(key);
-    u32 index = hash % map->capacity;
-
-    for (u64 offset = 0; offset < map->capacity; offset++) {
-        u32 lookup = (index + offset) % map->capacity;
-
-        if (map->entries[lookup].deleted) continue;
-
-        if (!map->entries[lookup].occupied) return false;
-
-        if (compare_strings(key, map->entries[lookup].name)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void *hashmap_get(hashmap_t *map, string_t key) {
-    u32 hash = get_string_hash(key);
-    u32 index = hash % map->capacity;
-
-    for (u64 offset = 0; offset < map->capacity; offset++) {
-        u32 lookup = (index + offset) % map->capacity;
-
-        if (map->entries[lookup].deleted) continue;
-
-        if (!map->entries[lookup].occupied) return NULL;
-
-        if (compare_strings(key, map->entries[lookup].name)) {
-            return (u8*)map->values + lookup * map->element_size;
-        }
-    }
-
-    return NULL;
-}
-
-b32 hashmap_remove(hashmap_t *map, string_t key) {
-    u32 hash = get_string_hash(key);
-    u32 index = hash % map->capacity;
-
-    for (u64 offset = 0; offset < map->capacity; offset++) {
-        u32 lookup = (index + offset) % map->capacity;
-
-        if (map->entries[lookup].deleted) continue;
-
-        if (!map->entries[lookup].occupied) return false;
-
-        if (compare_strings(key, map->entries[lookup].name)) {
-            map->entries[lookup].deleted = true;
-            map->load--;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
 void hashmap_tests(void) {
-    hashmap_t map = {};
+    hashmap_t<u32> map = {};
 
-    b32 result = hashmap_create(&map, 256, sizeof(u32));
+    b32 result = hashmap_create(&map, 256);
 
     assert(result);
     map.capacity = 3;
 
     u8 name1[] = { "hashmap1" };
     u8 name2[] = { "hashmap2" };
-    u64 size = 8;
+    u32 size = 8;
     void* ref;
 
     string_t key1 = (string_t){ .size = size , .data = name1 };
