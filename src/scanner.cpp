@@ -537,7 +537,9 @@ token_t peek_token(scanner_t *state) {
     // reallocated and because of that we will get memory leak if 
     // we dont change it in original
     if (peek_state.symbols.data != state->symbols.data) {
-        state->symbols.data = peek_state.symbols.data;
+        u64 count = state->symbols.count;
+        state->symbols = peek_state.symbols;
+        state->symbols.count = count;
     }
 
     return token;
