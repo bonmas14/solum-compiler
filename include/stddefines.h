@@ -28,6 +28,12 @@ struct string_t {
     u8 *data;
 };
 
+struct symbol_t {
+    u64 size;
+    u64 table_index;
+};
+
+
 #define STR(s) reinterpret_cast<const u8*>(s)
 
 // @nocheckin

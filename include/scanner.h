@@ -86,7 +86,9 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "s8", "s16", "s32", "s64", 
     "f32", "f64",
 
-    "b32", "null", "default",
+    "b32", 
+
+    "null", "default",
 
     "if", "else", "while", "for",
 
@@ -111,11 +113,6 @@ struct scanner_t {
     area_t<u8> symbols;
     string_t file;
 }; 
-
-struct symbol_t {
-    u64 size;
-    u64 table_index;
-};
 
 struct token_t {
     u32 type;

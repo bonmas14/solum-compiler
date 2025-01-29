@@ -34,7 +34,9 @@
 //
 //   b32 area_add(area_t *container, T element)
 //   T * area_get(area_t *container, u64 index)
+//
 //   b32 area_allocate(area_t *container, u64 elements, u64 *start_index)
+//   b32 area_fill(area_t *container, u64 elements_amount, u64 start_index)
 //
 // -------------------- 
 
@@ -61,9 +63,12 @@ b32 area_delete(area_t<DataType> *area);
 template<typename DataType>
 b32 area_allocate(area_t<DataType> *area, u64 elements_amount, u64 *start_index);
 
+template<typename DataType> 
+b32 area_fill(area_t<DataType> *area, DataType *data, u64 elements_amount, u64 start_index);
+
 // add element to an area, and advance
 template<typename DataType>
-b32 area_add(area_t<DataType> *area, void *data);
+b32 area_add(area_t<DataType> *area, DataType *data);
 
 // get element by index
 template<typename DataType>
@@ -135,9 +140,20 @@ b32 area_allocate(area_t<DataType> *area, u64 elements_amount, u64 *start_index)
     return true;
 }
 
+template<typename DataType> 
+b32 area_fill(area_t<DataType> *area, DataType *data, u64 elements_amount, u64 start_index) {
+    DataType *start_address = area_get(area, start_index);
+
+    if (start_address == NULL) 
+        return false;
+    
+    memcpy(start_address, data, elements_amount * sizeof(DataType));
+    return true;
+}
+
 // add element to an area, and advance
 template<typename DataType>
-b32 area_add(area_t<DataType> *area, void *data) {
+b32 area_add(area_t<DataType> *area, DataType *data) {
     assert(area != 0);
     assert(data != 0);
 

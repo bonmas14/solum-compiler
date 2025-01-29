@@ -482,13 +482,25 @@ ast_node_t parse_global_statement(local_state_t *state) {
         next = peek_token(state->scanner);
 
         switch(next.type) {
-            case TOKEN_IDENT: {
-                // prototype function definition
+            case '=': {
+                // evaluate on the right size
+                //
+                // SUBTYPE_AST_UNKN_DECL
             } break;
 
-            case TOK_UNION: 
+            case TOKEN_IDENT: {
+                // prototype function definition
+                //
+                // SUBTYPE_AST_UNKN_DECL
+            } break;
+
+            case TOK_UNION: {
+                //
+
+            };
             case TOK_STRUCT: {
                 // SUBTYPE_AST_AST_TYPE_DEFINITION
+
             } break;
 
             case TOK_ENUM: {
@@ -602,10 +614,17 @@ b32 parse(scanner_t *scanner, parser_t* state) {
         return false;
     }
 
-    // @todo
-    // hashmap_t<u32> global_scope;
-    // hashmap_create();
-    // area_add(&state->scopes, );
+    u64 global_scope_index = 0;
+
+    if (!area_allocate(&state->scopes, 1, &global_scope_index)) {
+        log_error(STR("Parser: Couldn't create global scope."), 0);
+        return false;
+    }
+
+    if (!hashmap_create(area_get(&state->scopes, global_scope_index), &scanner->symbols, 100)) {
+        log_error(STR("Parser: Couldn't init global scope hashmap."), 0);
+        return false;
+    }
 
     b32 valid_parse = true;
     

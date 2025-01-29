@@ -388,8 +388,7 @@ static b32 process_word(scanner_t *state, token_t *token) {
         return false;
     }
 
-    u8* dest = area_get(&state->symbols, index);
-    memcpy(dest, identifier.data, identifier.size);
+    area_fill(&state->symbols, identifier.data, identifier.size, index);
 
     token->data.symbol.size = identifier.size;
     token->data.symbol.table_index = index;
