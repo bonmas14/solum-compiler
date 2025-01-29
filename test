@@ -11,4 +11,9 @@ a : b32;
 first_integer  : s32 = 2;
 second_integer : s32 = first_integer + 2;
 
-ptr : ^^^^^s32 = null;
+ptr : ^s32 = null;
+
+arr : [32]^s32 = 0;
+
+
+new;

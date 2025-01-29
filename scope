@@ -15,9 +15,9 @@ LOCAL SCOPE:
 
 1. Minimal language:
 
-- variables, arrays and pointers (all const stuff should work here)
-- scopes
-- math
++ math
++ variables, arrays and pointers
+~ blocks and scopes
 - function defines/calls (internal)
 
 2. Expanding functionality:

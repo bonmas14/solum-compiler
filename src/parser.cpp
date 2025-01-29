@@ -471,7 +471,7 @@ ast_node_t parse_expression(local_state_t *state) {
 ast_node_t parse_primary_type(local_state_t *state) {
     ast_node_t result = {};
 
-    token_t token = advance_token(state->scanner);
+    token_t token = peek_token(state->scanner);
 
     result.type  = AST_LEAF;
     result.token = token;
@@ -494,14 +494,17 @@ ast_node_t parse_primary_type(local_state_t *state) {
         case TOK_F32:
         case TOK_F64:
         case TOK_BOOL32:
+            advance_token(state->scanner);
             result.subtype = SUBTYPE_AST_STD_TYPE;
             break;
 
         case TOKEN_IDENT:
+            advance_token(state->scanner);
             result.subtype = SUBTYPE_AST_UNKN_TYPE;
             break;
 
         default: {
+            advance_token(state->scanner);
             result.type = AST_ERROR;
             log_error_token(STR("Unknown type"), state->scanner, token, 0);
         } break;
@@ -518,10 +521,57 @@ ast_node_t parse_type(local_state_t *state) {
     result.type  = AST_UNARY;
 
     switch (token.type) {
+        case '[': {
+            result.type = AST_BIN;
+
+            result.token = advance_token(state->scanner);
+
+            /*
+            if (peek_token(state->scanner).type != ']') { // @todo add the handle for [] without expression inside
+            }
+            */
+
+            ast_node_t size   = parse_expression(state);
+            token_t array_end = advance_token(state->scanner); 
+
+            if (array_end.type != ']') {
+                log_error_token(STR("Array initializer expression should end with ']'."), state->scanner, array_end, 0);
+                result.type = AST_ERROR;
+                break;
+            }
+
+            result.token.c1 = array_end.c1;
+            result.token.l1 = array_end.l1;
+
+            area_add(&state->parser->nodes, &size);
+            result.left_index = state->parser->nodes.count - 1;
+
+            // @todo this will allow for this case: [] ^ [] ^ [] s32
+            // this doesnt make any sence, so we need to delete it in analyzer step
+
+            ast_node_t type = parse_type(state);
+
+            // @todo check for AST_ERROR
+            if (type.subtype == SUBTYPE_AST_AUTO_TYPE) {
+                result.type = AST_ERROR;
+                log_error_token(STR("Type cannot be automatic when it specified as an array."), state->scanner, result.token, 0);
+                break;
+            }
+
+            area_add(&state->parser->nodes, &type);
+            result.right_index = state->parser->nodes.count - 1;
+
+        } break;
         case '^': {
             result.token = advance_token(state->scanner);
 
             ast_node_t node = parse_type(state);
+            // @todo check for AST_ERROR
+            if (node.subtype == SUBTYPE_AST_AUTO_TYPE) {
+                result.type = AST_ERROR;
+                log_error_token(STR("Type cannot be automatic when it specified as a pointer."), state->scanner, result.token, 0);
+                break;
+            }
             area_add(&state->parser->nodes, &node);
             result.left_index = state->parser->nodes.count - 1;
         } break;
@@ -588,6 +638,8 @@ ast_node_t parse_global_statement(local_state_t *state) {
 
     token_t name = peek_token(state->scanner);
     token_t next = peek_next_token(state->scanner);
+
+    node.token = name;
 
     if (name.type == TOKEN_IDENT && next.type == ':') {
         consume_token(TOKEN_IDENT, state->scanner);
@@ -659,11 +711,12 @@ ast_node_t parse_global_statement(local_state_t *state) {
     }
 
 
+    token_t semicolon = advance_token(state->scanner);
     // @todo we dont need semicolon everywhere
-    if (!consume_token(';', state->scanner)) {
+    if (semicolon.type != ';') {
         node.type = AST_ERROR;
 
-        log_error_token(STR("Missing semicolon after expression."), state->scanner, node.token, 0);
+        log_error_token(STR("Missing semicolon after expression."), state->scanner, semicolon, 0);
     }
 
 
