@@ -5,5 +5,10 @@
 
 identifier + something;
 
-first_integer : s32;
-second_integer : s32;
+t : u64;
+a : b32;
+
+first_integer  : s32 = 2;
+second_integer : s32 = first_integer + 2;
+
+ptr : ^^^^^s32 = null;

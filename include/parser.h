@@ -48,16 +48,21 @@ enum ast_subtype_t {
     AST_BLOCK_IMPERATIVE,
 };
 
-enum ast_funciton_flags_t {
-    FUNC_EXTERNAL = 0x00010000,
-    FUNC_PROTO    = 0x00100000,
-    FUNC_GENERIC  = 0x01000000,
+enum funciton_flags_t {
+    SCOPE_IS_GENERIC    = 0x00100000,
+    SCOPE_FUNC_EXTERNAL = 0x00010000,
+    SCOPE_FUNC_PROTO    = 0x00020000,
+};
+
+enum scope_entry_types_t {
+    SCOPE_VAR,
+    SCOPE_FUNC, // generic or not
+    SCOPE_TYPE // proto, enum, struct, union
 };
 
 struct ast_node_t {
     s32 type;
     s32 subtype;
-    u32 funciton_flags;
 
     token_t token;
 
@@ -72,6 +77,8 @@ struct ast_node_t {
 };
 
 struct scope_entry_t {
+    u32 type;
+    u32 flags;
     u32 node_index;
 };
 

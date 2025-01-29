@@ -34,7 +34,9 @@ ast_node_t parse_primary(local_state_t *state) {
         case TOKEN_CONST_INT:
         case TOKEN_CONST_STRING:
         case TOKEN_IDENT:
+        case TOK_NULL:
             break;
+
         case TOKEN_OPEN_BRACE:
             result = parse_expression(state);
 
@@ -466,19 +468,17 @@ ast_node_t parse_expression(local_state_t *state) {
 // }
 //
 
-ast_node_t parse_type(local_state_t *state) {
-    ast_node_t node = {};
+ast_node_t parse_primary_type(local_state_t *state) {
+    ast_node_t result = {};
 
-    token_t token = peek_token(state->scanner);
+    token_t token = advance_token(state->scanner);
 
-    node.type  = AST_LEAF;
-    node.token = token;
+    result.type  = AST_LEAF;
+    result.token = token;
 
     switch (token.type) {
-        // AST_LEAF
         case '=':
-            advance_token(state->scanner);
-            node.subtype = SUBTYPE_AST_AUTO_TYPE;
+            result.subtype = SUBTYPE_AST_AUTO_TYPE;
             break;
 
         case TOK_U8:
@@ -494,19 +494,70 @@ ast_node_t parse_type(local_state_t *state) {
         case TOK_F32:
         case TOK_F64:
         case TOK_BOOL32:
-            advance_token(state->scanner);
-            node.subtype = SUBTYPE_AST_STD_TYPE;
+            result.subtype = SUBTYPE_AST_STD_TYPE;
             break;
 
-        // proto / struct / enum / union
         case TOKEN_IDENT:
-            advance_token(state->scanner);
-            node.subtype = SUBTYPE_AST_UNKN_TYPE;
+            result.subtype = SUBTYPE_AST_UNKN_TYPE;
             break;
 
+        default: {
+            result.type = AST_ERROR;
+            log_error_token(STR("Unknown type"), state->scanner, token, 0);
+        } break;
+    }
+
+    return result;
+}
+
+ast_node_t parse_type(local_state_t *state) {
+    ast_node_t result = {};
+
+    token_t token = peek_token(state->scanner);
+
+    result.type  = AST_UNARY;
+
+    switch (token.type) {
+        case '^': {
+            result.token = advance_token(state->scanner);
+
+            ast_node_t node = parse_type(state);
+            area_add(&state->parser->nodes, &node);
+            result.left_index = state->parser->nodes.count - 1;
+        } break;
+
+        default: {
+            result = parse_primary_type(state);
+        } break;
+    }
+
+    return result;
+}
+
+ast_node_t parse_declaration_type(local_state_t *state) {
+    ast_node_t node = {};
+
+    token_t token = peek_token(state->scanner);
+
+    node.type  = AST_LEAF;
+    node.token = token;
+
+    switch (token.type) {
         // case '<':
         case '(': { 
             node.type = AST_BIN;
+
+            consume_token('(', state->scanner);
+
+            // parser_parameter_list();
+            //     parse_parameter();
+            consume_token(')', state->scanner);
+
+            if (consume_token(TOKEN_RET, state->scanner)) {
+                // we have return values
+            } else {
+                // we dont return anything
+            }
 
             /*
             if (token.type == '<') {
@@ -515,6 +566,7 @@ ast_node_t parse_type(local_state_t *state) {
                 // CENTER
             }
             */
+
             // left = parse_parameter_list();
             // right = parse_return_types_list();
             //
@@ -522,11 +574,8 @@ ast_node_t parse_type(local_state_t *state) {
         } break;
 
         default: {
-            advance_token(state->scanner);
-            node.type = AST_ERROR;
-            log_error_token(STR("Unknown type"), state->scanner, token, 0);
+            node = parse_type(state);
         } break;
-
     }
 
     return node;
@@ -553,7 +602,6 @@ ast_node_t parse_global_statement(local_state_t *state) {
             };
             case TOK_STRUCT: {
                 // SUBTYPE_AST_AST_TYPE_DEFINITION
-
             } break;
 
             case TOK_ENUM: {
@@ -561,7 +609,7 @@ ast_node_t parse_global_statement(local_state_t *state) {
 
 
             default: {
-                ast_node_t type = parse_type(state);
+                ast_node_t type = parse_declaration_type(state);
 
                 if (type.type == AST_ERROR) {
                     node.type = AST_ERROR;
@@ -576,26 +624,31 @@ ast_node_t parse_global_statement(local_state_t *state) {
                 if (consume_token(';', state->scanner)) {
                     node.type = AST_UNARY; 
                     node.subtype = SUBTYPE_AST_VAR;
-                } else {
-                    node.type = AST_BIN; 
-                    // we got specific decl
-                    //
-                    // it could be type definition also
+                    return node;
                 }
-    
-                return node;
 
-                // @todo we cant just string from token... 
-                // because it is in symbols table.
-                // 
-                // how to solve:
-                //  create scope_t and use it instead of bare hashmaps
-                //  so we could do extra dereference
+                node.type = AST_BIN; 
+
+                if (!consume_token('=', state->scanner)) {
+                    node.type = AST_ERROR;
+                    log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
+                    break;
+                }
+
+                // @todo check for:
+                // - function declaration
+                // - prototype declaration
                 //
-                //  scope_add(string_t symbol);
+                // right now we assume we only have expresions here
+                ast_node_t expresion = parse_expression(state);
+                area_add(&state->parser->nodes, &expresion);
+                node.right_index = state->parser->nodes.count - 1;
 
-                // parser->
-                // = name.data.symbol.table_index;
+                // we got specific decl
+                //
+                // it could be type definition also
+
+                // return node;
             } break;
         }
     } else {
@@ -676,13 +729,12 @@ b32 parse(scanner_t *scanner, parser_t* state) {
         if (node.subtype == SUBTYPE_AST_VAR) {
             scope_entry_t entry = {};
 
+            entry.type       = SCOPE_VAR;
             entry.node_index = root_index;
 
             hashmap_t<scope_entry_t> *scope = area_get(&state->scopes, 0);
 
             if (hashmap_contains(scope, node.token.data.symbol)) {
-                // error...
-
                 log_error_token(STR("the name of declaration is already in use."), local.scanner, node.token, 0);
                 valid_parse = false;
                 break;
