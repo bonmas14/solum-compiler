@@ -466,6 +466,71 @@ ast_node_t parse_expression(local_state_t *state) {
 // }
 //
 
+ast_node_t parse_type(local_state_t *state) {
+    ast_node_t node = {};
+
+    token_t token = peek_token(state->scanner);
+
+    node.type  = AST_LEAF;
+    node.token = token;
+
+    switch (token.type) {
+        // AST_LEAF
+        case '=':
+            advance_token(state->scanner);
+            node.subtype = SUBTYPE_AST_AUTO_TYPE;
+            break;
+
+        case TOK_U8:
+        case TOK_U16:
+        case TOK_U32:
+        case TOK_U64:
+
+        case TOK_S8:
+        case TOK_S16:
+        case TOK_S32:
+        case TOK_S64:
+
+        case TOK_F32:
+        case TOK_F64:
+        case TOK_BOOL32:
+            advance_token(state->scanner);
+            node.subtype = SUBTYPE_AST_STD_TYPE;
+            break;
+
+        // proto / struct / enum / union
+        case TOKEN_IDENT:
+            advance_token(state->scanner);
+            node.subtype = SUBTYPE_AST_UNKN_TYPE;
+            break;
+
+        // case '<':
+        case '(': { 
+            node.type = AST_BIN;
+
+            /*
+            if (token.type == '<') {
+                node.type = AST_TERN;
+                // parse_generic_type_list();
+                // CENTER
+            }
+            */
+            // left = parse_parameter_list();
+            // right = parse_return_types_list();
+            //
+            // center = imperative block or expression
+        } break;
+
+        default: {
+            advance_token(state->scanner);
+            node.type = AST_ERROR;
+            log_error_token(STR("Unknown type"), state->scanner, token, 0);
+        } break;
+
+    }
+
+    return node;
+}
 
 ast_node_t parse_global_statement(local_state_t *state) {
     ast_node_t node = {};
@@ -482,18 +547,6 @@ ast_node_t parse_global_statement(local_state_t *state) {
         next = peek_token(state->scanner);
 
         switch(next.type) {
-            case '=': {
-                // evaluate on the right size
-                //
-                // SUBTYPE_AST_UNKN_DECL
-            } break;
-
-            case TOKEN_IDENT: {
-                // prototype function definition
-                //
-                // SUBTYPE_AST_UNKN_DECL
-            } break;
-
             case TOK_UNION: {
                 //
 
@@ -506,51 +559,31 @@ ast_node_t parse_global_statement(local_state_t *state) {
             case TOK_ENUM: {
             } break;
 
-            case '<':       // <T>(a : T) -> T   = {}
-            case '(': {     // (a : s32)  -> s32 = {}
-                // FUNC_GENERIC
-                // SUBTYPE_AST_TYPE_DEFINITION
-                // function/prototype definition
-                //
-                // @todo we can do generic prototypes btw.
-                // but this could slow down compilation a bit
-                //
-                // t : <T>(a : T, b : T) -> T = prototype;
-                //
-                // f : t = {
-                //     return a + b;
-                // }
-                // 
-                // mul_by_2 : <B>(a : t<B>, b : B) = {
-                //     a(b, b);
-                // }
-            } break;
 
+            default: {
+                ast_node_t type = parse_type(state);
 
-            case TOK_BOOL32:
-
-            case TOK_U8:
-            case TOK_U16:
-            case TOK_U32:
-            case TOK_U64:
-
-            case TOK_S8:
-            case TOK_S16:
-            case TOK_S32:
-            case TOK_S64:
-
-            case TOK_F32:
-            case TOK_F64: {
-                node.token   = advance_token(state->scanner);
-
-                if (consume_token(';', state->scanner)) {
-                    // name
-                    node.type = AST_BIN; 
-                } else {
-                    node.type = AST_TERN; 
+                if (type.type == AST_ERROR) {
+                    node.type = AST_ERROR;
+                    break;
                 }
 
-                node.subtype = SUBTYPE_AST_EXPR;
+                area_add(&state->parser->nodes, &type);
+                node.left_index = state->parser->nodes.count - 1;
+
+                node.token = name;
+
+                if (consume_token(';', state->scanner)) {
+                    node.type = AST_UNARY; 
+                    node.subtype = SUBTYPE_AST_VAR;
+                } else {
+                    node.type = AST_BIN; 
+                    // we got specific decl
+                    //
+                    // it could be type definition also
+                }
+    
+                return node;
 
                 // @todo we cant just string from token... 
                 // because it is in symbols table.
@@ -564,15 +597,7 @@ ast_node_t parse_global_statement(local_state_t *state) {
                 // parser->
                 // = name.data.symbol.table_index;
             } break;
-
-            default: {
-                         // @todo log error here
-            } break;
         }
-
-        // @nocheckin 
-        node = parse_expression(state);
-
     } else {
         // this is where expression is, we care only now.
         // we will delete top level statements
@@ -646,6 +671,26 @@ b32 parse(scanner_t *scanner, parser_t* state) {
 
         u64 root_index = local.parser->nodes.count - 1;
         area_add(&local.parser->root_indices, &root_index);
+
+        // only adding AST_VAR
+        if (node.subtype == SUBTYPE_AST_VAR) {
+            scope_entry_t entry = {};
+
+            entry.node_index = root_index;
+
+            hashmap_t<scope_entry_t> *scope = area_get(&state->scopes, 0);
+
+            if (hashmap_contains(scope, node.token.data.symbol)) {
+                // error...
+
+                log_error_token(STR("the name of declaration is already in use."), local.scanner, node.token, 0);
+                valid_parse = false;
+                break;
+            } else {
+                hashmap_add(scope, node.token.data.symbol, &entry);
+            }
+        }
+
 
         curr = peek_token(local.scanner);
     }

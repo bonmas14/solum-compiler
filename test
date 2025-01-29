@@ -3,5 +3,7 @@
 
 "hello world";
 
-
 identifier + something;
+
+first_integer : s32;
+second_integer : s32;

@@ -40,6 +40,7 @@ struct interop_state_t {
         f64 f;
     } container;
 };
+
 interop_state_t interop_node(parser_t *parser, ast_node_t *node) {
     interop_state_t state = { .valid = true };
     ast_node_t* child;
@@ -138,10 +139,15 @@ interop_state_t interop_node(parser_t *parser, ast_node_t *node) {
     state.valid = false;
     return state;
 }
-
-int main(void) {
+void debug_tests(void) {
     hashmap_tests();
     area_tests();
+}
+
+int main(void) {
+#ifdef DEBUG
+    debug_tests();
+#endif
 
     scanner_t scanner = {};
 

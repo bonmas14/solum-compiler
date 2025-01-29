@@ -19,18 +19,31 @@ enum ast_types_t {
 };
 
 enum ast_subtype_t {
-    SUBTYPE_AST_UNKNOWN   = -1,
 
     SUBTYPE_AST_EXPR      = 0,
 
-    SUBTYPE_AST_STRUCT_DEF    = 0x10,
-    SUBTYPE_AST_UNION_DEF     = 0x11,
-    SUBTYPE_AST_ENUM_DEF      = 0x12,
-    SUBTYPE_AST_PROTOFUNC_DEF = 0x13,
+    // DECLARATIONS 
+    // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
+    SUBTYPE_AST_UNKN_DECL  = 0x10,
 
-    SUBTYPE_AST_UNKN_DECL = 0x20,
-    SUBTYPE_AST_FUNC_DECL = 0x21,
-    SUBTYPE_AST_VAR_DECL  = 0x22,
+    SUBTYPE_AST_STRUCT_DEF = 0x11,
+    SUBTYPE_AST_UNION_DEF  = 0x12,
+    SUBTYPE_AST_ENUM_DEF   = 0x13,
+    SUBTYPE_AST_PROTO_DEF  = 0x14,
+
+    SUBTYPE_AST_FUNC = 0x15, 
+    SUBTYPE_AST_VAR  = 0x16, 
+
+    // types
+    SUBTYPE_AST_AUTO_TYPE = 0x20,
+    SUBTYPE_AST_STD_TYPE  = 0x21,
+    SUBTYPE_AST_UNKN_TYPE = 0x22,
+    SUBTYPE_AST_FUNC_TYPE = 0x23,
+
+    SUBTYPE_AST_FUNC_PARAM = 0x30,
+
+
+    // definitions
 
     AST_BLOCK_IMPERATIVE,
 };
@@ -49,6 +62,7 @@ struct ast_node_t {
     token_t token;
 
     u64 left_index;
+    u64 center_index;
     u64 right_index;
 
     u64 list_start_index;
@@ -58,7 +72,7 @@ struct ast_node_t {
 };
 
 struct scope_entry_t {
-    u32 node_index; 
+    u32 node_index;
 };
 
 struct parser_t {

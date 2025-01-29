@@ -381,6 +381,10 @@ static b32 process_word(scanner_t *state, token_t *token) {
 
     token->type = match_with_keyword(identifier);
 
+    if (token->type != TOKEN_IDENT) {
+        return true;
+    }
+
     u64 index = 0;
     if (!area_allocate(&state->symbols, identifier.size, &index)) {
         log_error_token(STR("Scanner: couldn't allocate space for symbol"), state, *token, 0);
@@ -436,6 +440,7 @@ token_t advance_token(scanner_t *state) {
 
     switch(ch) {
         case '.': 
+        case ':':
         case ';':
 
         case '+': 
