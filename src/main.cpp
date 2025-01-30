@@ -41,25 +41,25 @@ int main(void) {
 #endif
 
     /*
-    scanner_t scanner = {};
+       scanner_t scanner = {};
 
-    if (!scanner_create(STR("test"), &scanner)) {
-        log_error(STR("Main: couldn't open file and load it into memory."), 0);
-        return -1;
-    }
+       if (!scanner_create(STR("test"), &scanner)) {
+       log_error(STR("Main: couldn't open file and load it into memory."), 0);
+       return -1;
+       }
 
-    parser_t parser = {};
+       parser_t parser = {};
 
-    parse(&scanner, &parser);
+       parse(&scanner, &parser);
 
-    for (u64 i = 0; i < parser.root_indices.count; i++) {
-        ast_node_t *root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+       for (u64 i = 0; i < parser.root_indices.count; i++) {
+       ast_node_t *root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-        print_node(&scanner, &parser, root, 0);
-    }
+       print_node(&scanner, &parser, root, 0);
+       }
 
-    generate_code();
-    */
+       generate_code();
+       */
 
     area_t<u8> area = {};
     area_create(&area, 1000);
@@ -81,27 +81,27 @@ void repl(area_t<u8> *area) {
         ch = 0;
         area_add(area, &ch);
 
-		fprintf(stderr, "\x1b[1;1f\x1b[0J");
-		fprintf(stderr, "%.*s\n", (int)area->count, area->data);
+        fprintf(stderr, "\x1b[1;1f\x1b[0J");
+        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
-		string_t str = {};
+        string_t str = {};
 
-		str.size = area->count;
+        str.size = area->count;
         area->count--;
-		str.data = area->data;
+        str.data = area->data;
 
-		scanner_t scanner = {};
-		parser_t  parser = {};
+        scanner_t scanner = {};
+        parser_t  parser = {};
 
-		if (!scanner_open(&str, &scanner)) return;
-		if (!parse(&scanner, &parser)) return;
+        if (!scanner_open(&str, &scanner)) return;
+        if (!parse(&scanner, &parser)) return;
 
-		for (u64 i = 0; i < parser.root_indices.count; i++) {
-			ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+        for (u64 i = 0; i < parser.root_indices.count; i++) {
+            ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-			print_node(&scanner, &parser, root, 0);
-		}
+            print_node(&scanner, &parser, root, 0);
+        }
 
-		scanner_delete(&scanner);
+        scanner_delete(&scanner);
     } 
 }
