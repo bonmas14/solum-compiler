@@ -5,8 +5,12 @@
 #include "area_alloc.h"
 #include "hashmap.h"
 
+#ifdef _WIN32
 #include <conio.h>
 #include <windows.h>
+#else 
+#include <stdio.h>
+#endif
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c)
@@ -71,18 +75,26 @@ int main(void) {
     return 0;
 }
 
+#ifdef _WIN32
 void repl(area_t<u8> *area) {
     if (_kbhit()) {
         u8 ch = _getch();
 
-        if (ch == '\b') area->count--;
-        else            area_add(area, &ch);
+        if (ch == '\r') ch = '\n';
+
+        if (ch == '\b') {
+            if (area->count != 0) {
+                area->count--;
+            }
+        } else {
+            area_add(area, &ch);
+        }
 
         ch = 0;
         area_add(area, &ch);
 
-        fprintf(stderr, "\x1b[1;1f\x1b[0J");
-        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
+        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
+        fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
 
         string_t str = {};
 
@@ -93,15 +105,62 @@ void repl(area_t<u8> *area) {
         scanner_t scanner = {};
         parser_t  parser = {};
 
-        if (!scanner_open(&str, &scanner)) return;
-        if (!parse(&scanner, &parser)) return;
+        scanner_open(&str, &scanner);
+        parse(&scanner, &parser);
 
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-            print_node(&scanner, &parser, root, 0);
+            // print_node(&scanner, &parser, root, 0);
         }
 
         scanner_delete(&scanner);
+
+        fprintf(stderr, "\x1b[u\x1b[?25h");
     } 
 }
+
+#else 
+
+void repl(area_t<u8> *area) {
+    u8 ch = getchar();
+
+    if (ch == '\r') ch = '\n';
+
+    if (ch == '\b') {
+        if (area->count != 0) {
+            area->count--;
+        }
+    } else {
+        area_add(area, &ch);
+    }
+
+    ch = 0;
+    area_add(area, &ch);
+
+    fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
+    fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
+
+    string_t str = {};
+
+    str.size = area->count;
+    area->count--;
+    str.data = area->data;
+
+    scanner_t scanner = {};
+    parser_t  parser = {};
+
+    scanner_open(&str, &scanner);
+    parse(&scanner, &parser);
+
+    for (u64 i = 0; i < parser.root_indices.count; i++) {
+        ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+
+        // print_node(&scanner, &parser, root, 0);
+    }
+
+    scanner_delete(&scanner);
+
+    fprintf(stderr, "\x1b[u\x1b[?25h");
+}
+#endif

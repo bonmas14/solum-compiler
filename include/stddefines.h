@@ -42,7 +42,11 @@ struct symbol_t {
 #ifdef DEBUG
 #define assert(result) { \
     if ((result) == false) { \
-        log_error(STR("assertion failed."), 0);\
+        u8 fname[256] = { __FILE__ };\
+        u64 line = __LINE__;\
+        u8 buffer[512];\
+        sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", fname, line);\
+        log_error(buffer, 0);\
     } \
 }
 #else 
