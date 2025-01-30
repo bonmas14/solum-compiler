@@ -111,6 +111,7 @@ struct scanner_t {
 
     area_t<line_tuple_t> lines; 
     area_t<u8> symbols;
+    b32 is_dynamic;
     string_t file;
 }; 
 
@@ -124,11 +125,14 @@ struct token_t {
     } data;
 };
 
+
 b32 scanner_create(const u8* filename, scanner_t *state);
 void scanner_delete(scanner_t *state);
 
+b32 scanner_open(string_t *string, scanner_t *state);
+
 token_t advance_token(scanner_t *state);
-b32     consume_token(u32 token_type, scanner_t *state);
+b32     consume_token(u32 token_type, scanner_t *state, token_t *token);
 token_t peek_token(scanner_t *state);
 token_t peek_next_token(scanner_t *state);
 

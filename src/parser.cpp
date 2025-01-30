@@ -37,15 +37,16 @@ ast_node_t parse_primary(local_state_t *state) {
         case TOK_NULL:
             break;
 
-        case TOKEN_OPEN_BRACE:
+        case TOKEN_OPEN_BRACE: {
             result = parse_expression(state);
 
-            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner)) {
+            token_t error_token = {};
+            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token)) {
                 result.type = AST_ERROR;
 
-                log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, peek_token(state->scanner), 0);
+                log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, error_token, 0);
             }
-            break;
+        } break;
         default:
             result.type = AST_ERROR;
             log_error_token(STR("Parser: wrong primary token type"),
@@ -416,7 +417,8 @@ ast_node_t parse_logic_or_expression(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_assing_expression(local_state_t *state) {
+// @todo: add mulitple return statements assignment
+ast_node_t parse_assignment_expression(local_state_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_logic_or_expression(state);
@@ -434,7 +436,7 @@ ast_node_t parse_assing_expression(local_state_t *state) {
             area_add(&state->parser->nodes, &left);
             result.left_index = state->parser->nodes.count - 1;
 
-            right = parse_assing_expression(state);
+            right = parse_assignment_expression(state);
             area_add(&state->parser->nodes, &right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
@@ -452,14 +454,30 @@ ast_node_t parse_assing_expression(local_state_t *state) {
 }
 
 ast_node_t parse_expression(local_state_t *state) {
-    return parse_assing_expression(state);
-    /*
-    ast_node_t left = {};
+    ast_node_t result = parse_assignment_expression(state);
 
-    left = parse_primary(state);
+    // @todo change to an ast list later
+    // for performance
+    token_t expression_separator = {};
+    if (consume_token(',', state->scanner, &expression_separator)) {
+        // @todo check of AST_ERROR
+        ast_node_t node = result;
 
-    ast_node_t right = {};
-    */
+        result = {};
+
+        result.type    = AST_BIN;
+        result.subtype = SUBTYPE_AST_EXPR;
+        result.token   = expression_separator;
+
+        area_add(&state->parser->nodes, &node);
+        result.left_index = state->parser->nodes.count - 1;
+
+        node = parse_expression(state);
+        area_add(&state->parser->nodes, &node);
+        result.right_index = state->parser->nodes.count - 1;
+    }
+
+    return result;
 }
 
 // ast_node_t parse_block(local_state_t *state, ast_subtype_t subtype) {
@@ -597,13 +615,13 @@ ast_node_t parse_declaration_type(local_state_t *state) {
         case '(': { 
             node.type = AST_BIN;
 
-            consume_token('(', state->scanner);
+            consume_token('(', state->scanner, NULL);
 
             // parser_parameter_list();
             //     parse_parameter();
-            consume_token(')', state->scanner);
+            consume_token(')', state->scanner, NULL);
 
-            if (consume_token(TOKEN_RET, state->scanner)) {
+            if (consume_token(TOKEN_RET, state->scanner, NULL)) {
                 // we have return values
             } else {
                 // we dont return anything
@@ -642,8 +660,8 @@ ast_node_t parse_global_statement(local_state_t *state) {
     node.token = name;
 
     if (name.type == TOKEN_IDENT && next.type == ':') {
-        consume_token(TOKEN_IDENT, state->scanner);
-        consume_token(':', state->scanner);
+        consume_token(TOKEN_IDENT, state->scanner, NULL);
+        consume_token(':', state->scanner, NULL);
 
         next = peek_token(state->scanner);
 
@@ -673,7 +691,7 @@ ast_node_t parse_global_statement(local_state_t *state) {
 
                 node.token = name;
 
-                if (consume_token(';', state->scanner)) {
+                if (consume_token(';', state->scanner, NULL)) {
                     node.type = AST_UNARY; 
                     node.subtype = SUBTYPE_AST_VAR;
                     return node;
@@ -681,7 +699,7 @@ ast_node_t parse_global_statement(local_state_t *state) {
 
                 node.type = AST_BIN; 
 
-                if (!consume_token('=', state->scanner)) {
+                if (!consume_token('=', state->scanner, NULL)) {
                     node.type = AST_ERROR;
                     log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
                     break;

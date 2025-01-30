@@ -440,6 +440,7 @@ token_t advance_token(scanner_t *state) {
 
     switch(ch) {
         case '.': 
+        case ',':
         case ':':
         case ';':
 
@@ -557,11 +558,16 @@ token_t peek_next_token(scanner_t *state) {
     return advance_token(&peek_state);
 }
 
-b32 consume_token(u32 token_type, scanner_t *state) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token) {
     scanner_t peek_state = *state;
-    token_t token = advance_token(&peek_state);
+    token_t local_token = {};
 
-    if (token.type != token_type) {
+    if (token == NULL) {
+        token  = &local_token;
+    }
+	*token = advance_token(&peek_state);
+
+    if (token->type != token_type) {
         return false;
     }
 
@@ -604,24 +610,25 @@ b32 read_file_into_string(const u8 *filename, string_t *output) {
 }
 
 b32 scan_lines(scanner_t *state) {
-    state->lines = {};
+    if (state->lines.data == NULL) {
+        state->lines = {};
+        u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
-    u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
+        if (init_size == 0) {
+            init_size = MINIMAL_SIZE;
+        }
 
-    if (init_size == 0) {
-        init_size = MINIMAL_SIZE;
-    }
-
-    if (!area_create(&state->lines, init_size)) {
-        log_error(STR("Scanner: Couldn't create list."), 0);
-        return false;
+        if (!area_create(&state->lines, init_size)) {
+            log_error(STR("Scanner: Couldn't create list."), 0);
+            return false;
+        }
     }
 
     line_tuple_t line = {};
     line.start        = 0;
 
     for (u64 i = 0; i < state->file.size; i++) {
-        if (state->file.data[i] != '\n') {
+        if (!(state->file.data[i] == '\n' || state->file.data[i] == '\r' || state->file.data[i] == 0)) {
             continue;
         }
 
@@ -639,12 +646,35 @@ b32 scan_lines(scanner_t *state) {
 }
 
 void scanner_delete(scanner_t *state) {
-    if (state->file.size > 0) {
+    if (!state->is_dynamic && state->file.size > 0) {
         free(state->file.data);
     }
+
+    area_delete(&state->symbols);
+    area_delete(&state->lines);
+}
+
+b32 scanner_open(string_t *string, scanner_t *state) {
+    *state = {};
+    state->is_dynamic = true;
+    state->file = *string;
+
+    if (!scan_lines(state)) {
+        log_error(STR("Scanner: couldn't scan_lines file."), 0);
+        return false;
+    }
+
+    if (!area_create(&state->symbols, 256)) {
+        log_error(STR("Scanner: Couldn't symbols list."), 0);
+        return false;
+    }
+
+    return true;
 }
 
 b32 scanner_create(const u8* filename, scanner_t *state) {
+    *state = {};
+
     if (!read_file_into_string(filename, &state->file)) {
         log_error(STR("Scanner: couldn't read file."), 0);
         return false;
