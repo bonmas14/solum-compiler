@@ -40,16 +40,17 @@ static inline void stepback_char(scanner_t *state) {
 }
 
 static inline u8 peek_char(scanner_t *state) {
-    assert(state->file.data != 0);
     if (state->file.size == 0) return 0;
+
+    assert(state->file.data != 0);
     if (state->file_index >= state->file.size) return 0; 
 
     return state->file.data[state->file_index];
 }
 
 static inline u8 peek_next_char(scanner_t *state) {
+    assert(state->file.size > 0);
     assert(state->file.data != 0);
-    if (state->file.size == 0) return 0;
     if (state->file_index >= (state->file.size - 1)) return 0; 
 
     return state->file.data[state->file_index + 1];

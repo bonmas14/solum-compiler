@@ -111,7 +111,7 @@ void repl(area_t<u8> *area) {
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-            // print_node(&scanner, &parser, root, 0);
+            print_node(&scanner, &parser, root, 0);
         }
 
         scanner_delete(&scanner);
@@ -123,44 +123,40 @@ void repl(area_t<u8> *area) {
 #else 
 
 void repl(area_t<u8> *area) {
-    u8 ch = getchar();
+    u8 ch = fgetc(stdin);
 
-    if (ch == '\r') ch = '\n';
+    if (ch == '\n') {
+        area_add(area, &ch);
+        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
+        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
-    if (ch == '\b') {
-        if (area->count != 0) {
-            area->count--;
+        string_t str = {};
+
+        str.size = area->count;
+        str.data = area->data;
+
+        scanner_t scanner = {};
+        parser_t  parser  = {};
+
+        scanner_open(&str, &scanner);
+        parse(&scanner, &parser);
+
+        fprintf(stderr, "------------TREE-------------\n");
+
+        for (u64 i = 0; i < parser.root_indices.count; i++) {
+            ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+
+            print_node(&scanner, &parser, root, 0);
         }
+
+        scanner_delete(&scanner);
+
+        fprintf(stderr, "\x1b[?25h");
+        fprintf(stderr, "-----------------------------\n");
+
+        area->count = 0;
     } else {
         area_add(area, &ch);
     }
-
-    ch = 0;
-    area_add(area, &ch);
-
-    fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
-    fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
-
-    string_t str = {};
-
-    str.size = area->count;
-    area->count--;
-    str.data = area->data;
-
-    scanner_t scanner = {};
-    parser_t  parser = {};
-
-    scanner_open(&str, &scanner);
-    parse(&scanner, &parser);
-
-    for (u64 i = 0; i < parser.root_indices.count; i++) {
-        ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
-
-        // print_node(&scanner, &parser, root, 0);
-    }
-
-    scanner_delete(&scanner);
-
-    fprintf(stderr, "\x1b[u\x1b[?25h");
 }
 #endif
