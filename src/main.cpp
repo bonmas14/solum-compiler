@@ -18,31 +18,31 @@
 
 void repl(area_t<u8> *area);
 
-void print_node(scanner_t *scanner, parser_t *parser, ast_node_t* node, u32 depth) {
-    log_info_token(scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
+void print_node(compiler_t *compiler, ast_node_t* node, u32 depth) {
+    log_info_token(compiler->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
 
     ast_node_t* child;
     if (node->type == AST_UNARY) {
-        child = area_get(&parser->nodes, node->left_index);
-        print_node(scanner, parser, child, depth + 1);
+        child = area_get(&compiler->parser->nodes, node->left_index);
+        print_node(compiler, child, depth + 1);
     } else if (node->type == AST_BIN) {
-        child = area_get(&parser->nodes, node->left_index);
-        print_node(scanner, parser, child, depth + 1);
+        child = area_get(&compiler->parser->nodes, node->left_index);
+        print_node(compiler, child, depth + 1);
 
-        child = area_get(&parser->nodes, node->right_index);
-        print_node(scanner, parser, child, depth + 1);
+        child = area_get(&compiler->parser->nodes, node->right_index);
+        print_node(compiler, child, depth + 1);
     } else if (node->type == AST_LIST) {
-
         b32 first_time = true;
+
         for (u64 i = 0; i < node->child_count; i++) {
             if (first_time) {
                 first_time = false;
-                child = area_get(&parser->nodes, node->list_next_node);
+                child = area_get(&compiler->parser->nodes, node->list_next_node);
             } else {
-                child = area_get(&parser->nodes, child->list_next_node);
+                child = area_get(&compiler->parser->nodes, child->list_next_node);
             }
 
-            print_node(scanner, parser, child, depth + 1);
+            print_node(compiler, child, depth + 1);
         }
     }
 }
@@ -109,22 +109,26 @@ void repl(area_t<u8> *area) {
         fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
         fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
 
-        string_t str = {};
+        string_t code = {};
 
-        str.size = area->count;
+        code.size = area->count;
         area->count--;
-        str.data = area->data;
+        code.data = area->data;
 
-        scanner_t scanner = {};
-        parser_t  parser = {};
+        scanner_t  scanner  = {};
+        parser_t   parser   = {};
 
-        scanner_open(&str, &scanner);
-        parse(&scanner, &parser);
+        compiler_t compiler = {};
+        compiler.scanner = &scanner;
+        compiler.parser = &parser;
+
+        scanner_open(&code, &scanner);
+        parse(&compiler);
 
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-            print_node(&scanner, &parser, root, 0);
+            print_node(&compiler, root, 0);
         }
 
         scanner_delete(&scanner);
@@ -141,16 +145,21 @@ void repl(area_t<u8> *area) {
     if (ch == '\n') {
         area_add(area, &ch);
 
-        string_t str = {};
+        string_t code = {};
 
-        str.size = area->count;
-        str.data = area->data;
+        code.size = area->count;
+        code.data = area->data;
 
-        scanner_t scanner = {};
-        parser_t  parser  = {};
+        scanner_t  scanner  = {};
+        parser_t   parser   = {};
 
-        scanner_open(&str, &scanner);
-        parse(&scanner, &parser);
+        compiler_t compiler = {};
+
+        compiler.scanner = &scanner;
+        compiler.parser  = &parser;
+
+        scanner_open(&code, compiler.scanner);
+        parse(&compiler);
 
         fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
         fprintf(stderr, "%.*s\n", (int)area->count, area->data);
@@ -160,7 +169,7 @@ void repl(area_t<u8> *area) {
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-            print_node(&scanner, &parser, root, 0);
+            print_node(&compiler, root, 0);
         }
 
         scanner_delete(&scanner);

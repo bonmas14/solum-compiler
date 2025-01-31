@@ -1,7 +1,7 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
-#include "stddefines.h"
+#include "compiler.h"
 #include "scanner.h"
 #include "parser.h"
 

@@ -1,11 +1,10 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "stddefines.h"
+#include "compiler.h"
 #include "area_alloc.h"
 #include "hashmap.h"
 #include "scanner.h"
-#include "logger.h"
 
 #define INIT_NODES_SIZE (100)
 
@@ -50,17 +49,6 @@ enum ast_subtype_t {
     SUBTYPE_AST_FUNC_GENERICS = 0x32,
 };
 
-enum funciton_flags_t {
-    SCOPE_IS_GENERIC    = 0x00100000,
-    SCOPE_FUNC_EXTERNAL = 0x00010000,
-    SCOPE_FUNC_PROTO    = 0x00020000,
-};
-
-enum scope_entry_types_t {
-    SCOPE_VAR,
-    SCOPE_FUNC, // generic or not
-    SCOPE_TYPE // proto, enum, struct, union
-};
 
 struct ast_node_t {
     s32 type;
@@ -78,25 +66,11 @@ struct ast_node_t {
     u64 scope_index;
 };
 
-struct scope_entry_t {
-    u32 type;
-    u32 flags;
-    u32 node_index;
-};
-
-struct scope_tuple_t {
-    b32 is_global;
-    u64 parent_scope;
-    hashmap_t<scope_entry_t> scope;
-};
-
 struct parser_t {
     area_t<ast_node_t> nodes;
     area_t<u64> root_indices; 
-    area_t<scope_tuple_t> scopes;
 };
 
-
-b32 parse(scanner_t *scanner, parser_t *state);
+b32 parse(compiler_t *compiler);
 
 #endif // PARSER_H

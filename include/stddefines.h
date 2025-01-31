@@ -33,7 +33,6 @@ struct symbol_t {
     u64 table_index;
 };
 
-
 #define STR(s) reinterpret_cast<const u8*>(s)
 
 // @nocheckin

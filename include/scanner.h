@@ -1,8 +1,7 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
-#include "stddefines.h"
-#include "logger.h"
+#include "compiler.h"
 #include "area_alloc.h"
 
 #define APPROX_CHAR_PER_LINE (25)

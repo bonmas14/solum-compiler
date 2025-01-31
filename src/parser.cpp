@@ -9,23 +9,19 @@
 // 5. codegen
 
 
-struct local_state_t {
-    scanner_t *scanner;
-    parser_t  *parser;
-};
 
 /* helpers */
 
 /* parsing */
 
-ast_node_t parse_expression(local_state_t *state);
-ast_node_t parse_func_or_var_declaration(local_state_t *state, token_t *name, u64 scope_index);
-ast_node_t parse_struct_declaration(local_state_t *state, token_t *name, u64 scope_index);
-ast_node_t parse_union_declaration(local_state_t *state, token_t *name, u64 scope_index);
-ast_node_t parse_enum_declaration(local_state_t *state, token_t *name, u64 scope_index);
-ast_node_t parse_block(local_state_t* state, u64 parent_scope, ast_subtype_t subtype);
+ast_node_t parse_expression(compiler_t *state);
+ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name);
+ast_node_t parse_struct_declaration(compiler_t *state, token_t *name);
+ast_node_t parse_union_declaration(compiler_t *state, token_t *name);
+ast_node_t parse_enum_declaration(compiler_t *state, token_t *name);
+ast_node_t parse_block(compiler_t* state, ast_subtype_t subtype);
 
-void panic_skip(local_state_t *state) {
+void panic_skip(compiler_t *state) {
     token_t token = peek_token(state->scanner);
 
     u64 depth = 1;
@@ -45,7 +41,7 @@ void panic_skip(local_state_t *state) {
     }
 }
 
-void panic_skip_until_token(u32 value, local_state_t *state) {
+void panic_skip_until_token(u32 value, compiler_t *state) {
     token_t token = peek_token(state->scanner);
 
     while (token.type != value && token.type != TOKEN_EOF && token.type != TOKEN_ERROR) {
@@ -54,7 +50,7 @@ void panic_skip_until_token(u32 value, local_state_t *state) {
     }
 }
 
-ast_node_t parse_primary(local_state_t *state) {
+ast_node_t parse_primary(compiler_t *state) {
     token_t token = advance_token(state->scanner);
 
     ast_node_t result = {};
@@ -74,6 +70,13 @@ ast_node_t parse_primary(local_state_t *state) {
             break;
 
         case TOKEN_OPEN_BRACE: {
+            token_t next = peek_token(state->scanner);
+            if (next.type == TOKEN_CLOSE_BRACE) {
+                result.type = AST_ERROR;
+                log_error_token(STR("Expected expression"), state->scanner, next, 0);
+                break;
+            }
+
             result = parse_expression(state);
 
             token_t error_token = {};
@@ -83,6 +86,7 @@ ast_node_t parse_primary(local_state_t *state) {
                 log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, error_token, 0);
             }
         } break;
+
         default:
             result.type = AST_ERROR;
             log_error_token(STR("Parser: wrong primary token type"),
@@ -93,11 +97,11 @@ ast_node_t parse_primary(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_function_call(local_state_t *state) {
+ast_node_t parse_function_call(compiler_t *state) {
     return parse_primary(state);
 }
 
-ast_node_t parse_unary(local_state_t *state) {
+ast_node_t parse_unary(compiler_t *state) {
     token_t token = peek_token(state->scanner);
 
     ast_node_t result = {};
@@ -112,7 +116,7 @@ ast_node_t parse_unary(local_state_t *state) {
         case '-':
         case '!': {
             advance_token(state->scanner);
-            ast_node_t child = parse_unary(state);
+            ast_node_t child = parse_unary(state); // @todo check for errors
             area_add(&state->parser->nodes, &child);
             result.left_index = state->parser->nodes.count - 1;
         } break;
@@ -129,7 +133,7 @@ ast_node_t parse_unary(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_shift(local_state_t *state) {
+ast_node_t parse_shift(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_unary(state);
@@ -165,7 +169,7 @@ ast_node_t parse_shift(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_and(local_state_t *state) {
+ast_node_t parse_and(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_shift(state);
@@ -200,7 +204,7 @@ ast_node_t parse_and(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_or(local_state_t *state) {
+ast_node_t parse_or(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_and(state);
@@ -235,7 +239,7 @@ ast_node_t parse_or(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_xor(local_state_t *state) {
+ast_node_t parse_xor(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_or(state);
@@ -271,7 +275,7 @@ ast_node_t parse_xor(local_state_t *state) {
 }
 
 // @todo: different names later!!!
-ast_node_t parse_mul(local_state_t *state) {
+ast_node_t parse_mul(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_xor(state);
@@ -308,7 +312,7 @@ ast_node_t parse_mul(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_add(local_state_t *state) { 
+ast_node_t parse_add(compiler_t *state) { 
     ast_node_t result = {}, left, right;
 
     left = parse_mul(state);
@@ -344,7 +348,7 @@ ast_node_t parse_add(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_compare_expression(local_state_t *state) {
+ast_node_t parse_compare_expression(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_add(state);
@@ -383,7 +387,7 @@ ast_node_t parse_compare_expression(local_state_t *state) {
     return result;
 };
 
-ast_node_t parse_logic_and_expression(local_state_t *state) {
+ast_node_t parse_logic_and_expression(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_compare_expression(state);
@@ -418,7 +422,7 @@ ast_node_t parse_logic_and_expression(local_state_t *state) {
     return result;
 
 }
-ast_node_t parse_logic_or_expression(local_state_t *state) {
+ast_node_t parse_logic_or_expression(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_logic_and_expression(state);
@@ -454,7 +458,7 @@ ast_node_t parse_logic_or_expression(local_state_t *state) {
 }
 
 // @todo: add mulitple return statements assignment
-ast_node_t parse_assignment_expression(local_state_t *state) {
+ast_node_t parse_assignment_expression(compiler_t *state) {
     ast_node_t result = {}, left, right;
 
     left = parse_logic_or_expression(state);
@@ -489,7 +493,7 @@ ast_node_t parse_assignment_expression(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_expression(local_state_t *state) {
+ast_node_t parse_expression(compiler_t *state) {
     ast_node_t result = parse_assignment_expression(state);
 
     // @todo change to an ast list later
@@ -517,7 +521,7 @@ ast_node_t parse_expression(local_state_t *state) {
 }
 
 
-ast_node_t parse_primary_type(local_state_t *state) {
+ast_node_t parse_primary_type(compiler_t *state) {
     ast_node_t result = {};
 
     token_t token = advance_token(state->scanner);
@@ -562,7 +566,7 @@ ast_node_t parse_primary_type(local_state_t *state) {
 */
 
 // @todo dont forget about generics when creating type!
-ast_node_t parse_type(local_state_t *state) {
+ast_node_t parse_type(compiler_t *state) {
     ast_node_t result = {};
 
     token_t token = peek_token(state->scanner);
@@ -633,7 +637,7 @@ ast_node_t parse_type(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_param_declaration(local_state_t *state) {
+ast_node_t parse_param_declaration(compiler_t *state) {
     ast_node_t node = {};
 
     token_t name, next;
@@ -670,17 +674,18 @@ ast_node_t parse_param_declaration(local_state_t *state) {
     return node;
 }
 
-ast_node_t parse_generics_list(local_state_t *state) {
-
+ast_node_t parse_generics_list(compiler_t *state) {
+    return {};
 }
 
-ast_node_t parse_parameter_list(local_state_t *state) {
+ast_node_t parse_parameter_list(compiler_t *state) {
     ast_node_t result = {};
 
     result.type    = AST_LIST;
     result.subtype = SUBTYPE_AST_FUNC_PARAMS;
 
     token_t current = peek_token(state->scanner);
+    result.token = current;
 
     b32 first_time = true;
     u64 previous_node_index = 0;
@@ -716,10 +721,13 @@ ast_node_t parse_parameter_list(local_state_t *state) {
         }
     }
 
+    result.token.c1 = current.c0;
+    result.token.l1 = current.l0;
+
     return result;
 }
 
-ast_node_t parse_return_list(local_state_t *state) {
+ast_node_t parse_return_list(compiler_t *state) {
     ast_node_t result = {};
 
     result.type    = AST_LIST;
@@ -769,7 +777,7 @@ ast_node_t parse_return_list(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_function_type(local_state_t *state) {
+ast_node_t parse_function_type(compiler_t *state) {
     ast_node_t result = {};
 
     token_t token = peek_token(state->scanner);
@@ -793,6 +801,7 @@ ast_node_t parse_function_type(local_state_t *state) {
     }
     else if (token.type == '(') {
         result.type = AST_BIN; 
+        result.token = token;
     } else {
         assert(false);
     }
@@ -801,7 +810,9 @@ ast_node_t parse_function_type(local_state_t *state) {
 
     // center is generic types
 
-    consume_token('(', state->scanner, NULL);
+    if (!consume_token('(', state->scanner, NULL)) {
+        assert(false);
+    }
 
     ast_node_t parameters = parse_parameter_list(state);
     area_add(&state->parser->nodes, &parameters);
@@ -821,7 +832,7 @@ ast_node_t parse_function_type(local_state_t *state) {
     return result;
 }
 
-ast_node_t parse_declaration_type(local_state_t *state) {
+ast_node_t parse_declaration_type(compiler_t *state) {
     ast_node_t node = {};
 
     token_t token = peek_token(state->scanner);
@@ -847,7 +858,7 @@ ast_node_t parse_declaration_type(local_state_t *state) {
     return node;
 }
 
-ast_node_t parse_func_or_var_declaration(local_state_t *state, token_t *name, u64 scope_index) {
+ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
     ast_node_t node = {};
     node.token      = *name;
     node.type       = AST_BIN; 
@@ -880,7 +891,7 @@ ast_node_t parse_func_or_var_declaration(local_state_t *state, token_t *name, u6
     ast_node_t data;
 
     if (peek_token(state->scanner).type == '{') {
-        data = parse_block(state, scope_index, AST_BLOCK_IMPERATIVE);
+        data = parse_block(state, AST_BLOCK_IMPERATIVE);
     } else {
         data = parse_expression(state);
     }
@@ -897,7 +908,7 @@ ast_node_t parse_func_or_var_declaration(local_state_t *state, token_t *name, u6
     return node;
 }
 
-ast_node_t parse_union_declaration(local_state_t *state, token_t *name, u64 scope_index) {
+ast_node_t parse_union_declaration(compiler_t *state, token_t *name) {
     ast_node_t result = {};
 
     result.type = AST_ERROR;
@@ -909,7 +920,7 @@ ast_node_t parse_union_declaration(local_state_t *state, token_t *name, u64 scop
     return result;
 }
 
-ast_node_t parse_struct_declaration(local_state_t *state, token_t *name, u64 scope_index) {
+ast_node_t parse_struct_declaration(compiler_t *state, token_t *name) {
     ast_node_t result = {};
 
     result.type = AST_ERROR;
@@ -921,7 +932,7 @@ ast_node_t parse_struct_declaration(local_state_t *state, token_t *name, u64 sco
     return result;
 }
 
-ast_node_t parse_enum_declaration(local_state_t *state, token_t *name, u64 scope_index) {
+ast_node_t parse_enum_declaration(compiler_t *state, token_t *name) {
     ast_node_t result = {};
 
     result.type = AST_ERROR;
@@ -933,7 +944,7 @@ ast_node_t parse_enum_declaration(local_state_t *state, token_t *name, u64 scope
     return result;
 }
 
-ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
+ast_node_t parse_statement(compiler_t *state) {
     ast_node_t node = {};
 
     node.type = AST_ERROR;
@@ -952,25 +963,25 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
 
         switch(next.type) {
             case TOK_UNION: {
-                node = parse_union_declaration(state, &name, scope_index);
+                node = parse_union_declaration(state, &name);
             } break;
 
             case TOK_STRUCT: {
-                node = parse_struct_declaration(state, &name, scope_index);
+                node = parse_struct_declaration(state, &name);
             } break;
 
             case TOK_ENUM: {
-                node = parse_enum_declaration(state, &name, scope_index);
+                node = parse_enum_declaration(state, &name);
             } break;
 
             default: {
-                node = parse_func_or_var_declaration(state, &name, scope_index);
+                node = parse_func_or_var_declaration(state, &name);
             } break;
         }
     } else switch (name.type) {
         case  '{': {
             ignore_semicolon = true;
-            node = parse_block(state, scope_index, AST_BLOCK_IMPERATIVE);
+            node = parse_block(state, AST_BLOCK_IMPERATIVE);
         } break;
 
         case TOK_IF: {
@@ -980,7 +991,7 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
             node.token   = advance_token(state->scanner);
 
             ast_node_t expr = parse_expression(state);
-            ast_node_t stmt = parse_block(state, scope_index, AST_BLOCK_IMPERATIVE);
+            ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
             area_add(&state->parser->nodes, &expr);
             node.left_index = state->parser->nodes.count - 1;
@@ -993,14 +1004,14 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
             ignore_semicolon = true;
             node.token   = advance_token(state->scanner);
             if (peek_token(state->scanner).type == TOK_IF) {
-                node = parse_statement(state, scope_index);
+                node = parse_statement(state);
                 assert(node.subtype == SUBTYPE_AST_IF_STMT);
                 node.subtype = SUBTYPE_AST_ELIF_STMT;
             } else {
                 node.type    = AST_UNARY; 
                 node.subtype = SUBTYPE_AST_ELSE_STMT;
 
-                ast_node_t stmt = parse_block(state, scope_index, AST_BLOCK_IMPERATIVE);
+                ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
                 area_add(&state->parser->nodes, &stmt);
                 node.left_index = state->parser->nodes.count - 1;
             }
@@ -1013,7 +1024,7 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
             node.token   = advance_token(state->scanner);
 
             ast_node_t expr = parse_expression(state);
-            ast_node_t stmt = parse_block(state, scope_index, AST_BLOCK_IMPERATIVE);
+            ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
             area_add(&state->parser->nodes, &expr);
             node.left_index = state->parser->nodes.count - 1;
@@ -1042,6 +1053,10 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
 
         if (!consume_token(';', state->scanner, &semicolon)) {
             node.type = AST_ERROR;
+
+            node.token.c1 = semicolon.c1;
+            node.token.l1 = semicolon.l1;
+
             log_error_token(STR("Missing semicolon after statement."), state->scanner, node.token, 0);
             panic_skip(state);
         }
@@ -1050,9 +1065,7 @@ ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
     return node;
 }
 
-// @todo delete all scope data form parser.
-// it will be in analyzer!
-ast_node_t parse_imperative_block(local_state_t *state, u64 parent_scope) {
+ast_node_t parse_imperative_block(compiler_t *state) {
     ast_node_t result = {};
 
     result.type    = AST_LIST;
@@ -1060,27 +1073,11 @@ ast_node_t parse_imperative_block(local_state_t *state, u64 parent_scope) {
 
     token_t current = peek_token(state->scanner);
 
-    if (!area_allocate(&state->parser->scopes, 1, &result.scope_index)) {
-        log_error(STR("Parser: Couldn't create scope for imperative block."), 0);
-        result.type = AST_ERROR;
-        return result;
-    }
-
-    scope_tuple_t *tuple = area_get(&state->parser->scopes, result.scope_index);
-    tuple->is_global    = false;
-    tuple->parent_scope = parent_scope;
-
-    if (!hashmap_create(&tuple->scope, &state->scanner->symbols, 10)) {
-        log_error(STR("Parser: Couldn't init global scope hashmap."), 0);
-        result.type = AST_ERROR;
-        return result;
-    }
-
     b32 first_time = true;
     u64 previous_node_index = 0;
 
     while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
-        ast_node_t node = parse_statement(state, result.scope_index);
+        ast_node_t node = parse_statement(state);
 
         area_add(&state->parser->nodes, &node);
 
@@ -1101,7 +1098,7 @@ ast_node_t parse_imperative_block(local_state_t *state, u64 parent_scope) {
     return result;
 }
 
-ast_node_t parse_block(local_state_t *state, u64 parent_scope, ast_subtype_t subtype) {
+ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
     token_t start, stop, final = {};
 
     ast_node_t result = {};
@@ -1112,7 +1109,7 @@ ast_node_t parse_block(local_state_t *state, u64 parent_scope, ast_subtype_t sub
         return result;
     }
 
-    result = parse_imperative_block(state, parent_scope);
+    result = parse_imperative_block(state);
 
     if (!consume_token('}', state->scanner, &stop)) {
         result.type = AST_ERROR;
@@ -1133,84 +1130,38 @@ ast_node_t parse_block(local_state_t *state, u64 parent_scope, ast_subtype_t sub
     return result;
 }
 
-b32 parse(scanner_t *scanner, parser_t* state) {
-    local_state_t local = {};
-
-    local.scanner = scanner;
-    local.parser  = state;
-
-    if (!area_create(&state->nodes, INIT_NODES_SIZE)) {
+b32 parse(compiler_t *compiler) {
+    if (!area_create(&compiler->parser->nodes, INIT_NODES_SIZE)) {
         log_error(STR("Parser: Couldn't create nodes list."), 0);
         return false;
     }
 
-    if (!area_create(&state->root_indices, INIT_NODES_SIZE)) {
+    if (!area_create(&compiler->parser->root_indices, INIT_NODES_SIZE)) {
         log_error(STR("Parser: Couldn't create root indices list."), 0);
-        return false;
-    }
-
-    if (!area_create(&state->scopes, INIT_NODES_SIZE)) {
-        log_error(STR("Parser: Couldn't create scope indices list."), 0);
-        return false;
-    }
-
-    u64 global_scope_index = 0;
-
-    if (!area_allocate(&state->scopes, 1, &global_scope_index)) {
-        log_error(STR("Parser: Couldn't create global scope."), 0);
-        return false;
-    }
-
-    scope_tuple_t *tuple = area_get(&state->scopes, global_scope_index);
-    tuple->is_global    = true;
-    tuple->parent_scope = 0;
-
-
-    if (!hashmap_create(&tuple->scope, &scanner->symbols, 100)) {
-        log_error(STR("Parser: Couldn't init global scope hashmap."), 0);
         return false;
     }
 
     b32 valid_parse = true;
     
-    token_t curr = peek_token(local.scanner);
+    token_t curr = peek_token(compiler->scanner);
 
     while (curr.type != TOKEN_EOF && curr.type != TOKEN_ERROR) {
-        ast_node_t node = parse_statement(&local, global_scope_index);
+        ast_node_t node = parse_statement(compiler);
 
         if (node.type == AST_ERROR) {
             valid_parse = false; 
         }
 
-        if (!area_add(&local.parser->nodes, &node)) {
+        if (!area_add(&compiler->parser->nodes, &node)) {
             log_error(STR("Parser: Couldn't add node to a list."), 0);
             valid_parse = false; 
             break;
         } 
 
-        u64 root_index = local.parser->nodes.count - 1;
-        area_add(&local.parser->root_indices, &root_index);
+        u64 root_index = compiler->parser->nodes.count - 1;
+        area_add(&compiler->parser->root_indices, &root_index);
 
-        // only adding AST_VAR
-        if (node.subtype == SUBTYPE_AST_VAR) {
-            scope_entry_t entry = {};
-
-            entry.type       = SCOPE_VAR;
-            entry.node_index = root_index;
-
-            scope_tuple_t *tuple = area_get(&state->scopes, 0);
-
-            if (hashmap_contains(&tuple->scope, node.token.data.symbol)) {
-                log_error_token(STR("the name of declaration is already in use."), local.scanner, node.token, 0);
-                valid_parse = false;
-                break;
-            } else {
-                hashmap_add(&tuple->scope, node.token.data.symbol, &entry);
-            }
-        }
-
-
-        curr = peek_token(local.scanner);
+        curr = peek_token(compiler->scanner);
     }
 
     return valid_parse;
