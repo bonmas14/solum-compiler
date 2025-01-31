@@ -44,15 +44,9 @@ project "native-solum-compiler"
     filter "system:windows"
         flags { "MultiProcessorCompile" }
         defines "_CRT_SECURE_NO_WARNINGS"
-        -- includedirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
-        -- libdirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
-        -- links { "LLVM-C" }
     filter {}
 
     filter "system:linux"
-        -- includedirs { "/usr/lib/llvm-14/include/" } 
-        -- libdirs { "/usr/lib/llvm-14/lib/" }
-        -- links { "LLVMCore" }
     filter {}
 
 
@@ -82,8 +76,10 @@ project "llvm-solum-compiler"
     filter "system:windows"
         flags { "MultiProcessorCompile" }
         defines "_CRT_SECURE_NO_WARNINGS"
-        includedirs { "./include", "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
-        libdirs { "C:/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
+
+
+        includedirs { "./include", "E:/LLVM/clang+llvm-18.1.8-x86_64-pc-windows-msvc/include" }
+        libdirs { "E:/LLVM/clang+llvm-18.1.8-x86_64-pc-windows-msvc/lib" }
         links { "Ws2_32",
                 "LLVMAArch64AsmParser",
                 "LLVMAArch64CodeGen",
