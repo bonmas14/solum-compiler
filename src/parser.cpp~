@@ -1106,19 +1106,11 @@ ast_node_t parse_block(local_state_t *state, u64 parent_scope, ast_subtype_t sub
 
     ast_node_t result = {};
 
-    if (!consume_token('{', state->scanner, &start)) {
-        result.type = AST_ERROR;
-        log_error_token(STR("Expected opening of a block."), state->scanner, start, 0);
-        return result;
-    }
+    consume_token('{', state->scanner, &start);
 
     result = parse_imperative_block(state, parent_scope);
 
-    if (!consume_token('}', state->scanner, &stop)) {
-        result.type = AST_ERROR;
-        log_error_token(STR("Expected closing of a block."), state->scanner, stop, 0);
-        return result;
-    }
+    consume_token('}', state->scanner, &stop);
 
     final.type = '{'; // TOKEN_BLOCK
 

@@ -19,8 +19,13 @@ enum ast_types_t {
 };
 
 enum ast_subtype_t {
-
-    SUBTYPE_AST_EXPR      = 0,
+    SUBTYPE_AST_EXPR       = 0x00,
+    SUBTYPE_AST_IF_STMT    = 0x01,
+    SUBTYPE_AST_ELSE_STMT  = 0x02,
+    SUBTYPE_AST_ELIF_STMT  = 0x03,
+    SUBTYPE_AST_WHILE_STMT = 0x04,
+    SUBTYPE_AST_RET_STMT   = 0x05,
+    AST_BLOCK_IMPERATIVE   = 0x06,
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
@@ -40,12 +45,9 @@ enum ast_subtype_t {
     SUBTYPE_AST_UNKN_TYPE = 0x22,
     SUBTYPE_AST_FUNC_TYPE = 0x23,
 
-    SUBTYPE_AST_FUNC_PARAM = 0x30,
-
-
-    // definitions
-
-    AST_BLOCK_IMPERATIVE,
+    SUBTYPE_AST_FUNC_PARAMS   = 0x30,
+    SUBTYPE_AST_FUNC_RETURNS  = 0x31,
+    SUBTYPE_AST_FUNC_GENERICS = 0x32,
 };
 
 enum funciton_flags_t {

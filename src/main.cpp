@@ -140,8 +140,6 @@ void repl(area_t<u8> *area) {
 
     if (ch == '\n') {
         area_add(area, &ch);
-        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
-        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
         string_t str = {};
 
@@ -153,6 +151,9 @@ void repl(area_t<u8> *area) {
 
         scanner_open(&str, &scanner);
         parse(&scanner, &parser);
+
+        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
+        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
         fprintf(stderr, "------------TREE-------------\n");
 

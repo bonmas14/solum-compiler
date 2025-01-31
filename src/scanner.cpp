@@ -864,9 +864,11 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
     }
 
     u64 stop_line = token.l1 + line_stop + 1; 
+    b32 add_newline = false;
 
     if (stop_line > state->lines.count) {
         stop_line = state->lines.count;
+        add_newline = true;
     }
 
     for (u64 i = start_line; i < stop_line; i++) {
@@ -879,35 +881,53 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
             fprintf(stderr, " ");
         }
 
-        if (i != token.l0) {
-            fprintf(stderr, "    %.4zu | %.*s", i, (int)len, start);
+        if (i < token.l0 || i > token.l1) {
+            fprintf(stderr, "%.4zu | %.*s\n", i, (int)len - 1, start);
         } else {
-            fprintf(stderr, " -> %.4zu | %.*s", i, (int)token.c0, start);
+            u64 token_size = token.c1 - token.c0;
 
-            u64 line_print_size = 1;
+            if (token.l0 != token.l1) {
 
-            if (token.c1 < token.c0) {
-                u64 token_size = line->stop - token.c0;
+                if (i > token.l0 && i < token.l1) {
+                    set_console_color(255, 64, 64); // @todo: make new console color system based on stack
+                    fprintf(stderr, "%.4zu | %.*s", i, (int)len, start);
+                    set_console_color(64, 192, 255);
+                } else if (i == token.l0) {
+                    fprintf(stderr, "%.4zu | %.*s", i, (int)token.c0, start);
+                    len -= token.c0;
 
-                if (token_size != 0) {
-                    line_print_size = token_size;
-                }
+                    set_console_color(255, 64, 64);
+                    fprintf(stderr, "%.*s", (int)len, start + token.c0);
+                    set_console_color(64, 192, 255);
+                } else if (i == token.l1) {
+
+                    set_console_color(255, 64, 64);
+                    fprintf(stderr, "%.4zu | %.*s", i, (int)token.c1, start);
+                    len -= token.c1;
+
+                    set_console_color(64, 192, 255);
+
+                    fprintf(stderr, "%.*s", (int) len, start + token.c1);
+                } 
             } else {
-                u64 token_size = token.c1 - token.c0;
+                fprintf(stderr, "%.4zu | %.*s", i, (int)token.c0, start);
+                len -= token.c0;
 
-                if (token_size != 0) {
-                    line_print_size = token_size;
-                }
+                set_console_color(255, 64, 64);
+                fprintf(stderr, "%.*s", (int)token_size, start + token.c0);
+                set_console_color(64, 192, 255);
+
+                len -= token_size;
+
+                fprintf(stderr, "%.*s", (int) len, start + token.c0 + token_size);
             }
-
-            // decorate
-            set_console_color(255, 64, 64);
-            fprintf(stderr, "%.*s", (int)line_print_size, start + token.c0);
-            set_console_color(64, 192, 255);
-
-            fprintf(stderr, "%.*s", (int) (len - token.c1), start + token.c0 + line_print_size);
         }
     }
+
+    if (add_newline) {
+        fprintf(stderr, "\n");
+    }
+
     set_console_color(255, 255, 255);
 }
 

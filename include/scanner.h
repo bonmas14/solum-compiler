@@ -64,6 +64,7 @@ enum token_type_t {
     TOK_ELSE,
     TOK_WHILE,
     TOK_FOR,
+    TOK_RET,
 
     TOK_PROTOTYPE,
     TOK_EXTERNAL,
@@ -90,7 +91,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "null", "default",
 
-    "if", "else", "while", "for",
+    "if", "else", "while", "for", "ret",
 
     "prototype", "external",
 
