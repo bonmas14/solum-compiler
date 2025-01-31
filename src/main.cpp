@@ -31,6 +31,19 @@ void print_node(scanner_t *scanner, parser_t *parser, ast_node_t* node, u32 dept
 
         child = area_get(&parser->nodes, node->right_index);
         print_node(scanner, parser, child, depth + 1);
+    } else if (node->type == AST_LIST) {
+
+        b32 first_time = true;
+        for (u64 i = 0; i < node->child_count; i++) {
+            if (first_time) {
+                first_time = false;
+                child = area_get(&parser->nodes, node->list_next_node);
+            } else {
+                child = area_get(&parser->nodes, child->list_next_node);
+            }
+
+            print_node(scanner, parser, child, depth + 1);
+        }
     }
 }
 

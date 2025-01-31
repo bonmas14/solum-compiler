@@ -20,6 +20,15 @@ struct local_state_t {
 
 ast_node_t parse_expression(local_state_t *state);
 
+void panic_skip_till_token(u32 value, local_state_t *state) {
+    token_t token = peek_token(state->scanner);
+
+    while (token.type != value && token.type != TOKEN_EOF && token.type != TOKEN_ERROR) {
+        advance_token(state->scanner);
+        token = peek_token(state->scanner);
+    }
+}
+
 ast_node_t parse_primary(local_state_t *state) {
     token_t token = advance_token(state->scanner);
 
@@ -480,11 +489,6 @@ ast_node_t parse_expression(local_state_t *state) {
     return result;
 }
 
-// ast_node_t parse_block(local_state_t *state, ast_subtype_t subtype) {
-    // check for open brace and closing one
-    // and then do 
-// }
-//
 
 ast_node_t parse_primary_type(local_state_t *state) {
     ast_node_t result = {};
@@ -649,6 +653,190 @@ ast_node_t parse_declaration_type(local_state_t *state) {
     return node;
 }
 
+
+ast_node_t parse_statement(local_state_t *state, u64 scope_index) {
+
+    // varialba
+    // local func
+    // {}
+    // for while if/else
+    // expression
+
+    ast_node_t expr = parse_expression(state);
+    
+    token_t semicolon = advance_token(state->scanner);
+    // @todo we dont need semicolon everywhere
+    if (semicolon.type != ';') {
+        expr.type = AST_ERROR;
+        log_error_token(STR("Missing semicolon after expression."), state->scanner, semicolon, 0);
+        panic_skip_till_token(';', state);
+    }
+
+
+    return expr;
+}
+
+ast_node_t parse_imperative_block(local_state_t *state, u64 parent_scope) {
+    ast_node_t result = {};
+
+    result.type    = AST_LIST;
+    result.subtype = AST_BLOCK_IMPERATIVE;
+
+    token_t current = peek_token(state->scanner);
+
+    if (!area_allocate(&state->parser->scopes, 1, &result.scope_index)) {
+        log_error(STR("Parser: Couldn't create scope for imperative block."), 0);
+        result.type = AST_ERROR;
+        return result;
+    }
+
+    scope_tuple_t *tuple = area_get(&state->parser->scopes, result.scope_index);
+    tuple->is_global    = false;
+    tuple->parent_scope = parent_scope;
+
+    if (!hashmap_create(&tuple->scope, &state->scanner->symbols, 10)) {
+        log_error(STR("Parser: Couldn't init global scope hashmap."), 0);
+        result.type = AST_ERROR;
+        return result;
+    }
+
+    b32 first_time = true;
+    u64 previous_node_index = 0;
+
+    while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
+        ast_node_t node = parse_statement(state, result.scope_index);
+
+        area_add(&state->parser->nodes, &node);
+
+        if (first_time) {
+            first_time = false;
+            result.list_next_node = state->parser->nodes.count - 1;
+            previous_node_index = result.list_next_node;
+        } else {
+            ast_node_t *prev = area_get(&state->parser->nodes, previous_node_index);
+            prev->list_next_node = state->parser->nodes.count - 1;
+            previous_node_index = prev->list_next_node;
+        }
+
+        current = peek_token(state->scanner);
+        result.child_count++;
+    }
+
+    return result;
+}
+
+ast_node_t parse_block(local_state_t *state, u64 parent_scope, ast_subtype_t subtype) {
+    token_t start, stop, final = {};
+
+    ast_node_t result = {};
+
+    consume_token('{', state->scanner, &start);
+
+    result = parse_imperative_block(state, parent_scope);
+
+    consume_token('}', state->scanner, &stop);
+
+    final.type = '{'; // TOKEN_BLOCK
+
+    final.c0 = start.c0;
+    final.l0 = start.l0;
+
+    final.c1 = stop.c1;
+    final.l1 = stop.l1;
+
+    result.token = final;
+
+    return result;
+}
+
+ast_node_t parse_func_or_var_declaration(local_state_t *state, token_t *name) {
+    ast_node_t node = {};
+    node.token      = *name;
+    node.type       = AST_BIN; 
+
+    ast_node_t type = parse_declaration_type(state);
+
+    if (type.type == AST_ERROR) {
+        node.type = AST_ERROR;
+        panic_skip_till_token(';', state);
+        return node;
+    }
+
+    area_add(&state->parser->nodes, &type);
+    node.left_index = state->parser->nodes.count - 1;
+
+
+    if (peek_token(state->scanner).type == ';') {
+        node.type = AST_UNARY; 
+        node.subtype = SUBTYPE_AST_VAR;
+        return node;
+    }
+
+    if (!consume_token('=', state->scanner, NULL)) {
+        node.type = AST_ERROR;
+        log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
+        panic_skip_till_token(';', state);
+        return node;
+    }
+
+    // @todo check for:
+    // - function declaration
+    // - prototype declaration
+    //
+    // right now we assume we only have expresions here
+    ast_node_t expression = parse_expression(state);
+
+    if (expression.type == AST_ERROR) {
+        node.type = AST_ERROR;
+        panic_skip_till_token(';', state);
+        return node;
+    }
+
+    area_add(&state->parser->nodes, &expression);
+    node.right_index = state->parser->nodes.count - 1;
+
+    // we got specific decl
+    // it could be type definition also
+
+    return node;
+}
+
+ast_node_t parse_union_declaration(local_state_t *state, token_t *name) {
+    ast_node_t result = {};
+
+    result.type = AST_ERROR;
+    result.token = *name;
+
+    log_error_token(STR("unions are not realized."), state->scanner, advance_token(state->scanner), 0);
+    panic_skip_till_token(';', state);
+
+    return result;
+}
+
+ast_node_t parse_struct_declaration(local_state_t *state, token_t *name) {
+    ast_node_t result = {};
+
+    result.type = AST_ERROR;
+    result.token = *name;
+
+    log_error_token(STR("structs are not realized."), state->scanner, advance_token(state->scanner), 0);
+    panic_skip_till_token(';', state);
+
+    return result;
+}
+
+ast_node_t parse_enum_declaration(local_state_t *state, token_t *name) {
+    ast_node_t result = {};
+
+    result.type = AST_ERROR;
+    result.token = *name;
+
+    log_error_token(STR("enums are not realized."), state->scanner, advance_token(state->scanner), 0);
+    panic_skip_till_token(';', state);
+
+    return result;
+}
+
 ast_node_t parse_global_statement(local_state_t *state) {
     ast_node_t node = {};
 
@@ -667,65 +855,29 @@ ast_node_t parse_global_statement(local_state_t *state) {
 
         switch(next.type) {
             case TOK_UNION: {
-                //
-
+                node = parse_union_declaration(state, &name);
             };
             case TOK_STRUCT: {
-                // SUBTYPE_AST_AST_TYPE_DEFINITION
+                node = parse_struct_declaration(state, &name);
             } break;
 
             case TOK_ENUM: {
+                node = parse_enum_declaration(state, &name);
             } break;
 
-
             default: {
-                ast_node_t type = parse_declaration_type(state);
-
-                if (type.type == AST_ERROR) {
-                    node.type = AST_ERROR;
-                    break;
-                }
-
-                area_add(&state->parser->nodes, &type);
-                node.left_index = state->parser->nodes.count - 1;
-
-                node.token = name;
-
-                if (consume_token(';', state->scanner, NULL)) {
-                    node.type = AST_UNARY; 
-                    node.subtype = SUBTYPE_AST_VAR;
-                    return node;
-                }
-
-                node.type = AST_BIN; 
-
-                if (!consume_token('=', state->scanner, NULL)) {
-                    node.type = AST_ERROR;
-                    log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
-                    break;
-                }
-
-                // @todo check for:
-                // - function declaration
-                // - prototype declaration
-                //
-                // right now we assume we only have expresions here
-                ast_node_t expresion = parse_expression(state);
-                area_add(&state->parser->nodes, &expresion);
-                node.right_index = state->parser->nodes.count - 1;
-
-                // we got specific decl
-                //
-                // it could be type definition also
-
-                // return node;
+                node = parse_func_or_var_declaration(state, &name);
             } break;
         }
     } else {
+        // log_error_token(STR("no expressions allowed in global scope."), state->scanner, peek_token(state->scanner), 0);
+        // panic_skip_till_token(';', state);
+
+        node = parse_block(state, 0, AST_BLOCK_IMPERATIVE);
         // this is where expression is, we care only now.
         // we will delete top level statements
         // @todo log error here
-        node = parse_expression(state);
+        // node = parse_expression(state);
     }
 
 
@@ -733,13 +885,12 @@ ast_node_t parse_global_statement(local_state_t *state) {
     // @todo we dont need semicolon everywhere
     if (semicolon.type != ';') {
         node.type = AST_ERROR;
-
         log_error_token(STR("Missing semicolon after expression."), state->scanner, semicolon, 0);
+        panic_skip_till_token(';', state);
     }
 
 
     return node;
-
 }
 
 b32 parse(scanner_t *scanner, parser_t* state) {
@@ -770,7 +921,12 @@ b32 parse(scanner_t *scanner, parser_t* state) {
         return false;
     }
 
-    if (!hashmap_create(area_get(&state->scopes, global_scope_index), &scanner->symbols, 100)) {
+    scope_tuple_t *tuple = area_get(&state->scopes, global_scope_index);
+    tuple->is_global    = true;
+    tuple->parent_scope = 0;
+
+
+    if (!hashmap_create(&tuple->scope, &scanner->symbols, 100)) {
         log_error(STR("Parser: Couldn't init global scope hashmap."), 0);
         return false;
     }
@@ -784,7 +940,6 @@ b32 parse(scanner_t *scanner, parser_t* state) {
 
         if (node.type == AST_ERROR) {
             valid_parse = false; 
-            break;
         }
 
         if (!area_add(&local.parser->nodes, &node)) {
@@ -803,14 +958,14 @@ b32 parse(scanner_t *scanner, parser_t* state) {
             entry.type       = SCOPE_VAR;
             entry.node_index = root_index;
 
-            hashmap_t<scope_entry_t> *scope = area_get(&state->scopes, 0);
+            scope_tuple_t *tuple = area_get(&state->scopes, 0);
 
-            if (hashmap_contains(scope, node.token.data.symbol)) {
+            if (hashmap_contains(&tuple->scope, node.token.data.symbol)) {
                 log_error_token(STR("the name of declaration is already in use."), local.scanner, node.token, 0);
                 valid_parse = false;
                 break;
             } else {
-                hashmap_add(scope, node.token.data.symbol, &entry);
+                hashmap_add(&tuple->scope, node.token.data.symbol, &entry);
             }
         }
 

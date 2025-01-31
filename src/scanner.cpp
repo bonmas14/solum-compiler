@@ -453,6 +453,8 @@ token_t advance_token(scanner_t *state) {
 
         case '(':
         case ')':
+        case '{':
+        case '}':
         case '@': 
         case '^':
             break;

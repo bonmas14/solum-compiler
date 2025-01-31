@@ -70,7 +70,7 @@ struct ast_node_t {
     u64 center_index;
     u64 right_index;
 
-    u64 list_start_index;
+    u64 list_next_node;
     u64 child_count;
 
     u64 scope_index;
@@ -82,10 +82,16 @@ struct scope_entry_t {
     u32 node_index;
 };
 
+struct scope_tuple_t {
+    b32 is_global;
+    u64 parent_scope;
+    hashmap_t<scope_entry_t> scope;
+};
+
 struct parser_t {
     area_t<ast_node_t> nodes;
     area_t<u64> root_indices; 
-    area_t<hashmap_t<scope_entry_t>> scopes;
+    area_t<scope_tuple_t> scopes;
 };
 
 
