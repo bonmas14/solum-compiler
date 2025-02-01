@@ -163,6 +163,7 @@ void repl(area_t<u8> *area) {
         scanner_open(&code, compiler.scanner);
         parse(&compiler);
 
+        log_update_color();
         fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
         fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
@@ -176,6 +177,7 @@ void repl(area_t<u8> *area) {
 
         scanner_delete(&scanner);
 
+        log_update_color();
         fprintf(stderr, "\x1b[?25h");
         fprintf(stderr, "-----------------------------\n");
 
