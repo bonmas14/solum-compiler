@@ -846,7 +846,6 @@ void print_token_info(token_t token, u64 left_pad) {
     get_token_info(STR(& token_info), token);
     
     sprintf((char*)buffer, "Token: '%.100s'. Data: %.100s", token_name, token_info);
-    set_console_color(255, 255, 255);
     log_no_dec(buffer, left_pad);
 }
 
@@ -854,8 +853,6 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
     if (token.type == TOKEN_ERROR || token.type == TOKEN_EOF) {
         return;
     }
-        
-    set_console_color(64, 192, 255);
 
     u64 start_line = token.l0 - line_start;
 
@@ -878,47 +875,53 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
         u8  *start = state->file.data + line->start;
 
         for (u64 j = 0; j < left_pad; j++) {
+            log_update_color();
             fprintf(stderr, " ");
         }
 
         if (i < token.l0 || i > token.l1) {
+            log_update_color();
             fprintf(stderr, "%.4zu | %.*s\n", i, (int)len - 1, start);
         } else {
             u64 token_size = token.c1 - token.c0;
 
             if (token.l0 != token.l1) {
+                log_push_color(255, 64, 64); 
 
                 if (i > token.l0 && i < token.l1) {
-                    set_console_color(255, 64, 64); // @todo: make new console color system based on stack
+                    log_update_color();
                     fprintf(stderr, "%.4zu | %.*s", i, (int)len, start);
-                    set_console_color(64, 192, 255);
+                    log_pop_color();
                 } else if (i == token.l0) {
+                    log_update_color();
                     fprintf(stderr, "%.4zu | %.*s", i, (int)token.c0, start);
                     len -= token.c0;
 
-                    set_console_color(255, 64, 64);
                     fprintf(stderr, "%.*s", (int)len, start + token.c0);
-                    set_console_color(64, 192, 255);
+                    log_pop_color();
                 } else if (i == token.l1) {
-
-                    set_console_color(255, 64, 64);
+                    log_update_color();
                     fprintf(stderr, "%.4zu | %.*s", i, (int)token.c1, start);
                     len -= token.c1;
 
-                    set_console_color(64, 192, 255);
-
+                    log_pop_color();
+                    log_update_color();
                     fprintf(stderr, "%.*s", (int) len, start + token.c1);
-                } 
+                } else {
+                    log_pop_color();
+                }
             } else {
                 fprintf(stderr, "%.4zu | %.*s", i, (int)token.c0, start);
                 len -= token.c0;
 
-                set_console_color(255, 64, 64);
+                log_push_color(255, 64, 64); 
+                log_update_color();
                 fprintf(stderr, "%.*s", (int)token_size, start + token.c0);
-                set_console_color(64, 192, 255);
+                log_pop_color();
 
                 len -= token_size;
 
+                log_update_color();
                 fprintf(stderr, "%.*s", (int) len, start + token.c0 + token_size);
             }
         }
@@ -927,28 +930,32 @@ void print_code_lines(scanner_t *state, token_t token, u64 line_start, u64 line_
     if (add_newline) {
         fprintf(stderr, "\n");
     }
-
-    set_console_color(255, 255, 255);
 }
 
 void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
+    log_push_color(64, 192, 255);
     print_token_info(token, left_pad);
+
     print_code_lines(state, token, 1, 1, left_pad);
-    log_no_dec(STR(""), left_pad);
+    log_pop_color();
 }
 
 void log_warning_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_warning(text, left_pad);
+
+    log_push_color(255, 244, 120);
     print_token_info(token, left_pad);
 
     print_code_lines(state, token, 2, 2, left_pad);
-    log_no_dec(STR(""), left_pad);
+    log_pop_color();
 }
 
 void log_error_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_error(text, left_pad);
+
+    log_push_color(255, 128, 128);
     print_token_info(token, left_pad);
 
     print_code_lines(state, token, 3, 3, left_pad);
-    log_no_dec(STR(""), left_pad);
+    log_pop_color();
 }

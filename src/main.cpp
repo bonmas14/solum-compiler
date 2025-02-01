@@ -53,6 +53,7 @@ void debug_tests(void) {
 }
 
 int main(void) {
+    log_push_color(255, 255, 255);
 #ifdef DEBUG
     debug_tests();
 #endif
@@ -106,6 +107,7 @@ void repl(area_t<u8> *area) {
         ch = 0;
         area_add(area, &ch);
 
+        log_update_color();
         fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
         fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
 
