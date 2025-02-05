@@ -774,6 +774,11 @@ ast_node_t parse_return_list(compiler_t *state) {
         }
     }
 
+    if (result.child_count > 1) {
+        log_error_token(STR("multiple return values not supported currently"), state->scanner, result.token, 0);
+        result.type = AST_ERROR;
+    }
+
     return result;
 }
 
@@ -810,7 +815,7 @@ ast_node_t parse_function_type(compiler_t *state) {
 
     // center is generic types
 
-    if (!consume_token('(', state->scanner, NULL)) {
+    if (consume_token('(', state->scanner, NULL)) {
         assert(false);
     }
 

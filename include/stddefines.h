@@ -38,19 +38,5 @@ struct symbol_t {
 // @nocheckin
 #define STRING(s) (string_t) { .size = sizeof(s), .data = reinterpret_cast<const u8*>(s) }
 
-#ifdef DEBUG
-#define assert(result) { \
-    if ((result) == false) { \
-        u8 fname[256] = { __FILE__ };\
-        u64 line = __LINE__;\
-        u8 buffer[512];\
-        sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", fname, line);\
-        log_error(buffer, 0);\
-    } \
-}
-#else 
-#define assert(result)
-#endif
-
 
 #endif // USER_DEFINES
