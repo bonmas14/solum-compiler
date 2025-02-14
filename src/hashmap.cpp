@@ -56,13 +56,14 @@ void hashmap_tests(void) {
     u8 name2[] = { "hashmap2" };
 
     u64 index = 0;
-    assert(area_allocate(&symbols, sizeof(name1), &index));
-    assert(area_fill(&symbols, (u8*)name1, sizeof(name1), index));
-    symbol_t key1 = (symbol_t){ .size = sizeof(name1), .table_index = index };
+    area_allocate(&symbols, sizeof(name1), &index);
 
-    assert(area_allocate(&symbols, sizeof(name2), &index));
-    assert(area_fill(&symbols, (u8*)name2, sizeof(name2), index));
-    symbol_t key2 = (symbol_t){ .size = sizeof(name2), .table_index = index };
+    area_fill(&symbols, (u8*)name1, sizeof(name1), index);
+    symbol_t key1 = (symbol_t){ .size = sizeof(name1), .table_index = (u32)index };
+
+    area_allocate(&symbols, sizeof(name2), &index);
+    area_fill(&symbols, (u8*)name2, sizeof(name2), index);
+    symbol_t key2 = (symbol_t){ .size = sizeof(name2), .table_index = (u32)index };
 
     u32 size = 8;
 

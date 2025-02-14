@@ -14,16 +14,16 @@ void area_tests(void) {
     u64 data2 = 804;
     u64 data3 = 104;
 
-    assert(area_add(&list, &data1));
-    assert(area_add(&list, &data2));
-    assert(area_add(&list, &data3));
+    area_add(&list, &data1);
+    area_add(&list, &data2);
+    area_add(&list, &data3);
 
     assert(data1 == *area_get(&list, 0));
     assert(data2 == *area_get(&list, 1));
     assert(data3 == *area_get(&list, 2));
 
     u64 index = 0;
-    assert(area_allocate(&list, 100, &index));
+    area_allocate(&list, 100, &index);
 
     // 100 values for area_fill_test
     u64 test[100] = { 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040,
@@ -37,7 +37,7 @@ void area_tests(void) {
                       4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 
                       4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040, 4040 };
 
-    assert(area_fill(&list, (u64*)test, 100, index));
+    area_fill(&list, (u64*)test, 100, index);
     assert(*area_get(&list, 100) == test[100 - 3]);
     assert(*area_get(&list, 10) == test[10 - 3]);
 

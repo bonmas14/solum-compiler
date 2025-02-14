@@ -29,14 +29,13 @@ struct string_t {
 };
 
 struct symbol_t {
-    u64 size;
-    u64 table_index;
+    u32 size;
+    u32 table_index;
 };
 
-#define STR(s) reinterpret_cast<const u8*>(s)
+#define STR(s) (u8[]) { s }
 
-// @nocheckin
-#define STRING(s) (string_t) { .size = sizeof(s), .data = reinterpret_cast<const u8*>(s) }
+#define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }
 
 
 #endif // USER_DEFINES

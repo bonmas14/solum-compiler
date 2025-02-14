@@ -1,6 +1,7 @@
 #include "stddefines.h"
 #include "scanner.h"
 #include "parser.h"
+#include "analyzer.h"
 #include "backend.h"
 #include "area_alloc.h"
 #include "hashmap.h"
@@ -58,26 +59,33 @@ int main(void) {
     debug_tests();
 #endif
 
-    /*
-       scanner_t scanner = {};
+    compiler_t compiler = {};
 
-       if (!scanner_create(STR("test"), &scanner)) {
-       log_error(STR("Main: couldn't open file and load it into memory."), 0);
-       return -1;
-       }
+    scanner_t  scanner  = {};
+    parser_t   parser   = {};
+    analyzer_t analyzer = {};
 
-       parser_t parser = {};
+    compiler.scanner  = &scanner;
+    compiler.parser   = &parser;
+    compiler.analyzer = &analyzer;
 
-       parse(&scanner, &parser);
+    if (!scanner_create((u8[]) {"test"}, &scanner)) {
+        log_error(STR("Main: couldn't open file and load it into memory."), 0);
+        return -1;
+    }
 
-       for (u64 i = 0; i < parser.root_indices.count; i++) {
-       ast_node_t *root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+    parse(&compiler);
 
-       print_node(&scanner, &parser, root, 0);
-       }
+    analyze_code(&compiler);
 
-       generate_code();
-       */
+    for (u64 i = 0; i < parser.root_indices.count; i++) {
+        ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+
+        print_node(&compiler, root, 0);
+    }
+
+
+    generate_code();
 
     area_t<u8> area = {};
     area_create(&area, 1000);
@@ -86,6 +94,8 @@ int main(void) {
         repl(&area);
     }
 
+
+    log_update_color();
     return 0;
 }
 
@@ -117,15 +127,19 @@ void repl(area_t<u8> *area) {
         area->count--;
         code.data = area->data;
 
+        compiler_t compiler = {};
+
         scanner_t  scanner  = {};
         parser_t   parser   = {};
+        analyzer_t analyzer = {};
 
-        compiler_t compiler = {};
-        compiler.scanner = &scanner;
-        compiler.parser = &parser;
+        compiler.scanner  = &scanner;
+        compiler.parser   = &parser;
+        compiler.analyzer = &analyzer;
 
         scanner_open(&code, &scanner);
         parse(&compiler);
+        analyze_code(&compiler);
 
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
@@ -152,16 +166,19 @@ void repl(area_t<u8> *area) {
         code.size = area->count;
         code.data = area->data;
 
-        scanner_t  scanner  = {};
-        parser_t   parser   = {};
-
         compiler_t compiler = {};
 
-        compiler.scanner = &scanner;
-        compiler.parser  = &parser;
+        scanner_t  scanner  = {};
+        parser_t   parser   = {};
+        analyzer_t analyzer = {};
+
+        compiler.scanner  = &scanner;
+        compiler.parser   = &parser;
+        compiler.analyzer = &analyzer;
 
         scanner_open(&code, compiler.scanner);
         parse(&compiler);
+        analyze_code(&compiler);
 
         log_update_color();
         fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");

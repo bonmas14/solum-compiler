@@ -1,0 +1,2 @@
+- Rewrite parser to not use BNF-type logic to parse files. because it is too much of a code
+- Rewrite logger because it got render bugs again

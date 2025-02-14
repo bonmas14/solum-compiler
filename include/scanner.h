@@ -56,7 +56,6 @@ enum token_type_t {
     TOK_F64,
 
     TOK_BOOL32,
-    TOK_NULL,
     TOK_DEFAULT,
 
     TOK_IF,
@@ -76,6 +75,15 @@ enum token_type_t {
 
     TOKEN_EOF   = 2047,
     TOKEN_ERROR = 2048,
+
+    TOKEN_GEN_FUNC_DEF,
+    TOKEN_GEN_GENERIC_FUNC_DEF,
+
+    TOKEN_GEN_FUNC_CALL,
+    TOKEN_GEN_ARRAY_CALL,
+    TOKEN_GEN_PARAM_LIST,
+
+    TOKEN_GEN_BLOCK,
 };
 
 #ifdef SCANNER_DEFINITION
@@ -88,7 +96,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "b32", 
 
-    "null", "default",
+    "default",
 
     "if", "else", "while", "for", "ret",
 
@@ -117,7 +125,7 @@ struct scanner_t {
 
 struct token_t {
     u32 type;
-    u64 c0, c1, l0, l1; //  without human readable offsets
+    u32 c0, c1, l0, l1; //  without human readable offsets
     union {
         u64 const_int;
         f64 const_double;
@@ -126,7 +134,7 @@ struct token_t {
 };
 
 
-b32 scanner_create(const u8* filename, scanner_t *state);
+b32 scanner_create(u8* filename, scanner_t *state);
 void scanner_delete(scanner_t *state);
 
 b32 scanner_open(string_t *string, scanner_t *state);
@@ -139,6 +147,6 @@ token_t peek_next_token(scanner_t *state);
 // --- logging for scanner
 
 void log_info_token(scanner_t *state, token_t token, u64 left_pad);
-void log_warning_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad);
-void log_error_token(const u8 *text, scanner_t *state, token_t token, u64 left_pad);
+void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);
+void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);
 #endif // SCANNER_H

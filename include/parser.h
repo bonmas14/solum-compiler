@@ -9,6 +9,7 @@
 #define INIT_NODES_SIZE (100)
 
 enum ast_types_t {
+    AST_EMPTY,
     AST_LEAF,
     AST_UNARY,
     AST_BIN,
@@ -28,15 +29,14 @@ enum ast_subtype_t {
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
-    SUBTYPE_AST_UNKN_DECL  = 0x10,
+
+    SUBTYPE_AST_UNKN_DEF   = 0x10,
 
     SUBTYPE_AST_STRUCT_DEF = 0x11,
     SUBTYPE_AST_UNION_DEF  = 0x12,
     SUBTYPE_AST_ENUM_DEF   = 0x13,
-    SUBTYPE_AST_PROTO_DEF  = 0x14,
 
-    SUBTYPE_AST_FUNC = 0x15, 
-    SUBTYPE_AST_VAR  = 0x16, 
+    SUBTYPE_AST_PARAM_DEF  = 0x14, 
 
     // types
     SUBTYPE_AST_AUTO_TYPE = 0x20,
@@ -50,12 +50,13 @@ enum ast_subtype_t {
 };
 
 
-struct ast_node_t {
+struct alignas(16) ast_node_t {
     s32 type;
     s32 subtype;
 
     token_t token;
 
+    // -- specific to node.type
     u64 left_index;
     u64 center_index;
     u64 right_index;

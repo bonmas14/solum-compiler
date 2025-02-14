@@ -7,7 +7,6 @@ static u32 stack[LOGGER_COLOR_STACK_SIZE];
 
 void log_push_color(u8 r, u8 g, u8 b) {
     stack[current_index] = r | (g << 8) | (b << 16);
-
     current_index = (current_index + 1) % LOGGER_COLOR_STACK_SIZE;
 }
 
@@ -26,42 +25,38 @@ void log_update_color(void) {
     fprintf(stderr, "\x1b[38;2;%u;%u;%um", r, g, b);
 }
 
-void log_no_dec(const u8 *text, u64 left_pad) {
-    while (left_pad-- > 0) {
-        fprintf(stderr, " ");
-    }
+void add_left_pad(u64 amount) {
+    while (amount-- > 0) fprintf(stderr, " ");
+}
 
+void log_write(u8 *text, u64 left_pad) {
+    add_left_pad(left_pad);
     log_update_color();
     fprintf(stderr, "%s\n", text);
 }
 
-void log_info(const u8 *text, u64 left_pad) {
-    while (left_pad-- > 0) {
-        fprintf(stderr, " ");
-    }
+void log_info(u8 *text, u64 left_pad) {
+    add_left_pad(left_pad);
 
-    log_push_color(64, 192, 255);
+    log_push_color(INFO_COLOR);
     log_update_color();
     fprintf(stderr, "INFO: %s\n", text);
     log_pop_color();
 }
 
-void log_warning(const u8 *text, u64 left_pad) {
-    while (left_pad-- > 0) {
-        fprintf(stderr, " ");
-    }
-    log_push_color(255, 192, 64);
+void log_warning(u8 *text, u64 left_pad) {
+    add_left_pad(left_pad);
+
+    log_push_color(WARNING_COLOR);
     log_update_color();
     fprintf(stderr, "WARNING: %s\n", text);
     log_pop_color();
 }
 
-void log_error(const u8 *text, u64 left_pad) {
-    while (left_pad-- > 0) {
-        fprintf(stderr, " ");
-    }
+void log_error(u8 *text, u64 left_pad) {
+    add_left_pad(left_pad);
 
-    log_push_color(255, 64, 64);
+    log_push_color(ERROR_COLOR);
     log_update_color();
     fprintf(stderr, "ERROR: %s\n", text);
     log_pop_color();
