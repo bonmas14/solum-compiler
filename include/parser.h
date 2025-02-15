@@ -55,6 +55,7 @@ struct alignas(16) ast_node_t {
     s32 subtype;
 
     token_t token;
+    u64 self_index;
 
     // -- specific to node.type
     u64 left_index;

@@ -59,10 +59,6 @@ static inline b32 match_char(scanner_t *state, u8 in) {
     return peek_char(state) == in;
 }
 
-static inline b32 match_next_char(scanner_t *state, u8 in) {
-    return peek_next_char(state) == in;
-}
-
 // --- Helpers
 
 static inline b32 char_is_digit(u8 in) {
@@ -104,7 +100,7 @@ static inline b32 char_is_letter(u8 in) {
 }
 
 static inline b32 char_is_number_or_letter(u8 in) {
-    return char_is_digit(in) || char_is_letter(in);
+    return char_is_digit(in) | char_is_letter(in);
 }
 
 static inline b32 char_is_special(u8 in) {
@@ -857,7 +853,7 @@ void print_token_info(token_t token, u64 left_pad) {
     get_token_name(token_name, token);
     get_token_info(token_info, token);
     
-    sprintf((char*)buffer, "Token: '%.50s'. Data: %.50s", token_name, token_info);
+    sprintf((char*)buffer, "line: %u, char: %u | Token: '%.50s'. Data: %.50s", token.l0 + 1, token.c0 + 1, token_name, token_info);
     log_write(buffer, left_pad);
 }
 
@@ -866,7 +862,7 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
         return;
     }
 
-    u64 start_line = token.l0;
+    u64 start_line = token.l0 - 2;
 
     if (start_line > token.l0) {
         start_line = 0;
@@ -880,11 +876,27 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
         add_newline = true;
     }
 
-    for (u64 i = start_line; i < stop_line; i++) {
-        line_tuple_t *line = area_get(&state->lines, i);
+    b32 cancel_skip = false;
 
-        u64 len    = line->stop - line->start + 1;
-        u8  *start = state->file.data + line->start;
+    for (u64 i = start_line; i < stop_line; i++) {
+        line_tuple_t line = *area_get(&state->lines, i);
+
+        u64 len   = line.stop - line.start + 1;
+        u8 *start = state->file.data + line.start;
+
+        b32 skip_line = true;
+
+        for (u64 j = 0; j < len; j++) {
+            if (*(start + j) != ' ' && *(start + j) != '\n' && *(start + j) != '\r') {
+                skip_line   = false;
+                cancel_skip = true;
+            }
+        }
+        
+        if (!cancel_skip && skip_line && i < token.l0) { 
+            cancel_skip = true;
+            continue;
+        }
 
         for (u64 j = 0; j < left_pad; j++) {
             log_update_color();
@@ -923,6 +935,7 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
                     log_pop_color();
                 }
             } else {
+                log_update_color();
                 fprintf(stderr, "| %.*s", (int)token.c0, start);
                 len -= token.c0;
 
@@ -948,10 +961,11 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(INFO_COLOR);
     print_token_info(token, left_pad);
 
-    log_write(STR(""), left_pad);
+    log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR(""), left_pad);
 
+    log_pop_color();
     log_pop_color();
 }
 
@@ -962,21 +976,24 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
 
     print_token_info(token, left_pad);
 
-    log_write(STR(""), left_pad);
+    log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR(""), left_pad);
 
     log_pop_color();
+    log_pop_color();
 }
 
 void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
-    log_push_color(255, 128, 128);
+    log_push_color(ERROR_COLOR);
     log_error(text, left_pad);
 
     print_token_info(token, left_pad);
 
-    log_write(STR(""), left_pad);
+    log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR(""), left_pad);
+
+    log_pop_color();
     log_pop_color();
 }

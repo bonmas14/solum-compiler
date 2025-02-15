@@ -6,6 +6,9 @@
 #include "hashmap.h"
 #include "scanner.h"
 
+#define MAX_COUNT_OF_PARAMS 16 // @todo for now!!
+#define MAX_COUNT_OF_RETS 16
+
 enum funciton_flags_t {
     SCOPE_IS_GENERIC    = 0x00100000,
     SCOPE_FUNC_EXTERNAL = 0x00010000,
@@ -22,12 +25,28 @@ struct scope_entry_t {
     u32 type;
     u32 flags;
     u32 node_index;
+
+    union {
+        struct {
+            u32 argc;
+            u32 retc;
+
+            u32 argv_types[MAX_COUNT_OF_PARAMS];
+            u32 retv_types[MAX_COUNT_OF_RETS];
+        } func;
+
+        struct {
+            b32 is_const;
+            u32 type;
+        } var;
+    };
 };
 
 struct scope_tuple_t {
     b32 is_global;
     u64 parent_scope;
     hashmap_t<scope_entry_t> scope;
+    area_t<symbol_t> user_types_lookup_list; 
 };
 
 struct ir_opcode_t {

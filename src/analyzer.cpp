@@ -1,5 +1,6 @@
 #include "analyzer.h"
 #include "parser.h"
+#include "scanner.h"
 #include "logger.h"
 #include "area_alloc.h"
 #include "hashmap.h"
@@ -24,9 +25,37 @@
 b32 analyze_function(compiler_t *compiler, ast_node_t *node, scope_tuple_t *parent_scope) {
     log_info(STR("analyzing"), 0);
 
+    scope_entry_t entry = {};
+
+    if (hashmap_contains(&parent_scope->scope, node->token.data.symbol)) {
+        log_error_token(STR("Function was already declared"), compiler->scanner, node->token, 0);
+
+        log_error_token(STR("Previously declared here: "),
+                compiler->scanner,
+                area_get(&compiler->parser->nodes, hashmap_get(&parent_scope->scope, node->token.data.symbol)->node_index)->token,
+                0);
+
+        return false;
+    }
+
+    entry.type = SCOPE_FUNC;
     // check and create unique symbol
-    // 
     // create scope, add parent
+
+    entry.node_index = node->self_index;
+
+
+    ast_node_t *type = area_get(&compiler->parser->nodes, node->left_index);
+
+    entry.func.argc = area_get(&compiler->parser->nodes, type->left_index)->child_count;
+    entry.func.retc = area_get(&compiler->parser->nodes,type->right_index)->child_count;
+
+    if (entry.func.retc > 1) {
+        log_error_token(STR("multiple return values are not supported currently."), compiler->scanner, node->token, 0);
+        return false;
+    }
+
+    hashmap_add(&parent_scope->scope, node->token.data.symbol, &entry);
 
     return true;
 }
@@ -78,7 +107,7 @@ b32 analyze_code(compiler_t *compiler) {
         ast_node_t* root = area_get(&parser->nodes, *area_get(&parser->root_indices, i));
 
 
-        check(analyze_root_statement(compiler, root, &global_scope));
+        (void)analyze_root_statement(compiler, root, &global_scope);
 
         // analyze 
         // print_node(&compiler, root, 0);
