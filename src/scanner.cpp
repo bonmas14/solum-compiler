@@ -408,7 +408,7 @@ token_t advance_token(scanner_t *state, area_t<u8> *symbols) {
 
     if (match_char(state, 0)) {
         token.c0 = token.c1 = state->current_char;
-        token.l0 = token.l1 = state->current_char;
+        token.l0 = token.l1 = state->current_line;
 
         token.type = TOKEN_EOF;
         return token;
