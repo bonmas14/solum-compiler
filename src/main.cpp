@@ -78,11 +78,13 @@ int main(void) {
 
     analyze_code(&compiler);
 
+    /*
     for (u64 i = 0; i < parser.root_indices.count; i++) {
         ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
         print_node(&compiler, root, 0);
     }
+    */
 
 
     generate_code();
@@ -176,14 +178,15 @@ void repl(area_t<u8> *area) {
         compiler.parser   = &parser;
         compiler.analyzer = &analyzer;
 
+        log_update_color();
+        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
+        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
+
         scanner_open(&code, compiler.scanner);
         parse(&compiler);
         analyze_code(&compiler);
 
         log_update_color();
-        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
-        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
-
         fprintf(stderr, "------------TREE-------------\n");
 
         for (u64 i = 0; i < parser.root_indices.count; i++) {

@@ -584,11 +584,13 @@ ast_node_t parse_expression(compiler_t *state) {
             area_add(&state->parser->nodes, &right);
             result.right_index = state->parser->nodes.count - 1;
         } break;
+
         case TOKEN_ERROR: {
             advance_token(state->scanner);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
+
         default: {
             result = left;
         } break;
@@ -655,12 +657,8 @@ ast_node_t parse_type(compiler_t *state) {
             advance_token(state->scanner);
 
             result.type = AST_BIN;
+            result.subtype = SUBTYPE_AST_ARR_TYPE;
             result.token.type = TOKEN_GEN_ARRAY_CALL;
-
-            /*
-            if (peek_token(state->scanner).type != ']') { // @todo add the handle for [] without expression inside
-            }
-            */
 
             ast_node_t size   = parse_expression(state); 
             check(size.type != AST_EMPTY);
@@ -680,15 +678,10 @@ ast_node_t parse_type(compiler_t *state) {
             area_add(&state->parser->nodes, &size);
             result.left_index = state->parser->nodes.count - 1;
 
-            // @todo this will allow for this case: [] ^ [] ^ [] s32
-            // this doesnt make any sence, so we need to delete it in analyzer step
-
             ast_node_t type = parse_type(state);
 
-            // @todo check for AST_ERROR
-            if (type.subtype == SUBTYPE_AST_AUTO_TYPE) {
+            if (type.type == AST_ERROR) {
                 result.type = AST_ERROR;
-                log_error_token(STR("Type cannot be automatic when it specified as an array."), state->scanner, result.token, 0);
                 break;
             }
 
@@ -699,12 +692,12 @@ ast_node_t parse_type(compiler_t *state) {
         } break;
         case '^': {
             result.token = advance_token(state->scanner);
+            result.subtype = SUBTYPE_AST_PTR_TYPE;
 
             ast_node_t node = parse_type(state);
-            // @todo check for AST_ERROR
-            if (node.subtype == SUBTYPE_AST_AUTO_TYPE) {
+
+            if (node.type == AST_ERROR) {
                 result.type = AST_ERROR;
-                log_error_token(STR("Type cannot be automatic when it specified as a pointer."), state->scanner, result.token, 0);
                 break;
             }
 

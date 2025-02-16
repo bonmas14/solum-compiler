@@ -6,8 +6,8 @@
 #include "hashmap.h"
 #include "scanner.h"
 
-#define MAX_COUNT_OF_PARAMS 16 // @todo for now!!
-#define MAX_COUNT_OF_RETS 16
+#define MAX_COUNT_OF_PARAMS 16
+#define MAX_COUNT_OF_RETS 1 
 
 enum funciton_flags_t {
     SCOPE_IS_GENERIC    = 0x00100000,
@@ -22,6 +22,7 @@ enum scope_entry_types_t {
 };
 
 struct scope_entry_t {
+    b32 resolved;
     u32 type;
     u32 flags;
     u32 node_index;
