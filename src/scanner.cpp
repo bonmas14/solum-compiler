@@ -346,7 +346,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     return true;
 }
 
-static b32 process_word(scanner_t *state, token_t *token) {
+static b32 process_word(scanner_t *state, token_t *token, area_t<u8> *symbols) {
     token->c0 = state->current_char;
     token->l0 = state->current_line;
 
@@ -383,9 +383,8 @@ static b32 process_word(scanner_t *state, token_t *token) {
 
     u64 index = 0;
 
-    area_allocate(&state->symbols, identifier.size, &index);
-
-    area_fill(&state->symbols, identifier.data, identifier.size, index);
+    area_allocate(symbols, identifier.size, &index);
+    area_fill(symbols, identifier.data, identifier.size, index);
 
     token->data.symbol.size = identifier.size;
     token->data.symbol.table_index = index;
@@ -402,7 +401,7 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state) {
+token_t advance_token(scanner_t *state, area_t<u8> *symbols) {
     eat_all_spaces(state);
 
     token_t token = {};
@@ -425,7 +424,7 @@ token_t advance_token(scanner_t *state) {
                 advance_char(state);
             }
 
-            token = advance_token(state);
+            token = advance_token(state, symbols);
             return token;
         }
     }
@@ -517,7 +516,7 @@ token_t advance_token(scanner_t *state) {
         default: {
             if (char_is_letter(ch)) {
                 stepback_char(state);
-                process_word(state, &token); // @todo add handlers for false case
+                process_word(state, &token, symbols); // @todo add handlers for false case
             } else if (char_is_digit(ch)) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
@@ -534,38 +533,40 @@ token_t advance_token(scanner_t *state) {
 }
 
 // @todo: add caching instead of just cleaning this up 
-token_t peek_token(scanner_t *state) {
+token_t peek_token(scanner_t *state, area_t<u8> *symbols) {
     scanner_t peek_state = *state;
-    token_t token = advance_token(&peek_state);
 
-    // this is because it is possible that symbols array will get
-    // reallocated and because of that we will get memory leak if 
-    // we dont change it in original
-    if (peek_state.symbols.data != state->symbols.data) {
-        u64 count = state->symbols.count;
-        state->symbols = peek_state.symbols;
-        state->symbols.count = count;
-    }
+    u64 count      = symbols->count;
+    token_t token  = advance_token(&peek_state, symbols);
+    symbols->count = count;
 
     return token;
 }
 
-token_t peek_next_token(scanner_t *state) {
+token_t peek_next_token(scanner_t *state, area_t<u8> *symbols) {
     scanner_t peek_state = *state;
-    (void)advance_token(&peek_state);
-    return advance_token(&peek_state);
+
+    u64 count = symbols->count;
+    (void)advance_token(&peek_state, symbols);
+    token_t token = advance_token(&peek_state, symbols);
+    symbols->count = count;
+
+    return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, area_t<u8> *symbols) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
     if (token == NULL) {
         token  = &local_token;
     }
-    *token = advance_token(&peek_state);
+
+    u64 count = symbols->count;
+    *token = advance_token(&peek_state, symbols);
 
     if (token->type != token_type) {
+        symbols->count = count;
         return false;
     }
 
@@ -648,7 +649,6 @@ void scanner_delete(scanner_t *state) {
         free(state->file.data);
     }
 
-    area_delete(&state->symbols);
     area_delete(&state->lines);
 }
 
@@ -657,7 +657,6 @@ b32 scanner_open(string_t *string, scanner_t *state) {
     state->file       = *string;
 
     check(scan_lines(state));
-    check(area_create(&state->symbols, 256));
 
     return true;
 }
@@ -676,15 +675,10 @@ b32 scanner_create(u8* filename, scanner_t *state) {
         return false;
     }
 
-    if (!area_create(&state->symbols, 256)) {
-        log_error(STR("Scanner: Couldn't symbols list."), 0);
-        return false;
-    }
-
     return true;
 }
 
-// introspect later
+// @todo introspect later
 void get_token_name(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_IDENT:

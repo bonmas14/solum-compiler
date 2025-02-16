@@ -62,7 +62,11 @@ struct compile_unit_t {
 struct analyzer_t {
     area_t<scope_tuple_t> scopes;
     area_t<compile_unit_t> units;
+
+    area_t<u8> symbols;
 };
+
+void analyzer_create(analyzer_t *analyzer);
 
 b32 analyze_code(compiler_t *compiler);
 

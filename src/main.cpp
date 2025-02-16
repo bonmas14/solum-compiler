@@ -59,11 +59,12 @@ int main(void) {
     debug_tests();
 #endif
 
-    compiler_t compiler = {};
+    analyzer_t analyzer = {};
+    analyzer_create(&analyzer);
 
+    compiler_t compiler = {};
     scanner_t  scanner  = {};
     parser_t   parser   = {};
-    analyzer_t analyzer = {};
 
     compiler.scanner  = &scanner;
     compiler.parser   = &parser;
@@ -79,12 +80,12 @@ int main(void) {
     analyze_code(&compiler);
 
     /*
-    for (u64 i = 0; i < parser.root_indices.count; i++) {
-        ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
+       for (u64 i = 0; i < parser.root_indices.count; i++) {
+       ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
 
-        print_node(&compiler, root, 0);
-    }
-    */
+       print_node(&compiler, root, 0);
+       }
+       */
 
 
     generate_code();
@@ -95,7 +96,6 @@ int main(void) {
     while (true) {
         repl(&area);
     }
-
 
     log_update_color();
     return 0;
@@ -129,19 +129,20 @@ void repl(area_t<u8> *area) {
         area->count--;
         code.data = area->data;
 
+        analyzer_t analyzer = {};
+        analyzer_create(&analyzer);
+
         compiler_t compiler = {};
 
         scanner_t  scanner  = {};
         parser_t   parser   = {};
-        analyzer_t analyzer = {};
 
         compiler.scanner  = &scanner;
         compiler.parser   = &parser;
         compiler.analyzer = &analyzer;
 
         scanner_open(&code, &scanner);
-        parse(&compiler);
-        analyze_code(&compiler);
+        if (parse(&compiler)) analyze_code(&compiler);
 
         for (u64 i = 0; i < parser.root_indices.count; i++) {
             ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
@@ -168,11 +169,12 @@ void repl(area_t<u8> *area) {
         code.size = area->count;
         code.data = area->data;
 
-        compiler_t compiler = {};
 
+        compiler_t compiler = {};
         scanner_t  scanner  = {};
         parser_t   parser   = {};
         analyzer_t analyzer = {};
+        analyzer_create(&analyzer);
 
         compiler.scanner  = &scanner;
         compiler.parser   = &parser;
@@ -183,8 +185,7 @@ void repl(area_t<u8> *area) {
         fprintf(stderr, "%.*s\n", (int)area->count, area->data);
 
         scanner_open(&code, compiler.scanner);
-        parse(&compiler);
-        analyze_code(&compiler);
+        if (parse(&compiler)) analyze_code(&compiler);
 
         log_update_color();
         fprintf(stderr, "------------TREE-------------\n");
