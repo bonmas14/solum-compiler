@@ -3,7 +3,6 @@
 
 #include "stddefines.h"
 #include "logger.h"
-#include "area_alloc.h"
 
 #include <memory.h> 
 
@@ -19,24 +18,24 @@
 
 // -------------------- 
 //
-//  Simple hashmap for using in compiler. with trick to use area_t
-//  as lookup for strings.
-//                                   - bonmas14 (29.01.2025)
+//  Simple hashmap for using in compiler.
+//  Never using arrays inside again
+//                                     - bonmas14 (25.02.2025)
 //
 //  Full interface:
 //
-//   b32  hashmap_create(hashmap_t *container, area_t<u8> *symbols, u64 init_size);
+//   b32  hashmap_create(hashmap_t *container, u64 init_size);
 //   void hashmap_delete(hashmap_t *map);
 //
-//   b32 hashmap_add(hashmap_t *map, symbol_t key, T *value);
-//   T * hashmap_get(hashmap_t *map, symbol_t key);
-//   b32 hashmap_remove(hashmap_t   *map, symbol_t key);
-//   b32 hashmap_contains(hashmap_t *map, symbol_t key);
+//   b32 hashmap_add(hashmap_t *map, string_t key, T *value);
+//   T * hashmap_get(hashmap_t *map, string_t key);
+//   b32 hashmap_remove(hashmap_t   *map, string_t key);
+//   b32 hashmap_contains(hashmap_t *map, string_t key);
 //
 // -------------------- 
 
 struct hash_entry_t {
-    symbol_t name;
+    string_t name;
     b32 occupied;
     b32 deleted;
 };
@@ -46,7 +45,6 @@ struct hashmap_t {
     u64 load;
     u64 capacity;
 
-    area_t<u8> *symbols;
     hash_entry_t *entries;
     DataType     *values;
 };
@@ -54,7 +52,7 @@ struct hashmap_t {
 // ----------- Initialization 
 
 template<typename DataType>
-b32 hashmap_create(hashmap_t<DataType> *container, area_t<u8> *symbols, u64 init_size);
+b32 hashmap_create(hashmap_t<DataType> *container, u64 init_size);
 
 template<typename DataType>
 b32 hashmap_delete(hashmap_t<DataType> *map);
@@ -62,24 +60,24 @@ b32 hashmap_delete(hashmap_t<DataType> *map);
 // ----------- Control 
 
 template<typename DataType>
-b32       hashmap_add(hashmap_t<DataType> *map, symbol_t key, DataType *value);
+b32       hashmap_add(hashmap_t<DataType> *map, string_t key, DataType *value);
 
 template<typename DataType>
-DataType *hashmap_get(hashmap_t<DataType> *map, symbol_t key);
+DataType *hashmap_get(hashmap_t<DataType> *map, string_t key);
 
 template<typename DataType>
-b32 hashmap_remove(hashmap_t<DataType>   *map, symbol_t key);
+b32 hashmap_remove(hashmap_t<DataType>   *map, string_t key);
 
 template<typename DataType>
-b32 hashmap_contains(hashmap_t<DataType> *map, symbol_t key);
+b32 hashmap_contains(hashmap_t<DataType> *map, string_t key);
 
 // ----------- Helpers
 
 void hashmap_tests(void);
 u32 get_hash(u64 size, void *data);
 
-u32 get_symbol_hash(area_t<u8> *symbols, symbol_t symbol);
-b32 compare_symbols(area_t<u8> *symbols, symbol_t a, symbol_t b);
+u32 get_string_hash(string_t symbol);
+b32 compare_strings(string_t a, string_t b);
 
 template<typename DataType>
 b32 rebuild_map(hashmap_t<DataType> *map);
@@ -87,11 +85,10 @@ b32 rebuild_map(hashmap_t<DataType> *map);
 // ----------- Implementation
 
 template<typename DataType>
-b32 hashmap_create(hashmap_t<DataType> *map, area_t<u8> *symbols, u64 init_size) {
+b32 hashmap_create(hashmap_t<DataType> *map, u64 init_size) {
     assert(init_size > 0);
 
     map->capacity = init_size;
-    map->symbols  = symbols;
     map->entries  = (hash_entry_t*)ALLOC(sizeof(hash_entry_t) * init_size);
     map->values   =     (DataType*)ALLOC(sizeof(DataType)     * init_size);
 
@@ -118,8 +115,8 @@ b32 hashmap_delete(hashmap_t<DataType> *map) {
 }
 
 template<typename DataType>
-b32 hashmap_contains(hashmap_t<DataType> *map, symbol_t key) {
-    u32 hash = get_symbol_hash(map->symbols, key);
+b32 hashmap_contains(hashmap_t<DataType> *map, string_t key) {
+    u32 hash = get_string_hash(key);
     u32 index = hash % map->capacity;
 
     for (u64 offset = 0; offset < map->capacity; offset++) {
@@ -129,7 +126,7 @@ b32 hashmap_contains(hashmap_t<DataType> *map, symbol_t key) {
 
         if (!map->entries[lookup].occupied) return false;
 
-        if (compare_symbols(map->symbols, key, map->entries[lookup].name)) {
+        if (compare_strings(key, map->entries[lookup].name)) {
             return true;
         }
     }
@@ -138,8 +135,8 @@ b32 hashmap_contains(hashmap_t<DataType> *map, symbol_t key) {
 }
 
 template<typename DataType>
-DataType *hashmap_get(hashmap_t<DataType> *map, symbol_t key) {
-    u32 hash = get_symbol_hash(map->symbols, key);
+DataType *hashmap_get(hashmap_t<DataType> *map, string_t key) {
+    u32 hash = get_string_hash(key);
     u32 index = hash % map->capacity;
 
     for (u64 offset = 0; offset < map->capacity; offset++) {
@@ -149,7 +146,7 @@ DataType *hashmap_get(hashmap_t<DataType> *map, symbol_t key) {
 
         if (!map->entries[lookup].occupied) return NULL;
 
-        if (compare_symbols(map->symbols, key, map->entries[lookup].name)) {
+        if (compare_strings(key, map->entries[lookup].name)) {
             return map->values + lookup;
         }
     }
@@ -158,14 +155,14 @@ DataType *hashmap_get(hashmap_t<DataType> *map, symbol_t key) {
 }
 
 template<typename DataType>
-b32 hashmap_add(hashmap_t<DataType> *map, symbol_t key, DataType *value) {
+b32 hashmap_add(hashmap_t<DataType> *map, string_t key, DataType *value) {
     if (map->load > (map->capacity * MAX_HASHMAP_LOAD)) {
         if (!rebuild_map(map)) {
             log_error(STR("Map is full, couldn't insert element, attempted to but we resize it and still failed."), 0);
         }
     }
 
-    u32 hash  = get_symbol_hash(map->symbols, key);
+    u32 hash  = get_string_hash(key);
     u32 index = hash % map->capacity;
 
     for (u64 offset = 0; offset < map->capacity; offset++) {
@@ -180,7 +177,7 @@ b32 hashmap_add(hashmap_t<DataType> *map, symbol_t key, DataType *value) {
             map->load++;
 
             return true;
-        } else if (compare_symbols(map->symbols, key, map->entries[lookup].name)) {
+        } else if (compare_strings(key, map->entries[lookup].name)) {
             return false;
         }
     }
@@ -189,8 +186,8 @@ b32 hashmap_add(hashmap_t<DataType> *map, symbol_t key, DataType *value) {
 }
 
 template<typename DataType>
-b32 hashmap_remove(hashmap_t<DataType>   *map, symbol_t key) {
-    u32 hash = get_symbol_hash(map->symbols, key);
+b32 hashmap_remove(hashmap_t<DataType> *map, string_t key) {
+    u32 hash = get_string_hash(key);
     u32 index = hash % map->capacity;
 
     for (u64 offset = 0; offset < map->capacity; offset++) {
@@ -200,7 +197,7 @@ b32 hashmap_remove(hashmap_t<DataType>   *map, symbol_t key) {
 
         if (!map->entries[lookup].occupied) return false;
 
-        if (compare_symbols(map->symbols, key, map->entries[lookup].name)) {
+        if (compare_strings(key, map->entries[lookup].name)) {
             map->entries[lookup].deleted = true;
             map->load--;
             return true;
@@ -215,7 +212,7 @@ template<typename DataType>
 b32 rebuild_map(hashmap_t<DataType> *map) {
     hashmap_t<DataType> old_map = *map;
 
-    if (!hashmap_create(map, map->symbols, map->capacity * 2)) {
+    if (!hashmap_create(map, map->capacity * 2)) {
         *map = old_map;
         return false;
     }

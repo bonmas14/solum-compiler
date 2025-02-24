@@ -3,6 +3,7 @@
 
 #include "compiler.h"
 #include "area_alloc.h"
+#include "arena.h"
 
 #define APPROX_CHAR_PER_LINE (25)
 #define MINIMAL_SIZE (50)
@@ -128,7 +129,7 @@ struct token_t {
     union {
         u64 const_int;
         f64 const_double;
-        symbol_t symbol;
+        string_t string;
     } data;
 };
 
@@ -138,10 +139,10 @@ void scanner_delete(scanner_t *state);
 
 b32 scanner_open(string_t *string, scanner_t *state);
 
-token_t advance_token(scanner_t *state, area_t<u8> *symbols);
-b32     consume_token(u32 token_type, scanner_t *state, token_t *token, area_t<u8> *symbols);
-token_t peek_token(scanner_t *state, area_t<u8> *symbols);
-token_t peek_next_token(scanner_t *state, area_t<u8> *symbols);
+token_t advance_token(scanner_t *state, arena_t *symbols);
+b32     consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *symbols);
+token_t peek_token(scanner_t *state, arena_t *symbols);
+token_t peek_next_token(scanner_t *state, arena_t *symbols);
 
 // --- logging for scanner
 

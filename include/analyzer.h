@@ -47,13 +47,13 @@ struct scope_tuple_t {
     b32 is_global;
     u64 parent_scope;
     hashmap_t<scope_entry_t> scope;
-    area_t<symbol_t> user_types_lookup_list; 
+    area_t<string_t> user_types_lookup_list; 
 };
 
 struct analyzer_t {
     area_t<scope_tuple_t> scopes;
 
-    area_t<u8> symbols;
+    arena_t * symbols;
 };
 
 void analyzer_create(analyzer_t *analyzer);

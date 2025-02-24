@@ -28,11 +28,6 @@ struct string_t {
     u8 *data;
 };
 
-struct symbol_t {
-    u32 size;
-    u32 table_index;
-};
-
 #define STR(s) (u8[]) { s }
 
 #define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }

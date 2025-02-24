@@ -32,8 +32,9 @@ void analyzer_create(analyzer_t *analyzer) {
     global_scope->is_global    = true;
     global_scope->parent_scope = 0;
 
-    assert(area_create(&analyzer->symbols, 256));
-    assert(hashmap_create(&global_scope->scope, &analyzer->symbols, 100));
+    analyzer->symbols = arena_create(256);
+
+    assert(hashmap_create(&global_scope->scope, 100));
 }
 
 b32 analyze_code(compiler_t *compiler) {

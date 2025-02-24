@@ -21,7 +21,7 @@ ast_node_t parse_block(compiler_t* state, ast_subtype_t subtype);
 /* helpers */
 
 void panic_skip(compiler_t *state) {
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     u64 depth = 1;
 
@@ -35,24 +35,24 @@ void panic_skip(compiler_t *state) {
         if (token.type == '{') depth++;
         if (token.type == '}') depth--;
 
-        advance_token(state->scanner, &state->analyzer->symbols);
-        token = peek_token(state->scanner, &state->analyzer->symbols);
+        advance_token(state->scanner, state->analyzer->symbols);
+        token = peek_token(state->scanner, state->analyzer->symbols);
     }
 }
 
 void panic_skip_until_token(u32 value, compiler_t *state) {
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     while (token.type != value && token.type != TOKEN_EOF && token.type != TOKEN_ERROR) {
-        advance_token(state->scanner, &state->analyzer->symbols);
-        token = peek_token(state->scanner, &state->analyzer->symbols);
+        advance_token(state->scanner, state->analyzer->symbols);
+        token = peek_token(state->scanner, state->analyzer->symbols);
     }
 }
 
 /* parsing */
 
 ast_node_t parse_primary(compiler_t *state) {
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     ast_node_t result = {};
 
@@ -66,23 +66,23 @@ ast_node_t parse_primary(compiler_t *state) {
         case TOKEN_CONST_STRING:
         case TOKEN_IDENT:
         case TOK_DEFAULT:
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             break;
 
         case TOKEN_OPEN_BRACE: {
-            advance_token(state->scanner, &state->analyzer->symbols);
-            token_t next = peek_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
+            token_t next = peek_token(state->scanner, state->analyzer->symbols);
 
             if (next.type == TOKEN_CLOSE_BRACE) {
                 result.type = AST_EMPTY;
-                advance_token(state->scanner, &state->analyzer->symbols);
+                advance_token(state->scanner, state->analyzer->symbols);
                 break;
             }
 
             result = parse_expression(state); 
             
             token_t error_token = {};
-            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token, &state->analyzer->symbols)) {
+            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token, state->analyzer->symbols)) {
                 result.type = AST_ERROR;
 
                 log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, error_token, 0);
@@ -102,13 +102,13 @@ ast_node_t parse_function_call(compiler_t *state) {
 
     if (result.type == AST_EMPTY) return result;
 
-    token_t end = {}, next = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t end = {}, next = peek_token(state->scanner, state->analyzer->symbols);
 
     if (next.type == '(' && result.token.type == TOKEN_IDENT) {
         ast_node_t left = result;
         result = {};
 
-        next = advance_token(state->scanner, &state->analyzer->symbols);
+        next = advance_token(state->scanner, state->analyzer->symbols);
 
         result.type  = AST_BIN;
 
@@ -123,7 +123,7 @@ ast_node_t parse_function_call(compiler_t *state) {
         ZERO_CHECK(result.right);
         *result.right = right;
 
-        check(consume_token(')', state->scanner, &end, &state->analyzer->symbols));
+        check(consume_token(')', state->scanner, &end, state->analyzer->symbols));
 
         next.type = TOKEN_GEN_FUNC_CALL;
 
@@ -137,7 +137,7 @@ ast_node_t parse_function_call(compiler_t *state) {
 }
 
 ast_node_t parse_unary(compiler_t *state) {
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     ast_node_t result = {};
 
@@ -150,7 +150,7 @@ ast_node_t parse_unary(compiler_t *state) {
         case '^':
         case '-':
         case '!': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             ast_node_t child = parse_unary(state); // @todo check for errors
             
             if (child.type == AST_EMPTY || child.type == AST_ERROR) {
@@ -162,7 +162,7 @@ ast_node_t parse_unary(compiler_t *state) {
             *result.left = child;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -181,7 +181,7 @@ ast_node_t parse_shift(compiler_t *state) {
 
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -190,7 +190,7 @@ ast_node_t parse_shift(compiler_t *state) {
     switch (token.type) {
         case TOKEN_LSHIFT: 
         case TOKEN_RSHIFT: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -204,7 +204,7 @@ ast_node_t parse_shift(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -222,7 +222,7 @@ ast_node_t parse_and(compiler_t *state) {
     left = parse_shift(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -230,7 +230,7 @@ ast_node_t parse_and(compiler_t *state) {
 
     switch (token.type) {
         case '&': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -242,7 +242,7 @@ ast_node_t parse_and(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -260,7 +260,7 @@ ast_node_t parse_or(compiler_t *state) {
     left = parse_and(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -268,7 +268,7 @@ ast_node_t parse_or(compiler_t *state) {
 
     switch (token.type) {
         case '|': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -280,7 +280,7 @@ ast_node_t parse_or(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -298,7 +298,7 @@ ast_node_t parse_xor(compiler_t *state) {
     left = parse_or(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -306,7 +306,7 @@ ast_node_t parse_xor(compiler_t *state) {
 
     switch (token.type) {
         case '^': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -318,7 +318,7 @@ ast_node_t parse_xor(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -337,7 +337,7 @@ ast_node_t parse_mul(compiler_t *state) {
     left = parse_xor(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -347,7 +347,7 @@ ast_node_t parse_mul(compiler_t *state) {
         case '*':
         case '/':
         case '%': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -359,7 +359,7 @@ ast_node_t parse_mul(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -377,7 +377,7 @@ ast_node_t parse_add(compiler_t *state) {
     left = parse_mul(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -386,7 +386,7 @@ ast_node_t parse_add(compiler_t *state) {
     switch (token.type) {
         case '+':
         case '-': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -398,7 +398,7 @@ ast_node_t parse_add(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -416,7 +416,7 @@ ast_node_t parse_compare_expression(compiler_t *state) {
     left = parse_add(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -429,7 +429,7 @@ ast_node_t parse_compare_expression(compiler_t *state) {
         case TOKEN_LEQ:
         case TOKEN_EQ:
         case TOKEN_NEQ: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
             *result.left = left;
@@ -440,7 +440,7 @@ ast_node_t parse_compare_expression(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -458,7 +458,7 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
     left = parse_compare_expression(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -466,7 +466,7 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
 
     switch (token.type) {
         case TOKEN_LOGIC_AND: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -478,7 +478,7 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -496,7 +496,7 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
     left = parse_logic_and_expression(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -504,7 +504,7 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
 
     switch (token.type) {
         case TOKEN_LOGIC_OR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -516,7 +516,7 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
             *result.right = right;
         } break;
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -535,7 +535,7 @@ ast_node_t parse_separated_expressions(compiler_t *state) {
     // @todo change to an ast list later
     // for performance
     token_t expression_separator = {};
-    if (consume_token(',', state->scanner, &expression_separator, &state->analyzer->symbols)) {
+    if (consume_token(',', state->scanner, &expression_separator, state->analyzer->symbols)) {
         // @todo check of AST_ERROR
         ast_node_t node = result;
 
@@ -564,7 +564,7 @@ ast_node_t parse_expression(compiler_t *state) {
     left = parse_separated_expressions(state);
     if (left.type == AST_EMPTY) return left;
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_BIN;
     result.token = token;
@@ -572,7 +572,7 @@ ast_node_t parse_expression(compiler_t *state) {
 
     switch (token.type) {
         case '=': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
             ZERO_CHECK(result.left);
@@ -587,7 +587,7 @@ ast_node_t parse_expression(compiler_t *state) {
         } break;
 
         case TOKEN_ERROR: {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
             result.type = AST_ERROR;
             log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
@@ -604,7 +604,7 @@ ast_node_t parse_expression(compiler_t *state) {
 ast_node_t parse_primary_type(compiler_t *state) {
     ast_node_t result = {};
 
-    token_t token = advance_token(state->scanner, &state->analyzer->symbols);
+    token_t token = advance_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_LEAF;
     result.token = token;
@@ -649,13 +649,13 @@ ast_node_t parse_primary_type(compiler_t *state) {
 ast_node_t parse_type(compiler_t *state) {
     ast_node_t result = {};
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     result.type  = AST_UNARY;
 
     switch (token.type) {
         case '[': {
-            advance_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
 
             result.type = AST_BIN;
             result.subtype = SUBTYPE_AST_ARR_TYPE;
@@ -664,7 +664,7 @@ ast_node_t parse_type(compiler_t *state) {
             ast_node_t size   = parse_expression(state); 
             check(size.type != AST_EMPTY);
 
-            token_t array_end = advance_token(state->scanner, &state->analyzer->symbols); 
+            token_t array_end = advance_token(state->scanner, state->analyzer->symbols); 
 
             if (array_end.type != ']') {
                 log_error_token(STR("Array initializer expression should end with ']'."), state->scanner, array_end, 0);
@@ -692,7 +692,7 @@ ast_node_t parse_type(compiler_t *state) {
 
         } break;
         case '^': {
-            result.token = advance_token(state->scanner, &state->analyzer->symbols);
+            result.token = advance_token(state->scanner, state->analyzer->symbols);
             result.subtype = SUBTYPE_AST_PTR_TYPE;
 
             ast_node_t type = parse_type(state);
@@ -720,14 +720,14 @@ ast_node_t parse_param_declaration(compiler_t *state) {
 
     token_t name, next;
 
-    if (!consume_token(TOKEN_IDENT, state->scanner, &name, &state->analyzer->symbols)) {
+    if (!consume_token(TOKEN_IDENT, state->scanner, &name, state->analyzer->symbols)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
         log_error_token(STR("parameter name should be identifier."), state->scanner, name, 0);
         return node;
     }
 
-    if (!consume_token(':', state->scanner, &next, &state->analyzer->symbols)) {
+    if (!consume_token(':', state->scanner, &next, state->analyzer->symbols)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
         log_error_token(STR("':' separator before parameter type is required."), state->scanner, name, 0);
@@ -763,7 +763,7 @@ ast_node_t parse_parameter_list(compiler_t *state) {
     result.type    = AST_LIST;
     result.subtype = SUBTYPE_AST_FUNC_PARAMS;
 
-    token_t current   = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t current   = peek_token(state->scanner, state->analyzer->symbols);
     result.token      = current;
     result.token.type = TOKEN_GEN_PARAM_LIST;
 
@@ -778,7 +778,7 @@ ast_node_t parse_parameter_list(compiler_t *state) {
         *previous_node = node;
         previous_node  = previous_node->list_next;
 
-        current = peek_token(state->scanner, &state->analyzer->symbols);
+        current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
 
         if (current.type != ',' && current.type != ')') {
@@ -787,8 +787,8 @@ ast_node_t parse_parameter_list(compiler_t *state) {
         } 
 
         if (current.type == ',') {
-            advance_token(state->scanner, &state->analyzer->symbols);
-            current = peek_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
+            current = peek_token(state->scanner, state->analyzer->symbols);
         }
     }
 
@@ -804,12 +804,12 @@ ast_node_t parse_return_list(compiler_t *state) {
     result.type    = AST_LIST;
     result.subtype = SUBTYPE_AST_FUNC_RETURNS;
 
-    if (!consume_token(TOKEN_RET, state->scanner, &result.token, &state->analyzer->symbols)) {
+    if (!consume_token(TOKEN_RET, state->scanner, &result.token, state->analyzer->symbols)) {
         result.type = AST_LEAF;
         return result;
     }
 
-    token_t current = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t current = peek_token(state->scanner, state->analyzer->symbols);
 
     ast_node_t *previous_node = NULL;
 
@@ -822,7 +822,7 @@ ast_node_t parse_return_list(compiler_t *state) {
         *previous_node = node;
         previous_node  = previous_node->list_next;
 
-        current = peek_token(state->scanner, &state->analyzer->symbols);
+        current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
 
         if (current.type != ',' && current.type != '=') {
@@ -831,8 +831,8 @@ ast_node_t parse_return_list(compiler_t *state) {
         }
 
         if (current.type == ',') {
-            advance_token(state->scanner, &state->analyzer->symbols);
-            current = peek_token(state->scanner, &state->analyzer->symbols);
+            advance_token(state->scanner, state->analyzer->symbols);
+            current = peek_token(state->scanner, state->analyzer->symbols);
         }
     }
 
@@ -842,14 +842,14 @@ ast_node_t parse_return_list(compiler_t *state) {
 ast_node_t parse_function_type(compiler_t *state) {
     ast_node_t result = {};
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
     result.token = token;
     result.token.type = TOKEN_GEN_FUNC_DEF;
 
     if (token.type == '<') {
         panic_skip_until_token('>', state);
 
-        token_t end = advance_token(state->scanner, &state->analyzer->symbols);
+        token_t end = advance_token(state->scanner, state->analyzer->symbols);
 
         token.c1 = end.c1;
         token.l1 = end.l1;
@@ -873,7 +873,7 @@ ast_node_t parse_function_type(compiler_t *state) {
 
     // center is generic types
 
-    if (!consume_token('(', state->scanner, NULL, &state->analyzer->symbols)) {
+    if (!consume_token('(', state->scanner, NULL, state->analyzer->symbols)) {
         assert(false);
     }
 
@@ -884,7 +884,7 @@ ast_node_t parse_function_type(compiler_t *state) {
     *result.left = parameters;
 
     // @todo check for errors
-    if (!consume_token(')', state->scanner, NULL, &state->analyzer->symbols)) {
+    if (!consume_token(')', state->scanner, NULL, state->analyzer->symbols)) {
         result.type = AST_ERROR;
         log_warning_token(STR("waiting for ')'."), state->scanner, result.token, 0);
     }
@@ -900,7 +900,7 @@ ast_node_t parse_function_type(compiler_t *state) {
     ZERO_CHECK(result.right);
     *result.right = returns;
 
-    token_t type_end = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t type_end = peek_token(state->scanner, state->analyzer->symbols);
 
     if (type_end.type == TOKEN_ERROR) {
         result.type = AST_ERROR;
@@ -917,7 +917,7 @@ ast_node_t parse_function_type(compiler_t *state) {
 ast_node_t parse_declaration_type(compiler_t *state) {
     ast_node_t node = {};
 
-    token_t token = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t token = peek_token(state->scanner, state->analyzer->symbols);
 
     node.type  = AST_LEAF;
     node.token = token;
@@ -959,12 +959,12 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
 
     node.subtype = SUBTYPE_AST_UNKN_DEF;
 
-    if (peek_token(state->scanner, &state->analyzer->symbols).type == ';') {
+    if (peek_token(state->scanner, state->analyzer->symbols).type == ';') {
         node.type = AST_UNARY; 
         return node;
     }
 
-    if (!consume_token('=', state->scanner, NULL, &state->analyzer->symbols)) {
+    if (!consume_token('=', state->scanner, NULL, state->analyzer->symbols)) {
         node.type = AST_ERROR;
         log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
         panic_skip(state);
@@ -973,7 +973,7 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
     
     ast_node_t data;
 
-    if (peek_token(state->scanner, &state->analyzer->symbols).type == '{') {
+    if (peek_token(state->scanner, state->analyzer->symbols).type == '{') {
         data = parse_block(state, AST_BLOCK_IMPERATIVE);
     } else {
         data = parse_expression(state);
@@ -998,7 +998,7 @@ ast_node_t parse_union_declaration(compiler_t *state, token_t *name) {
     result.type = AST_ERROR;
     result.token = *name;
 
-    log_error_token(STR("unions are not realized."), state->scanner, advance_token(state->scanner, &state->analyzer->symbols), 0);
+    log_error_token(STR("unions are not realized."), state->scanner, advance_token(state->scanner, state->analyzer->symbols), 0);
     panic_skip(state);
 
     return result;
@@ -1010,7 +1010,7 @@ ast_node_t parse_struct_declaration(compiler_t *state, token_t *name) {
     result.type = AST_ERROR;
     result.token = *name;
 
-    log_error_token(STR("structs are not realized."), state->scanner, advance_token(state->scanner, &state->analyzer->symbols), 0);
+    log_error_token(STR("structs are not realized."), state->scanner, advance_token(state->scanner, state->analyzer->symbols), 0);
     panic_skip(state);
 
     return result;
@@ -1022,7 +1022,7 @@ ast_node_t parse_enum_declaration(compiler_t *state, token_t *name) {
     result.type = AST_ERROR;
     result.token = *name;
 
-    log_error_token(STR("enums are not realized."), state->scanner, advance_token(state->scanner, &state->analyzer->symbols), 0);
+    log_error_token(STR("enums are not realized."), state->scanner, advance_token(state->scanner, state->analyzer->symbols), 0);
     panic_skip(state);
 
     return result;
@@ -1033,17 +1033,17 @@ ast_node_t parse_statement(compiler_t *state) {
 
     node.type = AST_ERROR;
 
-    token_t name = peek_token(state->scanner, &state->analyzer->symbols);
-    token_t next = peek_next_token(state->scanner, &state->analyzer->symbols);
+    token_t name = peek_token(state->scanner, state->analyzer->symbols);
+    token_t next = peek_next_token(state->scanner, state->analyzer->symbols);
 
     node.token = name;
     b32 ignore_semicolon = false;
 
     if (name.type == TOKEN_IDENT && next.type == ':') {
-        consume_token(TOKEN_IDENT, state->scanner, NULL, &state->analyzer->symbols);
-        consume_token(':', state->scanner, NULL, &state->analyzer->symbols);
+        consume_token(TOKEN_IDENT, state->scanner, NULL, state->analyzer->symbols);
+        consume_token(':', state->scanner, NULL, state->analyzer->symbols);
 
-        next = peek_token(state->scanner, &state->analyzer->symbols);
+        next = peek_token(state->scanner, state->analyzer->symbols);
 
         switch(next.type) {
             case TOK_UNION: {
@@ -1082,7 +1082,7 @@ ast_node_t parse_statement(compiler_t *state) {
             ignore_semicolon = true;
             node.type    = AST_BIN;
             node.subtype = SUBTYPE_AST_IF_STMT;
-            node.token   = advance_token(state->scanner, &state->analyzer->symbols);
+            node.token   = advance_token(state->scanner, state->analyzer->symbols);
 
             ast_node_t expr = parse_expression(state);
             check(expr.type != AST_EMPTY);
@@ -1100,8 +1100,8 @@ ast_node_t parse_statement(compiler_t *state) {
 
         case TOK_ELSE: {
             ignore_semicolon = true;
-            node.token   = advance_token(state->scanner, &state->analyzer->symbols);
-            if (peek_token(state->scanner, &state->analyzer->symbols).type == TOK_IF) {
+            node.token   = advance_token(state->scanner, state->analyzer->symbols);
+            if (peek_token(state->scanner, state->analyzer->symbols).type == TOK_IF) {
                 node = parse_statement(state);
                 assert(node.subtype == SUBTYPE_AST_IF_STMT);
                 node.subtype = SUBTYPE_AST_ELIF_STMT;
@@ -1120,7 +1120,7 @@ ast_node_t parse_statement(compiler_t *state) {
             ignore_semicolon = true;
             node.type    = AST_BIN;
             node.subtype = SUBTYPE_AST_WHILE_STMT;
-            node.token   = advance_token(state->scanner, &state->analyzer->symbols);
+            node.token   = advance_token(state->scanner, state->analyzer->symbols);
 
             ast_node_t expr = parse_expression(state);
             check(expr.type != AST_EMPTY);
@@ -1139,7 +1139,7 @@ ast_node_t parse_statement(compiler_t *state) {
         case TOK_RET: {
             node.type    = AST_UNARY;
             node.subtype = SUBTYPE_AST_RET_STMT;
-            node.token   = advance_token(state->scanner, &state->analyzer->symbols);
+            node.token   = advance_token(state->scanner, state->analyzer->symbols);
 
             ast_node_t expr = parse_expression(state);
 
@@ -1156,7 +1156,7 @@ ast_node_t parse_statement(compiler_t *state) {
     if (!ignore_semicolon) {
         token_t semicolon = {};
 
-        if (!consume_token(';', state->scanner, &semicolon, &state->analyzer->symbols)) {
+        if (!consume_token(';', state->scanner, &semicolon, state->analyzer->symbols)) {
             node.type = AST_ERROR;
 
             node.token.c1 = semicolon.c1;
@@ -1176,7 +1176,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
     result.type    = AST_LIST;
     result.subtype = AST_BLOCK_IMPERATIVE;
 
-    token_t current = peek_token(state->scanner, &state->analyzer->symbols);
+    token_t current = peek_token(state->scanner, state->analyzer->symbols);
 
     ast_node_t *previous_node = result.list_next;
 
@@ -1184,7 +1184,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
         ast_node_t node = parse_statement(state);
 
         if (node.type == AST_EMPTY) {
-            current = peek_token(state->scanner, &state->analyzer->symbols);
+            current = peek_token(state->scanner, state->analyzer->symbols);
             continue;
         }
 
@@ -1192,7 +1192,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
         *previous_node = node;
         previous_node  = previous_node->list_next;
 
-        current = peek_token(state->scanner, &state->analyzer->symbols);
+        current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
     }
 
@@ -1204,7 +1204,7 @@ ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
 
     ast_node_t result = {};
 
-    if (!consume_token('{', state->scanner, &start, &state->analyzer->symbols)) {
+    if (!consume_token('{', state->scanner, &start, state->analyzer->symbols)) {
         result.type = AST_ERROR;
         log_error_token(STR("Expected opening of a block."), state->scanner, start, 0);
         return result;
@@ -1212,7 +1212,7 @@ ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
 
     result = parse_imperative_block(state);
 
-    if (!consume_token('}', state->scanner, &stop, &state->analyzer->symbols)) {
+    if (!consume_token('}', state->scanner, &stop, state->analyzer->symbols)) {
         result.type = AST_ERROR;
         log_error_token(STR("Expected closing of a block."), state->scanner, stop, 0);
         return result;
@@ -1246,13 +1246,13 @@ b32 parse(compiler_t *compiler) {
 
     b32 valid_parse = true;
     
-    token_t curr = peek_token(compiler->scanner, &compiler->analyzer->symbols);
+    token_t curr = peek_token(compiler->scanner, compiler->analyzer->symbols);
 
     while (curr.type != TOKEN_EOF && curr.type != TOKEN_ERROR) {
         ast_node_t node = parse_statement(compiler);
 
         if (node.type == AST_EMPTY) {
-            curr = peek_token(compiler->scanner, &compiler->analyzer->symbols);
+            curr = peek_token(compiler->scanner, compiler->analyzer->symbols);
             continue;
         }
 
@@ -1266,7 +1266,7 @@ b32 parse(compiler_t *compiler) {
 
         area_add(&compiler->parser->roots, &root);
 
-        curr = peek_token(compiler->scanner, &compiler->analyzer->symbols);
+        curr = peek_token(compiler->scanner, compiler->analyzer->symbols);
     }
 
     return valid_parse;

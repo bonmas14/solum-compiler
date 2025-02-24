@@ -346,7 +346,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     return true;
 }
 
-static b32 process_word(scanner_t *state, token_t *token, area_t<u8> *symbols) {
+static b32 process_word(scanner_t *state, token_t *token, arena_t *symbols) {
     token->c0 = state->current_char;
     token->l0 = state->current_line;
 
@@ -381,13 +381,12 @@ static b32 process_word(scanner_t *state, token_t *token, area_t<u8> *symbols) {
         return true;
     }
 
-    u64 index = 0;
+    u8 *data = (u8*)arena_allocate(symbols, identifier.size);
 
-    area_allocate(symbols, identifier.size, &index);
-    area_fill(symbols, identifier.data, identifier.size, index);
+    memcpy(data, identifier.data, identifier.size);
 
-    token->data.symbol.size = identifier.size;
-    token->data.symbol.table_index = index;
+    token->data.string.size = identifier.size;
+    token->data.string.data = data;
 
     return true;
 }
@@ -401,7 +400,7 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state, area_t<u8> *symbols) {
+token_t advance_token(scanner_t *state, arena_t *symbols) {
     eat_all_spaces(state);
 
     token_t token = {};
@@ -533,28 +532,24 @@ token_t advance_token(scanner_t *state, area_t<u8> *symbols) {
 }
 
 // @todo: add caching instead of just cleaning this up 
-token_t peek_token(scanner_t *state, area_t<u8> *symbols) {
+token_t peek_token(scanner_t *state, arena_t *symbols) {
     scanner_t peek_state = *state;
 
-    u64 count      = symbols->count;
     token_t token  = advance_token(&peek_state, symbols);
-    symbols->count = count;
 
     return token;
 }
 
-token_t peek_next_token(scanner_t *state, area_t<u8> *symbols) {
+token_t peek_next_token(scanner_t *state, arena_t *symbols) {
     scanner_t peek_state = *state;
 
-    u64 count = symbols->count;
     (void)advance_token(&peek_state, symbols);
     token_t token = advance_token(&peek_state, symbols);
-    symbols->count = count;
 
     return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token, area_t<u8> *symbols) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *symbols) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
@@ -562,11 +557,9 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, area_t<u8> *
         token  = &local_token;
     }
 
-    u64 count = symbols->count;
     *token = advance_token(&peek_state, symbols);
 
     if (token->type != token_type) {
-        symbols->count = count;
         return false;
     }
 
