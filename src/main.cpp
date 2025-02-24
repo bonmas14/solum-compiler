@@ -4,6 +4,7 @@
 #include "analyzer.h"
 #include "backend.h"
 #include "area_alloc.h"
+#include "arena.h"
 #include "hashmap.h"
 
 #ifdef _WIN32
@@ -22,42 +23,38 @@ void repl(area_t<u8> *area);
 void print_node(compiler_t *compiler, ast_node_t* node, u32 depth) {
     log_info_token(compiler->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
 
-    ast_node_t* child;
     if (node->type == AST_UNARY) {
-        child = area_get(&compiler->parser->nodes, node->left_index);
-        print_node(compiler, child, depth + 1);
+        print_node(compiler, node->left, depth + 1);
     } else if (node->type == AST_BIN) {
-        child = area_get(&compiler->parser->nodes, node->left_index);
-        print_node(compiler, child, depth + 1);
-
-        child = area_get(&compiler->parser->nodes, node->right_index);
-        print_node(compiler, child, depth + 1);
+        print_node(compiler, node->left, depth + 1);
+        print_node(compiler, node->right, depth + 1);
     } else if (node->type == AST_LIST) {
         b32 first_time = true;
 
+        ast_node_t* child = node->list_next;
+
         for (u64 i = 0; i < node->child_count; i++) {
-            if (first_time) {
-                first_time = false;
-                child = area_get(&compiler->parser->nodes, node->list_next_node);
-            } else {
-                child = area_get(&compiler->parser->nodes, child->list_next_node);
-            }
+
+            assert(child != NULL);
 
             print_node(compiler, child, depth + 1);
+            child = child->list_next;
         }
     }
 }
 
 void debug_tests(void) {
+#ifdef DEBUG
     hashmap_tests();
     area_tests();
+    arena_tests();
+#endif
 }
 
 int main(void) {
-    log_push_color(255, 255, 255);
-#ifdef DEBUG
     debug_tests();
-#endif
+
+    log_push_color(255, 255, 255);
 
     analyzer_t analyzer = {};
     analyzer_create(&analyzer);
@@ -76,135 +73,9 @@ int main(void) {
     }
 
     parse(&compiler);
-
     analyze_code(&compiler);
-
-    /*
-       for (u64 i = 0; i < parser.root_indices.count; i++) {
-       ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
-
-       print_node(&compiler, root, 0);
-       }
-       */
-
-
-    generate_code();
-
-    area_t<u8> area = {};
-    area_create(&area, 1000);
-
-    while (true) {
-        repl(&area);
-    }
+    generate_code(&compiler);
 
     log_update_color();
     return 0;
 }
-
-#ifdef _WIN32
-void repl(area_t<u8> *area) {
-    if (_kbhit()) {
-        u8 ch = _getch();
-
-        if (ch == '\r') ch = '\n';
-
-        if (ch == '\b') {
-            if (area->count != 0) {
-                area->count--;
-            }
-        } else {
-            area_add(area, &ch);
-        }
-
-        ch = 0;
-        area_add(area, &ch);
-
-        log_update_color();
-        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
-        fprintf(stderr, "%.*s\x1b[s\n", (int)area->count, area->data);
-
-        string_t code = {};
-
-        code.size = area->count;
-        area->count--;
-        code.data = area->data;
-
-        analyzer_t analyzer = {};
-        analyzer_create(&analyzer);
-
-        compiler_t compiler = {};
-
-        scanner_t  scanner  = {};
-        parser_t   parser   = {};
-
-        compiler.scanner  = &scanner;
-        compiler.parser   = &parser;
-        compiler.analyzer = &analyzer;
-
-        scanner_open(&code, &scanner);
-        if (parse(&compiler)) analyze_code(&compiler);
-
-        for (u64 i = 0; i < parser.root_indices.count; i++) {
-            ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
-
-            print_node(&compiler, root, 0);
-        }
-
-        scanner_delete(&scanner);
-
-        fprintf(stderr, "\x1b[u\x1b[?25h");
-    } 
-}
-
-#else 
-
-void repl(area_t<u8> *area) {
-    u8 ch = fgetc(stdin);
-
-    if (ch == '\n') {
-        area_add(area, &ch);
-
-        string_t code = {};
-
-        code.size = area->count;
-        code.data = area->data;
-
-
-        compiler_t compiler = {};
-        scanner_t  scanner  = {};
-        parser_t   parser   = {};
-        analyzer_t analyzer = {};
-        analyzer_create(&analyzer);
-
-        compiler.scanner  = &scanner;
-        compiler.parser   = &parser;
-        compiler.analyzer = &analyzer;
-
-        log_update_color();
-        fprintf(stderr, "\x1b[?25l\x1b[1;1f\x1b[0J");
-        fprintf(stderr, "%.*s\n", (int)area->count, area->data);
-
-        scanner_open(&code, compiler.scanner);
-        if (parse(&compiler)) analyze_code(&compiler);
-
-        log_update_color();
-        fprintf(stderr, "------------TREE-------------\n");
-
-        for (u64 i = 0; i < parser.root_indices.count; i++) {
-            ast_node_t* root = area_get(&parser.nodes, *area_get(&parser.root_indices, i));
-
-            print_node(&compiler, root, 0);
-        }
-
-        scanner_delete(&scanner);
-
-        log_update_color();
-        fprintf(stderr, "\x1b[?25h");
-        fprintf(stderr, "-----------------------------\n");
-
-        area->count = 0;
-    } else {
-        area_add(area, &ch);
-    }
-}
-#endif

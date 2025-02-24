@@ -50,18 +50,8 @@ struct scope_tuple_t {
     area_t<symbol_t> user_types_lookup_list; 
 };
 
-struct ir_opcode_t {
-    u64 ir;
-};
-
-struct compile_unit_t {
-    u64 node_index;
-    area_t<ir_opcode_t> final_ir;
-};
-
 struct analyzer_t {
     area_t<scope_tuple_t> scopes;
-    area_t<compile_unit_t> units;
 
     area_t<u8> symbols;
 };

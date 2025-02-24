@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include "compiler.h"
+#include "arena.h"
 #include "area_alloc.h"
 #include "hashmap.h"
 #include "scanner.h"
@@ -53,27 +54,23 @@ enum ast_subtype_t {
 };
 
 
-struct alignas(16) ast_node_t {
+struct ast_node_t {
     s32 type;
     s32 subtype;
 
     token_t token;
-    u64 self_index;
 
-    // -- specific to node.type
-    u64 left_index;
-    u64 center_index;
-    u64 right_index;
+    ast_node_t *left;
+    ast_node_t *center;
+    ast_node_t *right;
 
-    u64 list_next_node;
+    ast_node_t *list_next;
     u64 child_count;
-
-    u64 scope_index;
 };
 
 struct parser_t {
-    area_t<ast_node_t> nodes;
-    area_t<u64> root_indices; 
+    arena_t *nodes;
+    area_t<ast_node_t*> roots; 
 };
 
 b32 parse(compiler_t *compiler);

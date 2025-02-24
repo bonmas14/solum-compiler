@@ -7,6 +7,6 @@
 
 struct codegen_state_t;
 
-void generate_code(void);
+void generate_code(compiler_t *compiler);
 
 #endif // BACKEND_H

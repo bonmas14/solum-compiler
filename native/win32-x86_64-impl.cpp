@@ -5,7 +5,7 @@ struct codegen_state_t {
     bool deez;
 };
 
-void generate_code(void) {
+void generate_code(compiler_t *compiler) {
     log_update_color();
     fprintf(stdout, "WE ARE IN CODEGEN\n");
 

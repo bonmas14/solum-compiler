@@ -112,16 +112,16 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         result.type  = AST_BIN;
 
-        left.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &left);
-        result.left_index = state->parser->nodes.count - 1;
+        result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.left);
+        *result.left = left;
 
         ast_node_t right = parse_expression(state);
             
         // @todo if right is AST_EMPTY we should change it to something different
-        right.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &right);
-        result.right_index = state->parser->nodes.count - 1;
+        result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.right);
+        *result.right = right;
 
         check(consume_token(')', state->scanner, &end, &state->analyzer->symbols));
 
@@ -157,9 +157,9 @@ ast_node_t parse_unary(compiler_t *state) {
                 check(false); // @todo better logging and parsing
             }
 
-            child.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &child);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = child;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -192,15 +192,16 @@ ast_node_t parse_shift(compiler_t *state) {
         case TOKEN_RSHIFT: {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_shift(state); 
+
             // @todo error check
-            right.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -231,14 +232,14 @@ ast_node_t parse_and(compiler_t *state) {
         case '&': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_and(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -269,14 +270,14 @@ ast_node_t parse_or(compiler_t *state) {
         case '|': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_or(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -307,14 +308,14 @@ ast_node_t parse_xor(compiler_t *state) {
         case '^': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_xor(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -348,14 +349,14 @@ ast_node_t parse_mul(compiler_t *state) {
         case '%': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_mul(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -387,14 +388,14 @@ ast_node_t parse_add(compiler_t *state) {
         case '-': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_add(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -429,14 +430,14 @@ ast_node_t parse_compare_expression(compiler_t *state) {
         case TOKEN_EQ:
         case TOKEN_NEQ: {
             advance_token(state->scanner, &state->analyzer->symbols);
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_compare_expression(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -467,14 +468,14 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
         case TOKEN_LOGIC_AND: {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_logic_and_expression(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -505,14 +506,14 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
         case TOKEN_LOGIC_OR: {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_logic_or_expression(state);
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, &state->analyzer->symbols);
@@ -544,14 +545,14 @@ ast_node_t parse_separated_expressions(compiler_t *state) {
         result.subtype = SUBTYPE_AST_EXPR;
         result.token   = expression_separator;
 
-        node.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &node);
-        result.left_index = state->parser->nodes.count - 1;
+        result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.left);
+        *result.left = node;
 
         node = parse_separated_expressions(state);
-        node.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &node);
-        result.right_index = state->parser->nodes.count - 1;
+        result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.right);
+        *result.right = node;
     }
 
     return result;
@@ -573,16 +574,16 @@ ast_node_t parse_expression(compiler_t *state) {
         case '=': {
             advance_token(state->scanner, &state->analyzer->symbols);
 
-            left.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &left);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = left;
 
             right = parse_expression(state); 
             check(right.type != AST_EMPTY);
 
-            right.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &right);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = right;
         } break;
 
         case TOKEN_ERROR: {
@@ -674,9 +675,9 @@ ast_node_t parse_type(compiler_t *state) {
             result.token.c1 = array_end.c1;
             result.token.l1 = array_end.l1;
 
-            size.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &size);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = size;
 
             ast_node_t type = parse_type(state);
 
@@ -685,25 +686,25 @@ ast_node_t parse_type(compiler_t *state) {
                 break;
             }
 
-            type.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &type);
-            result.right_index = state->parser->nodes.count - 1;
+            result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.right);
+            *result.right = type;
 
         } break;
         case '^': {
             result.token = advance_token(state->scanner, &state->analyzer->symbols);
             result.subtype = SUBTYPE_AST_PTR_TYPE;
 
-            ast_node_t node = parse_type(state);
+            ast_node_t type = parse_type(state);
 
-            if (node.type == AST_ERROR) {
+            if (type.type == AST_ERROR) {
                 result.type = AST_ERROR;
                 break;
             }
 
-            node.self_index   = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &node);
-            result.left_index = state->parser->nodes.count - 1;
+            result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(result.left);
+            *result.left = type;
         } break;
 
         default: {
@@ -745,9 +746,9 @@ ast_node_t parse_param_declaration(compiler_t *state) {
         return node;
     }
 
-    type.self_index = state->parser->nodes.count;
-    area_add(&state->parser->nodes, &type);
-    node.left_index = state->parser->nodes.count - 1;
+    node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+    ZERO_CHECK(node.left);
+    *node.left = type;
 
     return node;
 }
@@ -766,26 +767,16 @@ ast_node_t parse_parameter_list(compiler_t *state) {
     result.token      = current;
     result.token.type = TOKEN_GEN_PARAM_LIST;
 
-    b32 first_time = true;
-    u64 previous_node_index = 0;
+    ast_node_t *previous_node = NULL;
 
     while (current.type != ')' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_param_declaration(state);
 
         // @todo check for errors
         
-        node.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &node);
-
-        if (first_time) {
-            first_time = false;
-            result.list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = result.list_next_node;
-        } else {
-            ast_node_t *prev = area_get(&state->parser->nodes, previous_node_index);
-            prev->list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = prev->list_next_node;
-        }
+        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *previous_node = node;
+        previous_node  = previous_node->list_next;
 
         current = peek_token(state->scanner, &state->analyzer->symbols);
         result.child_count++;
@@ -820,26 +811,16 @@ ast_node_t parse_return_list(compiler_t *state) {
 
     token_t current = peek_token(state->scanner, &state->analyzer->symbols);
 
-    b32 first_time = true;
-    u64 previous_node_index = 0;
+    ast_node_t *previous_node = NULL;
 
     while (current.type != '=' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_type(state);
 
         // @todo check for errors
         
-        node.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &node);
-
-        if (first_time) {
-            first_time = false;
-            result.list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = result.list_next_node;
-        } else {
-            ast_node_t *prev = area_get(&state->parser->nodes, previous_node_index);
-            prev->list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = prev->list_next_node;
-        }
+        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *previous_node = node;
+        previous_node  = previous_node->list_next;
 
         current = peek_token(state->scanner, &state->analyzer->symbols);
         result.child_count++;
@@ -897,9 +878,10 @@ ast_node_t parse_function_type(compiler_t *state) {
     }
 
     ast_node_t parameters = parse_parameter_list(state);
-    parameters.self_index = state->parser->nodes.count;
-    area_add(&state->parser->nodes, &parameters);
-    result.left_index = state->parser->nodes.count - 1;
+    result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+    ZERO_CHECK(result.left);
+
+    *result.left = parameters;
 
     // @todo check for errors
     if (!consume_token(')', state->scanner, NULL, &state->analyzer->symbols)) {
@@ -914,9 +896,9 @@ ast_node_t parse_function_type(compiler_t *state) {
         log_warning_token(STR("couldn't parse return list in function."), state->scanner, result.token, 0);
     }
 
-    returns.self_index = state->parser->nodes.count;
-    area_add(&state->parser->nodes, &returns);
-    result.right_index = state->parser->nodes.count - 1;
+    result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+    ZERO_CHECK(result.right);
+    *result.right = returns;
 
     token_t type_end = peek_token(state->scanner, &state->analyzer->symbols);
 
@@ -971,9 +953,9 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
         return node;
     }
 
-    type.self_index = state->parser->nodes.count;
-    area_add(&state->parser->nodes, &type);
-    node.left_index = state->parser->nodes.count - 1;
+    node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+    ZERO_CHECK(node.left);
+    *node.left = type;
 
     node.subtype = SUBTYPE_AST_UNKN_DEF;
 
@@ -1003,9 +985,9 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
         return node;
     }
 
-    data.self_index = state->parser->nodes.count;
-    area_add(&state->parser->nodes, &data);
-    node.right_index = state->parser->nodes.count - 1;
+    node.right  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+    ZERO_CHECK(node.right);
+    *node.right = data;
 
     return node;
 }
@@ -1083,9 +1065,7 @@ ast_node_t parse_statement(compiler_t *state) {
                     break;
                 }
 
-                ast_node_t* right = area_get(&state->parser->nodes, node.right_index);
-
-                if (right->subtype != AST_BLOCK_IMPERATIVE) {
+                if (node.right->subtype != AST_BLOCK_IMPERATIVE) {
                     break;
                 }
 
@@ -1109,13 +1089,13 @@ ast_node_t parse_statement(compiler_t *state) {
             
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
-            expr.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &expr);
-            node.left_index = state->parser->nodes.count - 1;
+            node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(node.left);
+            *node.left = expr;
 
-            stmt.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &stmt);
-            node.right_index = state->parser->nodes.count - 1;
+            node.right  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(node.right);
+            *node.right = stmt;
         } break;
 
         case TOK_ELSE: {
@@ -1130,9 +1110,9 @@ ast_node_t parse_statement(compiler_t *state) {
                 node.subtype = SUBTYPE_AST_ELSE_STMT;
 
                 ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
-                stmt.self_index = state->parser->nodes.count;
-                area_add(&state->parser->nodes, &stmt);
-                node.left_index = state->parser->nodes.count - 1;
+                node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+                ZERO_CHECK(node.left);
+                *node.left = stmt;
             }
         } break;
 
@@ -1147,13 +1127,13 @@ ast_node_t parse_statement(compiler_t *state) {
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
-            expr.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &expr);
-            node.left_index = state->parser->nodes.count - 1;
+            node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(node.left);
+            *node.left = expr;
 
-            stmt.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &stmt);
-            node.right_index = state->parser->nodes.count - 1;
+            node.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(node.right);
+            *node.right = stmt;
         } break;
 
         case TOK_RET: {
@@ -1163,9 +1143,9 @@ ast_node_t parse_statement(compiler_t *state) {
 
             ast_node_t expr = parse_expression(state);
 
-            expr.self_index = state->parser->nodes.count;
-            area_add(&state->parser->nodes, &expr);
-            node.left_index = state->parser->nodes.count - 1;
+            node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+            ZERO_CHECK(node.left);
+            *node.left = expr;
         } break;
 
         default: {
@@ -1198,8 +1178,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
 
     token_t current = peek_token(state->scanner, &state->analyzer->symbols);
 
-    b32 first_time = true;
-    u64 previous_node_index = 0;
+    ast_node_t *previous_node = result.list_next;
 
     while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_statement(state);
@@ -1209,18 +1188,9 @@ ast_node_t parse_imperative_block(compiler_t *state) {
             continue;
         }
 
-        node.self_index = state->parser->nodes.count;
-        area_add(&state->parser->nodes, &node);
-
-        if (first_time) {
-            first_time = false;
-            result.list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = result.list_next_node;
-        } else {
-            ast_node_t *prev = area_get(&state->parser->nodes, previous_node_index);
-            prev->list_next_node = state->parser->nodes.count - 1;
-            previous_node_index = prev->list_next_node;
-        }
+        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *previous_node = node;
+        previous_node  = previous_node->list_next;
 
         current = peek_token(state->scanner, &state->analyzer->symbols);
         result.child_count++;
@@ -1262,12 +1232,14 @@ ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
 }
 
 b32 parse(compiler_t *compiler) {
-    if (!area_create(&compiler->parser->nodes, INIT_NODES_SIZE)) {
-        log_error(STR("Parser: Couldn't create nodes list."), 0);
+	compiler->parser->nodes = arena_create(INIT_NODES_SIZE);
+
+    if (!compiler->parser->nodes) {
+        log_error(STR("Parser: Couldn't create nodes arena."), 0);
         return false;
     }
 
-    if (!area_create(&compiler->parser->root_indices, INIT_NODES_SIZE)) {
+    if (!area_create(&compiler->parser->roots, INIT_NODES_SIZE)) {
         log_error(STR("Parser: Couldn't create root indices list."), 0);
         return false;
     }
@@ -1288,11 +1260,11 @@ b32 parse(compiler_t *compiler) {
             valid_parse = false; 
         }
 
-        node.self_index = compiler->parser->nodes.count;
-        area_add(&compiler->parser->nodes, &node);
+        ast_node_t *root = (ast_node_t*)arena_allocate(compiler->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(root);
+        *root = node;
 
-        u64 root_index = compiler->parser->nodes.count - 1;
-        area_add(&compiler->parser->root_indices, &root_index);
+        area_add(&compiler->parser->roots, &root);
 
         curr = peek_token(compiler->scanner, &compiler->analyzer->symbols);
     }
