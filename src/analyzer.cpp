@@ -22,7 +22,7 @@
     // block in general := structure is not allowed if it is not an function def
 
 void analyzer_create(analyzer_t *analyzer) {
-    assert(area_create(&analyzer->scopes, 100));
+    check(area_create(&analyzer->scopes, 100));
 
     u64 index = {};
     area_allocate(&analyzer->scopes, 1, &index);

@@ -182,20 +182,22 @@ DataType *area_get(area_t<DataType> *area, u64 index) {
 template<typename DataType>
 b32 area_grow(area_t<DataType> *area) {
     assert(area != 0);
-    DataType *data = (DataType*)REALLOC(area->data, area->grow_size * sizeof(DataType));
+    DataType *data = (DataType*)ALLOC(area->grow_size * sizeof(DataType));
 
     if (data == NULL) {
         log_error(STR("Area: Couldn't grow area."), 0);
         return false;
     }
 
-    area->data = data;
-    u64 size = (area->grow_size - area->raw_size) * sizeof(DataType);
+    (void)memset(data, 0, area->grow_size * sizeof(DataType));
 
-    (void)memset(area->data + area->count, 0, size);
-    
+    (void)memcpy(data, area->data, area->raw_size);
+
+    FREE(area->data);
+    area->data = data;
     area->raw_size  = area->grow_size;
     area->grow_size = area->raw_size * 2;
+
     return true;
 }
 
