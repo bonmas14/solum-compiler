@@ -66,7 +66,7 @@ int main(void) {
     compiler.parser   = &parser;
     compiler.analyzer = &analyzer;
 
-    if (!scanner_create((u8[]) {"test"}, &scanner)) {
+    if (!scanner_create(STR("test.slm"), &scanner)) {
         log_error(STR("Main: couldn't open file and load it into memory."), 0);
         return -1;
     }
@@ -74,11 +74,14 @@ int main(void) {
     parse(&compiler);
     analyze_code(&compiler);
 
+    /*
     for (u64 i = 0; i < parser.roots.count; i++) {
         ast_node_t * node = *area_get(&parser.roots, i);
 
         print_node(&compiler, node, 0);
     }
+    */
+
     generate_code(&compiler);
 
     log_update_color();

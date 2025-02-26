@@ -1,0 +1,28 @@
+c_string_length : (c_string : ^u8) -> u64 = {
+    current_pos : ^u8 = c_string;
+
+    while @current_pos != 0 {
+        current_pos = current_pos + 1;
+    }
+
+    ret current_pos - c_string;
+}
+
+get_string : (c_string : ^u8) -> String = {
+    str : string_t = default;
+
+    str.size = c_string_length(c_string);
+    str.data = c_string;
+
+    ret str;
+}
+
+main : (argc : Int, argv : ^^ Char) -> Int = {
+    if (argc < 1) {
+        ret -1;
+    }
+
+    str : String = get_string(argv[0]);
+
+    ret str.size;
+}

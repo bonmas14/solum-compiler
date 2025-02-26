@@ -109,10 +109,13 @@ static inline b32 char_is_special(u8 in) {
 }
 
 // @todo we need to support escape codes
-static b32 process_string(scanner_t *state, token_t *token) {
+static b32 process_string(scanner_t *state, token_t *token, arena_t *symbols) {
     token->type = TOKEN_CONST_STRING;
     token->c0 = state->current_char;
     token->l0 = state->current_line;
+
+    u64 i = 0;
+    u64 string_start = state->file_index;
 
     while (!match_char(state, '"')) {
         token->c1 = state->current_char;
@@ -136,6 +139,8 @@ static b32 process_string(scanner_t *state, token_t *token) {
         if (ch == '\\') {
             advance_char(state);
         }
+
+        i++;
     }
 
     token->c1 = state->current_char; 
@@ -143,25 +148,17 @@ static b32 process_string(scanner_t *state, token_t *token) {
 
     advance_char(state);
 
+    string_t identifier = {};
 
-    // @todo: add same stuff as in process_word if we would even need that here
-    // we just need to add identifier (string_t)
-   
-    /*
-    u64 index = 0;
+    identifier.size = i;
+    identifier.data = (u8*)state->file.data + string_start;
 
-    if (!area_allocate(&state->symbols, identifier.size, &index)) {
-        log_error_token(STR("Scanner: couldn't allocate space for symbol"), state, *token, 0);
-        token->type = TOKEN_ERROR;
-        return false;
-    }
+    u8 *data = (u8*)arena_allocate(symbols, identifier.size);
 
-    u8* dest = area_get(&state->symbols, index);
-    memcpy(dest, identifier.data, identifier.size);
+    memcpy(data, identifier.data, identifier.size);
 
-    token->data.symbol = identifier;
-    token->data.symbol.table_index = index;
-     */
+    token->data.string.size = identifier.size;
+    token->data.string.data = data;
 
     return true;
 }
@@ -372,8 +369,9 @@ static b32 process_word(scanner_t *state, token_t *token, arena_t *symbols) {
     buffer[i] = 0;
 
     string_t identifier = {};
-    identifier.size     = i;
-    identifier.data     = (u8*)buffer;
+    
+    identifier.size = i;
+    identifier.data = (u8*)buffer;
 
     token->type = match_with_keyword(identifier);
 
@@ -506,7 +504,7 @@ token_t advance_token(scanner_t *state, arena_t *symbols) {
         } break;
 
         case '"': {
-            process_string(state, &token); // @todo. do we need to check the value? 
+            process_string(state, &token, symbols); // @todo. do we need to check the value? 
                                            // right now we just ignore the result
                                            // because in failure it returns only TOKEN_EOF
             return token;
@@ -791,6 +789,9 @@ void get_token_name(u8 *buffer, token_t token) {
             break;
         case TOKEN_GEN_GET_SET:
             sprintf((char*)buffer, "%s", "get or set expression");
+            break;
+        case TOKEN_GEN_ARRAY_GET_SET:
+            sprintf((char*)buffer, "%s", "get or set array expression");
             break;
         case TOKEN_GEN_GENERIC_FUNC_DEF:
             sprintf((char*)buffer, "%s", "Generic func def");

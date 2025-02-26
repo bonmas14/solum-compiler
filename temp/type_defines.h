@@ -23,14 +23,17 @@ typedef double f64;
 
 typedef uint32_t b32;
 
-struct string_t {
+struct String {
     u64 size;
     u8 *data;
 };
 
-#define STR(s) (u8[]) { s }
+#define __internal_STR(s) (u8[]) { s }
 
-#define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }
+#define __internal_STRING(s) (String) { .size = sizeof(s), .data = STR(s) }
 
+#define Char char
+#define Int int
+#define Long long
 
 #endif // USER_DEFINES

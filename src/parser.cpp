@@ -143,20 +143,45 @@ ast_node_t parse_function_call(compiler_t *state) {
         result.type  = AST_BIN;
 
         result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-        ZERO_CHECK(result.left);
         *result.left = left;
 
-        ast_node_t right = parse_expression(state);
+        ast_node_t right = parse_function_call(state);
             
         check(right.type != AST_EMPTY);
         check(right.type != AST_ERROR);
         check(right.token.type == TOKEN_IDENT);
 
         result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-        ZERO_CHECK(result.right);
         *result.right = right;
 
         next.type = TOKEN_GEN_GET_SET;
+
+        next.c1 = end.c1;
+        next.l1 = end.l1;
+
+        result.token = next;
+    } else if (next.type == '[') {
+        ast_node_t left = result;
+        result = {};
+
+        next = advance_token(state->scanner, state->analyzer->symbols);
+
+        result.type  = AST_BIN;
+
+        result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *result.left = left;
+
+        ast_node_t right = parse_expression(state);
+            
+        check(consume_token(']', state->scanner, &end, state->analyzer->symbols));
+
+        check(right.type != AST_EMPTY);
+        check(right.type != AST_ERROR);
+
+        result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *result.right = right;
+
+        next.type = TOKEN_GEN_ARRAY_GET_SET;
 
         next.c1 = end.c1;
         next.l1 = end.l1;
@@ -500,12 +525,10 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
             advance_token(state->scanner, state->analyzer->symbols);
 
             result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-            ZERO_CHECK(result.left);
             *result.left = left;
 
             right = parse_logic_and_expression(state);
             result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-            ZERO_CHECK(result.right);
             *result.right = right;
         } break;
         case TOKEN_ERROR: {

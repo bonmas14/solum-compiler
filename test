@@ -1,8 +1,0 @@
-add : (a : s32, b : s32) -> s32 = {
-    ret a + b;
-}
-
-main : (argc : int, argv : ^^char) -> int = {
-    ret add(10, 5);
-}
-

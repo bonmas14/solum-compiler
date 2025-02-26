@@ -156,7 +156,7 @@ void print_primary_value(token_t token) {
             fprintf(file, "%zu", token.data.const_int);
             break;
         case TOKEN_CONST_STRING:
-            fprintf(file, "STR(\"%.*s\")", (int)token.data.string.size, token.data.string.data);
+            fprintf(file, "__internal_STR(\"%.*s\")", (int)token.data.string.size, token.data.string.data);
             break;
         case TOKEN_IDENT:
             fprintf(file, "%.*s", (int)token.data.string.size, token.data.string.data);
@@ -169,6 +169,13 @@ void print_primary_value(token_t token) {
 
 void generate_expression_token(token_t token) {
     switch (token.type) {
+        case '@':
+            fprintf(file, "*");
+            break;
+        case '^':
+            fprintf(file, "&");
+            break;
+
         case TOKEN_LSHIFT: 
             fprintf(file, "<<");
             break;
@@ -228,7 +235,19 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             fprintf(file, "(");
             generate_expression(compiler, expression->left);
             generate_expression_token(expression->token);
-            generate_expression(compiler, expression->right);
+            
+            if (expression->token.type == TOKEN_GEN_FUNC_CALL) {
+                fprintf(file, "(");
+                generate_expression(compiler, expression->right);
+                fprintf(file, ")");
+            } else if (expression->token.type == TOKEN_GEN_ARRAY_GET_SET) {
+                fprintf(file, "[");
+                generate_expression(compiler, expression->right);
+                fprintf(file, "]");
+            } else {
+                generate_expression(compiler, expression->right);
+            }
+
             fprintf(file, ")");
             break;
     }
@@ -275,6 +294,13 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             return;
 
         case SUBTYPE_AST_WHILE_STMT:
+            fprintf(file, "while (");
+            generate_expression(compiler, stmt->left);
+            fprintf(file, ") ");
+            generate_block(compiler, stmt->right, depth);
+            return;
+
+        default:
             fprintf(file, "NOT_HERE_YET");
             break;
     }
