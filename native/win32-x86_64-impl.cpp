@@ -140,7 +140,7 @@ void generate_type(ast_node_t *type) {
 
         case SUBTYPE_AST_UNKN_TYPE:
             {
-                fprintf(file, " %.*s", (int)type->token.data.string.size, type->token.data.string.data);
+                fprintf(file, "%.*s", (int)type->token.data.string.size, type->token.data.string.data);
             } break;
         default:
             break;
