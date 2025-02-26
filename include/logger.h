@@ -10,6 +10,8 @@
 #define LEFT_PAD_STANDART_OFFSET (4)
 
 
+void add_left_pad(FILE * file, u64 amount);
+
 void log_push_color(u8 r, u8 g, u8 b);
 void log_pop_color(void);
 void log_update_color(void);

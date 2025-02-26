@@ -65,6 +65,7 @@ struct ast_node_t {
     ast_node_t *right;
 
     ast_node_t *list_next;
+    ast_node_t *list_start;
     u64 child_count;
 };
 

@@ -31,10 +31,9 @@ void print_node(compiler_t *compiler, ast_node_t* node, u32 depth) {
     } else if (node->type == AST_LIST) {
         b32 first_time = true;
 
-        ast_node_t* child = node->list_next;
+        ast_node_t* child = node->list_start;
 
         for (u64 i = 0; i < node->child_count; i++) {
-
             assert(child != NULL);
 
             print_node(compiler, child, depth + 1);
@@ -74,6 +73,12 @@ int main(void) {
 
     parse(&compiler);
     analyze_code(&compiler);
+
+    for (u64 i = 0; i < parser.roots.count; i++) {
+        ast_node_t * node = *area_get(&parser.roots, i);
+
+        print_node(&compiler, node, 0);
+    }
     generate_code(&compiler);
 
     log_update_color();

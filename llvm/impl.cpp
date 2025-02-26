@@ -1,5 +1,3 @@
-#include "backend.h"
-
 #include <stdlib.h>
 #include "llvm/IR/Type.h"
 #include <llvm/IR/IRBuilder.h>
@@ -13,6 +11,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include "backend.h"
 
 struct codegen_state_t {
     llvm::LLVMContext context;

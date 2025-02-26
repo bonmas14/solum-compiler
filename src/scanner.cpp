@@ -789,6 +789,9 @@ void get_token_name(u8 *buffer, token_t token) {
         case TOKEN_GEN_FUNC_DEF:
             sprintf((char*)buffer, "%s", "Func def");
             break;
+        case TOKEN_GEN_GET_SET:
+            sprintf((char*)buffer, "%s", "get or set expression");
+            break;
         case TOKEN_GEN_GENERIC_FUNC_DEF:
             sprintf((char*)buffer, "%s", "Generic func def");
             break;

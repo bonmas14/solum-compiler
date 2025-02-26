@@ -78,6 +78,7 @@ enum token_type_t {
     TOKEN_ERROR = 2048,
 
     TOKEN_GEN_FUNC_DEF,
+    TOKEN_GEN_GET_SET,
     TOKEN_GEN_GENERIC_FUNC_DEF,
 
     TOKEN_GEN_FUNC_CALL,

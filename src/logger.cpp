@@ -25,18 +25,18 @@ void log_update_color(void) {
     fprintf(stderr, "\x1b[38;2;%u;%u;%um", r, g, b);
 }
 
-void add_left_pad(u64 amount) {
-    while (amount-- > 0) fprintf(stderr, " ");
+void add_left_pad(FILE * file, u64 amount) {
+    while (amount-- > 0) fprintf(file, " ");
 }
 
 void log_write(u8 *text, u64 left_pad) {
-    add_left_pad(left_pad);
+    add_left_pad(stderr, left_pad);
     log_update_color();
     fprintf(stderr, "%s\n", text);
 }
 
 void log_info(u8 *text, u64 left_pad) {
-    add_left_pad(left_pad);
+    add_left_pad(stderr, left_pad);
 
     log_push_color(INFO_COLOR);
     log_update_color();
@@ -45,7 +45,7 @@ void log_info(u8 *text, u64 left_pad) {
 }
 
 void log_warning(u8 *text, u64 left_pad) {
-    add_left_pad(left_pad);
+    add_left_pad(stderr, left_pad);
 
     log_push_color(WARNING_COLOR);
     log_update_color();
@@ -54,7 +54,7 @@ void log_warning(u8 *text, u64 left_pad) {
 }
 
 void log_error(u8 *text, u64 left_pad) {
-    add_left_pad(left_pad);
+    add_left_pad(stderr, left_pad);
 
     log_push_color(ERROR_COLOR);
     log_update_color();

@@ -101,10 +101,40 @@ ast_node_t parse_function_call(compiler_t *state) {
     ast_node_t result = parse_primary(state);
 
     if (result.type == AST_EMPTY) return result;
+    if (result.token.type != TOKEN_IDENT) return result;
 
     token_t end = {}, next = peek_token(state->scanner, state->analyzer->symbols);
 
-    if (next.type == '(' && result.token.type == TOKEN_IDENT) {
+    if (next.type == '(') {
+        ast_node_t left = result;
+        result = {};
+
+        next = advance_token(state->scanner, state->analyzer->symbols);
+
+        result.type  = AST_BIN;
+
+        result.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.left);
+        *result.left = left;
+
+        ast_node_t right = parse_expression(state);
+
+        check(right.type != AST_EMPTY);
+        check(right.type != AST_ERROR);
+            
+        result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        ZERO_CHECK(result.right);
+        *result.right = right;
+
+        check(consume_token(')', state->scanner, &end, state->analyzer->symbols));
+
+        next.type = TOKEN_GEN_FUNC_CALL;
+
+        next.c1 = end.c1;
+        next.l1 = end.l1;
+
+        result.token = next;
+    } else if (next.type == '.') {
         ast_node_t left = result;
         result = {};
 
@@ -118,14 +148,15 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         ast_node_t right = parse_expression(state);
             
-        // @todo if right is AST_EMPTY we should change it to something different
+        check(right.type != AST_EMPTY);
+        check(right.type != AST_ERROR);
+        check(right.token.type == TOKEN_IDENT);
+
         result.right = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
         ZERO_CHECK(result.right);
         *result.right = right;
 
-        check(consume_token(')', state->scanner, &end, state->analyzer->symbols));
-
-        next.type = TOKEN_GEN_FUNC_CALL;
+        next.type = TOKEN_GEN_GET_SET;
 
         next.c1 = end.c1;
         next.l1 = end.l1;
@@ -767,16 +798,26 @@ ast_node_t parse_parameter_list(compiler_t *state) {
     result.token      = current;
     result.token.type = TOKEN_GEN_PARAM_LIST;
 
-    ast_node_t *previous_node = NULL;
+    b32 start = true;
+    ast_node_t *previous_node;
 
     while (current.type != ')' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_param_declaration(state);
 
         // @todo check for errors
         
-        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-        *previous_node = node;
-        previous_node  = previous_node->list_next;
+
+        ast_node_t *list = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *list = node;
+
+        if (start) {
+            start = false;
+            result.list_start = list;
+            previous_node = result.list_start;
+        } else { 
+            previous_node->list_next = list;
+            previous_node = previous_node->list_next;
+        }
 
         current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
@@ -811,16 +852,26 @@ ast_node_t parse_return_list(compiler_t *state) {
 
     token_t current = peek_token(state->scanner, state->analyzer->symbols);
 
-    ast_node_t *previous_node = NULL;
+    b32 start = true;
+    ast_node_t *previous_node;
 
     while (current.type != '=' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_type(state);
 
         // @todo check for errors
         
-        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-        *previous_node = node;
-        previous_node  = previous_node->list_next;
+        ast_node_t *list = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
+        *list = node;
+
+        if (start) {
+            start = false;
+            result.list_start = list;
+            previous_node = result.list_start;
+        } else { 
+            previous_node->list_next = list;
+            previous_node = previous_node->list_next;
+        }
+
 
         current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
@@ -954,7 +1005,6 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
     }
 
     node.left = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-    ZERO_CHECK(node.left);
     *node.left = type;
 
     node.subtype = SUBTYPE_AST_UNKN_DEF;
@@ -1178,8 +1228,12 @@ ast_node_t parse_imperative_block(compiler_t *state) {
 
     token_t current = peek_token(state->scanner, state->analyzer->symbols);
 
-    ast_node_t *previous_node = result.list_next;
+    b32 start = true;
+    ast_node_t *previous_node;
 
+    // THE PROBLEM WITH LISTS
+    //
+    // WE GOT ERROR IN DOUBLE SCOPES BECAUSE IT REWRITES list_next IN UPPER SCOPES!
     while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_statement(state);
 
@@ -1188,9 +1242,17 @@ ast_node_t parse_imperative_block(compiler_t *state) {
             continue;
         }
 
-        previous_node  = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t));
-        *previous_node = node;
-        previous_node  = previous_node->list_next;
+        ast_node_t *list = (ast_node_t*)arena_allocate(state->parser->nodes, sizeof(ast_node_t)); *list = node;
+        *list = node;
+
+        if (start) {
+            start = false;
+            result.list_start = list;
+            previous_node = result.list_start;
+        } else { 
+            previous_node->list_next = list;
+            previous_node = previous_node->list_next;
+        }
 
         current = peek_token(state->scanner, state->analyzer->symbols);
         result.child_count++;
@@ -1232,7 +1294,7 @@ ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
 }
 
 b32 parse(compiler_t *compiler) {
-	compiler->parser->nodes = arena_create(INIT_NODES_SIZE);
+	compiler->parser->nodes = arena_create(sizeof(ast_node_t) * INIT_NODES_SIZE);
 
     if (!compiler->parser->nodes) {
         log_error(STR("Parser: Couldn't create nodes arena."), 0);
@@ -1261,7 +1323,6 @@ b32 parse(compiler_t *compiler) {
         }
 
         ast_node_t *root = (ast_node_t*)arena_allocate(compiler->parser->nodes, sizeof(ast_node_t));
-        ZERO_CHECK(root);
         *root = node;
 
         area_add(&compiler->parser->roots, &root);
