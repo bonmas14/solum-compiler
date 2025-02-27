@@ -13,6 +13,31 @@
 #define MAX_IDENT_SIZE (256)
 #define MAX_INT_CONST_SIZE (256)
 
+struct line_tuple_t {
+    u64 start;
+    u64 stop;
+};
+
+struct scanner_t {
+    u64 file_index;
+    u64 current_line;
+    u64 current_char;
+
+    list_t<line_tuple_t> lines; 
+    b32 is_dynamic;
+    string_t file;
+}; 
+
+struct token_t {
+    u32 type;
+    u32 c0, c1, l0, l1; //  without human readable offsets
+    union {
+        u64 const_int;
+        f64 const_double;
+        string_t string;
+    } data;
+};
+
 enum token_type_t {
     TOKEN_GR = '>',
     TOKEN_LS = '<',
@@ -109,42 +134,15 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 };
 #endif
 
-// @todo: we need to move it away from scanner
-struct line_tuple_t {
-    u64 start;
-    u64 stop;
-};
-
-struct scanner_t {
-    u64 file_index;
-    u64 current_line;
-    u64 current_char;
-
-    area_t<line_tuple_t> lines; 
-    b32 is_dynamic;
-    string_t file;
-}; 
-
-struct token_t {
-    u32 type;
-    u32 c0, c1, l0, l1; //  without human readable offsets
-    union {
-        u64 const_int;
-        f64 const_double;
-        string_t string;
-    } data;
-};
-
-
 b32 scanner_create(u8* filename, scanner_t *state);
 void scanner_delete(scanner_t *state);
 
 b32 scanner_open(string_t *string, scanner_t *state);
 
-token_t advance_token(scanner_t *state, arena_t *symbols);
-b32     consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *symbols);
-token_t peek_token(scanner_t *state, arena_t *symbols);
-token_t peek_next_token(scanner_t *state, arena_t *symbols);
+token_t advance_token(scanner_t *state, arena_t *allocator);
+b32     consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *allocator);
+token_t peek_token(scanner_t *state, arena_t *allocator);
+token_t peek_next_token(scanner_t *state, arena_t *allocator);
 
 // --- logging for scanner
 

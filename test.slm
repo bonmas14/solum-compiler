@@ -1,5 +1,19 @@
+test_of_no_args_func : () = {
+    test_of_no_args_func();
+}
+
+function_that_just_returns : (a : s32, b : s32) -> s32 = {
+    a, b = b, a; // not supported in C++ so we need to change that
+                 // we will do that on analyze step 
+}
+
+test_for_multiple_dots_access_inside : (var : s32) = {
+    var.a.b.c.d; 
+}
+
 c_string_length : (c_string : ^u8) -> u64 = {
     current_pos : ^u8 = c_string;
+
 
     while @current_pos != 0 {
         current_pos = current_pos + 1;
@@ -11,6 +25,12 @@ c_string_length : (c_string : ^u8) -> u64 = {
 get_string : (c_string : ^u8) -> String = {
     str : string_t = default;
 
+    // we cant automatically dereference
+    // thats also what we do on analyzer step,
+    
+    // but also we can think of analyzer step as a creator of scopes
+    // and binder of functions then we generate IR
+    // that is actually will need typecheck and so on
     str.size = c_string_length(c_string);
     str.data = c_string;
 
@@ -26,3 +46,5 @@ main : (argc : Int, argv : ^^ Char) -> Int = {
 
     ret str.size;
 }
+
+

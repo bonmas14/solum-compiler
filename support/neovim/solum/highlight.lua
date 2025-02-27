@@ -23,6 +23,8 @@ vim.api.nvim_create_autocmd("BufRead", {
         syntax match slmOperator /&/
         syntax match slmOperator /|/
         syntax match slmOperator /\^/
+        syntax match slmOperator /=/
+        syntax match slmOperator /;/
 
         syntax match slmOperator /!/
 
@@ -45,28 +47,28 @@ vim.api.nvim_create_autocmd("BufRead", {
         syntax match slmOperator /==/
         syntax match slmOperator /!=/
 
+        syntax match slmOperator /(/
+        syntax match slmOperator /)/
+        syntax match slmOperator /{/
+        syntax match slmOperator /}/
+        syntax match slmOperator /\[/
+        syntax match slmOperator /\]/
 
         syntax match slmOperator /->/
-
-
     ]])
 
-    -- Define strings (double-quoted strings)
     vim.cmd([[
       syntax match slmString /".*"/
     ]])
 
-    -- Define single-line comments (starting with #)
     vim.cmd([[
       syntax match slmComment /\/\/.*/
     ]])
 
-    -- Define multi-line comments (if applicable)
     vim.cmd([[
       syntax region slmMultiComment start=/\/\*/ end=/\*\//
     ]])
 
-    -- Define numbers (integer and float)
     vim.cmd([[
       syntax match slmNumber /\v\d+(\.\d+)?/
       syntax match slmNumber /\v-\d+(\.\d+)?/
@@ -74,10 +76,10 @@ vim.api.nvim_create_autocmd("BufRead", {
       syntax match slmNumber /\v0[b][01]+/
     ]])
 
-    -- Define highlight groups
+    -- Highlights
     vim.cmd([[
       highlight slmKeyword  guifg=#FF7700
-      highlight slmOperator guifg=#FF7700
+      highlight slmOperator guifg=#FF9438
       highlight slmIdent    guifg=#CCCCBB
       highlight slmType     guifg=#FFCC00
 
@@ -89,6 +91,4 @@ vim.api.nvim_create_autocmd("BufRead", {
       highlight slmNumber guifg=#BBFF44
     ]])
   end,
-
-
 })

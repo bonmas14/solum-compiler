@@ -21,26 +21,9 @@
     //
     // block in general := structure is not allowed if it is not an function def
 
-void analyzer_create(analyzer_t *analyzer) {
-    check(area_create(&analyzer->scopes, 100));
-
-    u64 index = {};
-    area_allocate(&analyzer->scopes, 1, &index);
-
-    scope_tuple_t *global_scope = area_get(&analyzer->scopes, index);
-
-    global_scope->is_global    = true;
-    global_scope->parent_scope = 0;
-
-    analyzer->symbols = arena_create(256);
-
-    assert(hashmap_create(&global_scope->scope, 100));
-}
 
 b32 analyze_code(compiler_t *compiler) {
-    parser_t   *parser   = compiler->parser;
     analyzer_t *analyzer = compiler->analyzer;
-
 
     return false;
 }

@@ -10,7 +10,6 @@
 #include <memory.h> 
 
 #define ALLOC(x)      calloc(1, x) 
-#define REALLOC(x, y) realloc(x, y)
 #define FREE(x)       free(x) 
 
 #endif

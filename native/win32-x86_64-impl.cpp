@@ -1,13 +1,16 @@
 #include "backend.h"
+#include "parser.h"
+#include "scanner.h"
+#include "analyzer.h"
+
 #include <stdlib.h>
 
 struct codegen_state_t {
     bool deez;
 };
 
-arena_t * local;
-FILE    * file;
-ast_node_t * name;
+FILE       * file;
+ast_node_t * name; // only exists here because we need it in generate_type... @todo 
 
 void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth);
 void generate_unkn_def(compiler_t *compiler, ast_node_t *root, u64 depth);
@@ -225,10 +228,10 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             break;
 
         case AST_UNARY:
-            fprintf(file, "(");
+            // fprintf(file, "(");
             generate_expression_token(expression->token);
             generate_expression(compiler, expression->left);
-            fprintf(file, ")");
+            // fprintf(file, ")");
             break;
 
         case AST_BIN:
@@ -349,9 +352,7 @@ void generate_unkn_def(compiler_t *compiler, ast_node_t *root, u64 depth) {
     // right expr/block
 }
 void generate_root(compiler_t *compiler, ast_node_t *root) {
-
     switch (root->subtype) {
-
         case SUBTYPE_AST_UNKN_DEF:
             generate_unkn_def(compiler, root, 0);
             break;
@@ -364,8 +365,6 @@ void generate_root(compiler_t *compiler, ast_node_t *root) {
 }
 
 void generate_code(compiler_t *compiler) {
-    local = arena_create(1024);
-
     log_update_color();
     fprintf(stdout, "WE ARE IN CODEGEN\n");
 
@@ -374,8 +373,8 @@ void generate_code(compiler_t *compiler) {
     fprintf(file, "#include <stdio.h>\n");
     fprintf(file, "#include \"type_defines.h\"\n");
 
-    for (u64 i = 0; i < compiler->parser->roots.count; i++) {
-        ast_node_t * node = *area_get(&compiler->parser->roots, i);
+    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
+        ast_node_t * node = *list_get(&compiler->parser->parsed_roots, i);
 
         generate_root(compiler, node);
     }

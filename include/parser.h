@@ -2,12 +2,27 @@
 #define PARSER_H
 
 #include "compiler.h"
-#include "arena.h"
-#include "area_alloc.h"
-#include "hashmap.h"
 #include "scanner.h"
 
-#define INIT_NODES_SIZE (100)
+struct ast_node_t {
+    s32 type;
+    s32 subtype;
+
+    token_t token;
+
+    ast_node_t *left;
+    ast_node_t *center;
+    ast_node_t *right;
+
+    ast_node_t *list_next;
+    ast_node_t *list_start;
+    u64 child_count;
+};
+
+struct parser_t {
+    list_t<ast_node_t*> parsed_roots;
+};
+
 
 enum ast_types_t {
     AST_EMPTY,
@@ -51,27 +66,6 @@ enum ast_subtype_t {
     SUBTYPE_AST_FUNC_PARAMS   = 0x30,
     SUBTYPE_AST_FUNC_RETURNS  = 0x31,
     SUBTYPE_AST_FUNC_GENERICS = 0x32,
-};
-
-
-struct ast_node_t {
-    s32 type;
-    s32 subtype;
-
-    token_t token;
-
-    ast_node_t *left;
-    ast_node_t *center;
-    ast_node_t *right;
-
-    ast_node_t *list_next;
-    ast_node_t *list_start;
-    u64 child_count;
-};
-
-struct parser_t {
-    arena_t *nodes;
-    area_t<ast_node_t*> roots; 
 };
 
 b32 parse(compiler_t *compiler);

@@ -5,6 +5,17 @@
 #include "area_alloc.h"
 #include "hashmap.h"
 
+struct ir_opcode_t {
+    u32 operation;
+    union {
+        struct {
+            u64 math_l;
+            u64 math_r;
+        };
+
+        u64 offset;
+    };
+};
 
 // IMM 
 // MV
@@ -77,18 +88,6 @@ enum ir_opcodes_t {
     
     IR_JUMP,
 
-};
-
-struct ir_opcode_t {
-    u32 operation;
-    union {
-        struct {
-            u64 math_l;
-            u64 math_r;
-        };
-
-        u64 offset;
-    };
 };
 
 #endif // IR_GEN_H

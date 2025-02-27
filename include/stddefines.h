@@ -28,9 +28,11 @@ struct string_t {
     u8 *data;
 };
 
+struct arena_t;
+extern arena_t * default_allocator;
+
 #define STR(s) (u8[]) { s }
 
 #define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }
-
 
 #endif // USER_DEFINES

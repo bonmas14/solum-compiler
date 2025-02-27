@@ -33,7 +33,7 @@ static inline void stepback_char(scanner_t *state) {
     state->file_index--;
 
     if (state->current_char == 0) {
-        state->current_char = area_get(&state->lines, --state->current_line)->stop;
+        state->current_char = list_get(&state->lines, --state->current_line)->stop;
     } else {
         state->current_char--;
     }
@@ -109,7 +109,7 @@ static inline b32 char_is_special(u8 in) {
 }
 
 // @todo we need to support escape codes
-static b32 process_string(scanner_t *state, token_t *token, arena_t *symbols) {
+static b32 process_string(scanner_t *state, token_t *token, arena_t *allocator) {
     token->type = TOKEN_CONST_STRING;
     token->c0 = state->current_char;
     token->l0 = state->current_line;
@@ -153,7 +153,7 @@ static b32 process_string(scanner_t *state, token_t *token, arena_t *symbols) {
     identifier.size = i;
     identifier.data = (u8*)state->file.data + string_start;
 
-    u8 *data = (u8*)arena_allocate(symbols, identifier.size);
+    u8 *data = (u8*)arena_allocate(allocator, identifier.size);
 
     memcpy(data, identifier.data, identifier.size);
 
@@ -343,7 +343,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     return true;
 }
 
-static b32 process_word(scanner_t *state, token_t *token, arena_t *symbols) {
+static b32 process_word(scanner_t *state, token_t *token, arena_t *allocator) {
     token->c0 = state->current_char;
     token->l0 = state->current_line;
 
@@ -379,7 +379,7 @@ static b32 process_word(scanner_t *state, token_t *token, arena_t *symbols) {
         return true;
     }
 
-    u8 *data = (u8*)arena_allocate(symbols, identifier.size);
+    u8 *data = (u8*)arena_allocate(allocator, identifier.size);
 
     memcpy(data, identifier.data, identifier.size);
 
@@ -398,7 +398,7 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state, arena_t *symbols) {
+token_t advance_token(scanner_t *state, arena_t *allocator) {
     eat_all_spaces(state);
 
     token_t token = {};
@@ -421,7 +421,7 @@ token_t advance_token(scanner_t *state, arena_t *symbols) {
                 advance_char(state);
             }
 
-            token = advance_token(state, symbols);
+            token = advance_token(state, allocator);
             return token;
         }
     }
@@ -504,7 +504,7 @@ token_t advance_token(scanner_t *state, arena_t *symbols) {
         } break;
 
         case '"': {
-            process_string(state, &token, symbols); // @todo. do we need to check the value? 
+            process_string(state, &token, allocator); // @todo. do we need to check the value? 
                                            // right now we just ignore the result
                                            // because in failure it returns only TOKEN_EOF
             return token;
@@ -513,7 +513,7 @@ token_t advance_token(scanner_t *state, arena_t *symbols) {
         default: {
             if (char_is_letter(ch)) {
                 stepback_char(state);
-                process_word(state, &token, symbols); // @todo add handlers for false case
+                process_word(state, &token, allocator); // @todo add handlers for false case
             } else if (char_is_digit(ch)) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
@@ -530,24 +530,24 @@ token_t advance_token(scanner_t *state, arena_t *symbols) {
 }
 
 // @todo: add caching instead of just cleaning this up 
-token_t peek_token(scanner_t *state, arena_t *symbols) {
+token_t peek_token(scanner_t *state, arena_t *allocator) {
     scanner_t peek_state = *state;
 
-    token_t token  = advance_token(&peek_state, symbols);
+    token_t token  = advance_token(&peek_state, allocator);
 
     return token;
 }
 
-token_t peek_next_token(scanner_t *state, arena_t *symbols) {
+token_t peek_next_token(scanner_t *state, arena_t *allocator) {
     scanner_t peek_state = *state;
 
-    (void)advance_token(&peek_state, symbols);
-    token_t token = advance_token(&peek_state, symbols);
+    advance_token(&peek_state, allocator);
+    token_t token = advance_token(&peek_state, allocator);
 
     return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *symbols) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *allocator) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
@@ -555,13 +555,15 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *sym
         token  = &local_token;
     }
 
-    *token = advance_token(&peek_state, symbols);
+    *token = peek_token(&peek_state, allocator);
 
     if (token->type != token_type) {
         return false;
     }
 
+    *token = advance_token(&peek_state, allocator);
     *state = peek_state;
+
     return true;
 }
 
@@ -611,7 +613,7 @@ b32 scan_lines(scanner_t *state) {
             init_size = MINIMAL_SIZE;
         }
 
-        if (!area_create(&state->lines, init_size)) {
+        if (!list_create(&state->lines, init_size)) {
             log_error(STR("Scanner: Couldn't create list."), 0);
             return false;
         }
@@ -627,7 +629,7 @@ b32 scan_lines(scanner_t *state) {
 
         line.stop  = i;
 
-        area_add(&state->lines, &line);
+        list_add(&state->lines, &line);
 
         line.start = i + 1;
     }
@@ -640,7 +642,7 @@ void scanner_delete(scanner_t *state) {
         free(state->file.data);
     }
 
-    area_delete(&state->lines);
+    list_delete(&state->lines);
 }
 
 b32 scanner_open(string_t *string, scanner_t *state) {
@@ -870,7 +872,7 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
     b32 cancel_skip = false;
 
     for (u64 i = start_line; i < stop_line; i++) {
-        line_tuple_t line = *area_get(&state->lines, i);
+        line_tuple_t line = *list_get(&state->lines, i);
 
         u64 len   = line.stop - line.start + 1;
         u8 *start = state->file.data + line.start;
