@@ -23,7 +23,6 @@ struct parser_t {
     list_t<ast_node_t*> parsed_roots;
 };
 
-
 enum ast_types_t {
     AST_EMPTY,
     AST_LEAF,
@@ -43,6 +42,7 @@ enum ast_subtype_t {
     SUBTYPE_AST_RET_STMT   = 0x05,
 
     AST_BLOCK_IMPERATIVE   = 0x06,
+    AST_BLOCK_ENUM         = 0x07,
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword

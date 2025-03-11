@@ -1,3 +1,40 @@
+
+first_struct : struct = {
+    what_a_sigma : s32;
+}
+
+
+Token : struct = {
+    type : u32;
+
+    c0 : u32;
+    c1 : u32;
+    l0 : u32;
+    l1 : u32;
+
+    data : union = {
+        const_int    : u64;
+        const_double : f64;
+        string       : String;
+    };
+}
+
+Ast_Node : struct = {
+    type    : s32;
+    subtype : s32;
+
+    token  : Token;
+
+    left   : ^Ast_Node;
+    center : ^Ast_Node;
+    right  : ^Ast_Node;
+
+    start : ^Ast_Node;
+    next  : ^Ast_Node;
+    child_count : u64;
+}
+
+
 test_of_no_args_func : () = {
     test_of_no_args_func();
 }

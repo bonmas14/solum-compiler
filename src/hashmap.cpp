@@ -48,9 +48,7 @@ void hashmap_tests(void) {
     u8 name1[] = { "hashmap1" };
     u8 name2[] = { "hashmap2" };
 
-    u64 index = 0;
     string_t key1 = (string_t){ .size = sizeof(name1), .data = name1 };
-
     string_t key2 = (string_t){ .size = sizeof(name2), .data = name2 };
 
     u32 size = 8;

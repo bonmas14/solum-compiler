@@ -2,8 +2,11 @@
 #include "parser.h"
 #include "scanner.h"
 #include "analyzer.h"
+#include "backend.h"
 
-void analyzer_create(analyzer_t *analyzer) {
+analyzer_t *analyzer_create(arena_t *allocator) {
+    analyzer_t *analyzer = (analyzer_t*)arena_allocate(allocator, sizeof(analyzer_t));
+
     check(list_create(&analyzer->scopes, 100));
 
     u64 index = {};
@@ -15,32 +18,26 @@ void analyzer_create(analyzer_t *analyzer) {
     global_scope->parent_scope = 0;
 
     check(hashmap_create(&global_scope->scope, 100));
+
+    return analyzer;
 }
 
 compiler_t create_compiler_instance(void) {
     compiler_t compiler = {};
 
-    compiler.scanner  =  (scanner_t*)arena_allocate(default_allocator, sizeof(scanner_t));
-    compiler.parser   =   (parser_t*)arena_allocate(default_allocator, sizeof(parser_t));
-    compiler.analyzer = (analyzer_t*)arena_allocate(default_allocator, sizeof(analyzer_t));
-
-    assert(compiler.scanner  != NULL);
-    assert(compiler.parser   != NULL);
-    assert(compiler.analyzer != NULL);
+    compiler.scanner = (scanner_t*)arena_allocate(default_allocator, sizeof(scanner_t));
+    compiler.parser  =  (parser_t*)arena_allocate(default_allocator, sizeof(parser_t));
 
 	compiler.node_allocator = arena_create(sizeof(ast_node_t) * INIT_NODES_SIZE);
+    assert(compiler.node_allocator != NULL);
 
-    if (!compiler.node_allocator) {
-        log_error(STR("Parser: Couldn't create node_allocator arena."), 0);
-        return {};
-    }
-
-    compiler.is_valid = true;
     compiler.string_allocator = arena_create(4096);
-
     assert(compiler.string_allocator != NULL);
 
-    analyzer_create(compiler.analyzer);
+    compiler.analyzer = analyzer_create(default_allocator);
+    compiler.codegen  = codegen_create(default_allocator);
+
+    compiler.is_valid = true;
 
     return compiler;
 }

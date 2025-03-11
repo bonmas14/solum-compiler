@@ -16,6 +16,7 @@
 struct scanner_t;
 struct parser_t;
 struct analyzer_t;
+struct codegen_t;
 
 struct compiler_t {
     b32 is_valid;
@@ -26,6 +27,7 @@ struct compiler_t {
     scanner_t  *scanner;
     parser_t   *parser;
     analyzer_t *analyzer;
+    codegen_t  *codegen;
 };
 
 compiler_t create_compiler_instance(void);

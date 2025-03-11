@@ -22,8 +22,24 @@
     // block in general := structure is not allowed if it is not an function def
 
 
+enum expr_analyze_result_t {
+    EXPR_GENERAL_ERROR,
+    EXPR_VALID,
+};
+
+
+b32 analyze_unkn_stmt(compiler_t *compiler) {
+    return compiler->is_valid;
+}
+
+b32 analyze_root_stmt(compiler_t *compiler) {
+    return compiler->is_valid;
+}
+
 b32 analyze_code(compiler_t *compiler) {
-    analyzer_t *analyzer = compiler->analyzer;
+    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
+        analyze_root_stmt(compiler);
+    }
 
     return false;
 }
