@@ -582,12 +582,7 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
 
     if (file_size == 0) return false;
 
-    output->data = (u8*)malloc(file_size + 1);
-
-    if (output->data == NULL) {
-        log_error(STR("Scanner: Couldn't allocate memory for a file."), 0);
-        return false;
-    }
+    output->data = (u8*)arena_allocate(default_allocator, file_size + 1);
 
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
@@ -604,23 +599,10 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
     return true;
 }
 
-b32 scan_lines(scanner_t *state) {
-    if (state->lines.data == NULL) {
-        state->lines = {};
-        u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
-
-        if (init_size == 0) {
-            init_size = MINIMAL_SIZE;
-        }
-
-        if (!list_create(&state->lines, init_size)) {
-            log_error(STR("Scanner: Couldn't create list."), 0);
-            return false;
-        }
-    }
+void scan_lines(scanner_t *state) {
+    assert(state->lines.data != NULL);
 
     line_tuple_t line = {};
-    line.start        = 0;
 
     for (u64 i = 0; i < state->file.size; i++) {
         if (!(state->file.data[i] == '\n' || state->file.data[i] == 0)) {
@@ -628,46 +610,30 @@ b32 scan_lines(scanner_t *state) {
         }
 
         line.stop  = i;
-
         list_add(&state->lines, &line);
-
         line.start = i + 1;
     }
-
-    return true;
 }
 
-void scanner_delete(scanner_t *state) {
-    if (!state->is_dynamic && state->file.size > 0) {
-        free(state->file.data);
-    }
-
+void scanner_close(scanner_t *state) {
     list_delete(&state->lines);
 }
 
 b32 scanner_open(string_t *string, scanner_t *state) {
-    state->is_dynamic = true;
-    state->file       = *string;
+    state->file = *string;
 
-    check(scan_lines(state));
+    u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
-    return true;
-}
+    if (init_size == 0) {
+        init_size = MINIMAL_SIZE;
+    }
 
-b32 scanner_create(u8* filename, scanner_t *state) {
-    *state = {};
-
-    if (!read_file_into_string(filename, &state->file)) {
-        log_error(STR("Scanner: couldn't read file."), 0);
+    if (!list_create(&state->lines, init_size)) {
+        log_error(STR("Scanner: Couldn't create list."), 0);
         return false;
     }
 
-    if (!scan_lines(state)) {
-        log_error(STR("Scanner: couldn't scan_lines file."), 0);
-
-        return false;
-    }
-
+    scan_lines(state);
     return true;
 }
 

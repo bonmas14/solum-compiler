@@ -48,15 +48,31 @@ void debug_tests(void) {
 #endif
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+
     debug_tests();
     log_push_color(255, 255, 255);
 
-    default_allocator = arena_create(4096);
-
+    default_allocator   = arena_create(PAGE_SIZE * 10);
     compiler_t compiler = create_compiler_instance();
 
-    if (!scanner_create(STR("test.slm"), compiler.scanner)) {
+
+    string_t file = {};
+
+    u8* filename = NULL;
+
+    if (argc <= 1) {
+        filename = STR("test.slm");
+    } else {
+        filename = (u8*)argv[1];
+    }
+
+    if (!read_file_into_string(filename, &file)) {
+        log_error(STR("Main: couldn't open file."), 0);
+        return -1;
+    }
+
+    if (!scanner_open(&file, compiler.scanner)) {
         log_error(STR("Main: couldn't open file and load it into memory."), 0);
         return -1;
     }

@@ -393,7 +393,7 @@ void generate_code(compiler_t *compiler) {
     log_update_color();
     fprintf(stdout, "WE ARE IN CODEGEN\n");
 
-    compiler->codegen->file = fopen("./temp/output.cpp", "wb");
+    compiler->codegen->file = fopen("./output.cpp", "wb");
 
     fprintf(compiler->codegen->file, "#include <stdio.h>\n");
     fprintf(compiler->codegen->file, "#include \"type_defines.h\"\n");

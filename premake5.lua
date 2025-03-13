@@ -4,7 +4,7 @@ workspace "solum"
     startproject "native-solum-compiler"
 
     warnings "Extra"
-    architecture "x86_64"
+ --    architecture "x86_64"
 
     filter "configurations:Debug"
         defines "DEBUG"

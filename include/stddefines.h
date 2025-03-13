@@ -1,6 +1,9 @@
 #ifndef USER_DEFINES
 #define USER_DEFINES
 
+// @todo: should be platform specific
+#define PAGE_SIZE ((u64)4096)
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
