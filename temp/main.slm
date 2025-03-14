@@ -1,4 +1,4 @@
 main : () -> Int = {
-    puts("Hello!");
+    puts(cast(^Char)"Hello!");
     ret 0;
 }
