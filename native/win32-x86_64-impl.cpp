@@ -222,7 +222,7 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             break;
 
         case AST_BIN:
-            fprintf(compiler->codegen->file, "(");
+            // fprintf(compiler->codegen->file, "(");
             generate_expression(compiler, expression->left);
             generate_expression_token(compiler, expression->token);
             
@@ -238,7 +238,7 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
                 generate_expression(compiler, expression->right);
             }
 
-            fprintf(compiler->codegen->file, ")");
+            // fprintf(compiler->codegen->file, ")");
             break;
     }
 }
@@ -250,6 +250,7 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
 
         case AST_BLOCK_IMPERATIVE:
             generate_block(compiler, stmt, depth);
+            fprintf(compiler->codegen->file, "\n");
             return;
         case SUBTYPE_AST_STRUCT_DEF:
             generate_struct_def(compiler, stmt, depth);
@@ -275,6 +276,7 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
             generate_block(compiler, stmt->right, depth);
+            fprintf(compiler->codegen->file, "\n");
             return;
 
         case SUBTYPE_AST_ELIF_STMT:
@@ -282,11 +284,13 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
             generate_block(compiler, stmt->right, depth);
+            fprintf(compiler->codegen->file, "\n");
             return;
 
         case SUBTYPE_AST_ELSE_STMT:
             fprintf(compiler->codegen->file, "else ");
             generate_block(compiler, stmt->left, depth);
+            fprintf(compiler->codegen->file, "\n");
             return;
 
         case SUBTYPE_AST_WHILE_STMT:
@@ -294,6 +298,7 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
             generate_block(compiler, stmt->right, depth);
+            fprintf(compiler->codegen->file, "\n");
             return;
 
         default:
@@ -316,7 +321,7 @@ void generate_block(compiler_t *compiler, ast_node_t *block, u64 depth) {
     }
 
     add_left_pad(compiler->codegen->file, depth * LEFT_PAD_STANDART_OFFSET);
-    fprintf(compiler->codegen->file, "}\n");
+    fprintf(compiler->codegen->file, "}");
 }
 
 void generate_unkn_def(compiler_t *compiler, ast_node_t *root, u64 depth) {

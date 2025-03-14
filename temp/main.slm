@@ -1,3 +1,4 @@
 main : () -> Int = {
+    puts("Hello!");
     ret 0;
 }

@@ -118,12 +118,12 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         ast_node_t right = parse_expression(state);
 
-        check(right.type != AST_ERROR);
+        check_value(right.type != AST_ERROR);
             
         result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.right = right;
 
-        check(consume_token(')', state->scanner, &end, state->string_allocator));
+        check_value(consume_token(')', state->scanner, &end, state->string_allocator));
 
         next.type = TOKEN_GEN_FUNC_CALL;
 
@@ -144,9 +144,9 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         ast_node_t right = parse_function_call(state);
             
-        check(right.type != AST_EMPTY);
-        check(right.type != AST_ERROR);
-        check(right.token.type == TOKEN_IDENT || right.token.type == TOKEN_GEN_GET_SET);
+        check_value(right.type != AST_EMPTY);
+        check_value(right.type != AST_ERROR);
+        check_value(right.token.type == TOKEN_IDENT || right.token.type == TOKEN_GEN_GET_SET);
 
         result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.right = right;
@@ -170,10 +170,10 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         ast_node_t right = parse_expression(state);
             
-        check(consume_token(']', state->scanner, &end, state->string_allocator));
+        check_value(consume_token(']', state->scanner, &end, state->string_allocator));
 
-        check(right.type != AST_EMPTY);
-        check(right.type != AST_ERROR);
+        check_value(right.type != AST_EMPTY);
+        check_value(right.type != AST_ERROR);
 
         result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.right = right;
@@ -204,10 +204,10 @@ ast_node_t parse_unary(compiler_t *state) {
         case '-':
         case '!': {
             advance_token(state->scanner, state->string_allocator);
-            ast_node_t child = parse_unary(state); // @todo check for errors
+            ast_node_t child = parse_unary(state); // @todo check_value for errors
             
             if (child.type == AST_EMPTY || child.type == AST_ERROR) {
-                check(false); // @todo better logging and parsing
+                check_value(false); // @todo better logging and parsing
             }
 
             result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
@@ -249,7 +249,7 @@ ast_node_t parse_shift(compiler_t *state) {
 
             right = parse_shift(state); 
 
-            // @todo error check
+            // @todo error check_value
             result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
             *result.right = right;
         } break;
@@ -570,7 +570,7 @@ ast_node_t parse_separated_expressions(compiler_t *state) {
     // for performance
     token_t expression_separator = {};
     if (consume_token(',', state->scanner, &expression_separator, state->string_allocator)) {
-        // @todo check of AST_ERROR
+        // @todo check_value of AST_ERROR
         ast_node_t node = result;
 
         result = {};
@@ -610,7 +610,7 @@ ast_node_t parse_expression(compiler_t *state) {
             *result.left = left;
 
             right = parse_expression(state); 
-            check(right.type != AST_EMPTY);
+            check_value(right.type != AST_EMPTY);
 
             result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
             *result.right = right;
@@ -687,7 +687,7 @@ ast_node_t parse_type(compiler_t *state) {
             result.token.type = TOKEN_GEN_ARRAY_CALL;
 
             ast_node_t size   = parse_expression(state); 
-            check(size.type != AST_EMPTY);
+            check_value(size.type != AST_EMPTY);
 
             token_t array_end = advance_token(state->scanner, state->string_allocator); 
 
@@ -790,7 +790,7 @@ ast_node_t parse_parameter_list(compiler_t *state) {
     while (current.type != ')' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_param_declaration(state);
 
-        // @todo check for errors
+        // @todo check_value for errors
         
 
         ast_node_t *list = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
@@ -844,7 +844,7 @@ ast_node_t parse_return_list(compiler_t *state) {
     while (current.type != '=' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_type(state);
 
-        // @todo check for errors
+        // @todo check_value for errors
         
         ast_node_t *list = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *list = node;
@@ -901,7 +901,7 @@ ast_node_t parse_function_type(compiler_t *state) {
 
     *result.left = parameters;
 
-    // @todo check for errors
+    // @todo check_value for errors
     if (!consume_token(')', state->scanner, NULL, state->string_allocator)) {
         result.type = AST_ERROR;
         log_warning_token(STR("waiting for ')'."), state->scanner, result.token, 0);
@@ -1008,9 +1008,9 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
 }
 
 ast_node_t parse_union_declaration(compiler_t *state, token_t *name) {
-    // @todo better checking 
-    check(consume_token(TOK_UNION, state->scanner, NULL, state->string_allocator));
-    check(consume_token('=', state->scanner, NULL, state->string_allocator));
+    // @todo better checking_value 
+    check_value(consume_token(TOK_UNION, state->scanner, NULL, state->string_allocator));
+    check_value(consume_token('=', state->scanner, NULL, state->string_allocator));
 
     ast_node_t result = {};
 
@@ -1019,15 +1019,15 @@ ast_node_t parse_union_declaration(compiler_t *state, token_t *name) {
     result.token = *name;
 
     result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    // @todo add checks
+    // @todo add checks_value
     *result.left = parse_block(state, AST_BLOCK_IMPERATIVE);
     return result;
 }
 
 ast_node_t parse_struct_declaration(compiler_t *state, token_t *name) {
-    // @todo better checking 
-    check(consume_token(TOK_STRUCT, state->scanner, NULL, state->string_allocator));
-    check(consume_token('=', state->scanner, NULL, state->string_allocator));
+    // @todo better checking_value 
+    check_value(consume_token(TOK_STRUCT, state->scanner, NULL, state->string_allocator));
+    check_value(consume_token('=', state->scanner, NULL, state->string_allocator));
 
     ast_node_t result = {};
 
@@ -1037,7 +1037,7 @@ ast_node_t parse_struct_declaration(compiler_t *state, token_t *name) {
     result.token   = *name;
 
     result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    // @todo add checks
+    // @todo add checks_value
     *result.left = parse_block(state, AST_BLOCK_IMPERATIVE);
 
     return result;
@@ -1115,7 +1115,7 @@ ast_node_t parse_statement(compiler_t *state) {
             node.token   = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
-            check(expr.type != AST_EMPTY);
+            check_value(expr.type != AST_EMPTY);
             
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
@@ -1150,7 +1150,7 @@ ast_node_t parse_statement(compiler_t *state) {
             node.token   = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
-            check(expr.type != AST_EMPTY);
+            check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
@@ -1173,7 +1173,7 @@ ast_node_t parse_statement(compiler_t *state) {
         } break;
 
         default: {
-            node = parse_expression(state); // @todo add check for AST_EMPTY
+            node = parse_expression(state); // @todo add check_value for AST_EMPTY
         } break;
     }
 

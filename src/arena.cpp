@@ -26,7 +26,7 @@ void arena_delete(arena_t *cont) {
 // bad recursive design, can fail @fix
 void * arena_allocate(arena_t *cont, u64 size) {
     assert(cont != NULL);
-    check(size > 0); 
+    check_value(size > 0); 
 
     if (size <= (cont->size - cont->index)) {
         void *current = (u8*)cont->start + cont->index;
@@ -42,7 +42,7 @@ void * arena_allocate(arena_t *cont, u64 size) {
 
     cont->next = arena_create(cont->size * 2);
 
-    check(cont->next != NULL);
+    check_value(cont->next != NULL);
 
     return arena_allocate(cont->next, size);
 }
@@ -79,12 +79,10 @@ void arena_tests(void) {
 
     arena_delete(arena);
     
-
     arena_t *arena2 = arena_create(10);
+    u8*      arr    = (u8*)arena_allocate(arena2, 10);
 
-    u8* arr = (u8*)arena_allocate(arena2, 10);
-
-    memcpy(arr, "hello 10", 10);
+    memcpy(arr, "hello 10!", 10);
 
     log_info(STR("arena: OK"), 0);
 }

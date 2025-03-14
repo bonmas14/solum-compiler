@@ -7,7 +7,7 @@
 analyzer_t *analyzer_create(arena_t *allocator) {
     analyzer_t *analyzer = (analyzer_t*)arena_allocate(allocator, sizeof(analyzer_t));
 
-    check(list_create(&analyzer->scopes, 100));
+    check_value(list_create(&analyzer->scopes, 100));
 
     u64 index = {};
     list_allocate(&analyzer->scopes, 1, &index);
@@ -17,7 +17,7 @@ analyzer_t *analyzer_create(arena_t *allocator) {
     global_scope->is_global    = true;
     global_scope->parent_scope = 0;
 
-    check(hashmap_create(&global_scope->scope, 100));
+    check_value(hashmap_create(&global_scope->scope, 100));
 
     return analyzer;
 }

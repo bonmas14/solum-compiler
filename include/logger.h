@@ -23,12 +23,12 @@ void log_error(u8 *text, u64 left_pad);
 
 void debug_break(void);
 
-#define check(value) {\
+#define check_value(value) {\
     if ((b32)(value) == false) {\
         u8 fname[256] = { __FILE__ };\
         u64 line = __LINE__;\
         u8 buffer[512];\
-        sprintf((char*)buffer, "check failed: %.256s, line: %zu", fname, line);\
+        sprintf((char*)buffer, "check failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
         log_error(buffer, 0);\
     }\
 }
@@ -40,7 +40,7 @@ void debug_break(void);
         u8 fname[256] = { __FILE__ };\
         u64 line = __LINE__;\
         u8 buffer[512];\
-        sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", fname, line);\
+        sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
         log_error(buffer, 0);\
         debug_break();\
     } \

@@ -1,3 +1,4 @@
+#include "compiler.h"
 #include "analyzer.h"
 #include "parser.h"
 #include "scanner.h"
@@ -27,18 +28,43 @@ enum expr_analyze_result_t {
     EXPR_VALID,
 };
 
-
 b32 analyze_unkn_stmt(compiler_t *compiler) {
     return compiler->is_valid;
 }
 
-b32 analyze_root_stmt(compiler_t *compiler) {
+b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
+    check_value(compiler != NULL);
+    check_value(root     != NULL);
+
+    if (root->type == AST_EMPTY)
+        return true;
+
+    if (root->type == AST_ERROR)
+        return false;
+
+    switch (root->subtype) {
+        case SUBTYPE_AST_UNKN_DEF:
+            break;
+
+        case SUBTYPE_AST_STRUCT_DEF:
+            break;
+
+        default:
+            log_error_token(STR("Expression or invalid type of statement"), compiler->scanner, root->token, 0);
+            return false;
+    }
+
     return compiler->is_valid;
 }
 
 b32 analyze_code(compiler_t *compiler) {
     for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
-        analyze_root_stmt(compiler);
+        ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
+
+        if (!analyze_root_stmt(compiler, node)) {
+            log_error(STR("Error"), 0);
+            return false;
+        }
     }
 
     return false;
