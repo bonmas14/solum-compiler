@@ -4,6 +4,14 @@
 #include "analyzer.h"
 #include "backend.h"
 
+void init_standart_types(list_t<types_t> *scope) {
+    // how? 
+    //
+
+
+    
+}
+
 analyzer_t *analyzer_create(arena_t *allocator) {
     analyzer_t *analyzer = (analyzer_t*)arena_allocate(allocator, sizeof(analyzer_t));
 
@@ -18,6 +26,11 @@ analyzer_t *analyzer_create(arena_t *allocator) {
     global_scope->parent_scope = 0;
 
     check_value(hashmap_create(&global_scope->scope, 100));
+    check_value(list_create(&global_scope->user_types_lookup_list, 100));
+
+    // populate hashmap with standart types
+
+    init_standart_types(&global_scope->user_types_lookup_list);
 
     return analyzer;
 }

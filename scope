@@ -11,6 +11,32 @@ BASIC POINTERS ARE NOT ARRAYS BY DEFAUT!
 But they can be accessed with []. But we also can override it!
 
 
+arr : [s32] = default;
+
+// transforms into
+
+arr = create_array_type(sizeof(s32));
+
+
+
+how to cast?
+
+// implicit conversions of extending types?
+// but explicit conversion after that
+
+a : s32;
+b : s64;
+u : f32;
+
+u = cast(f32) a + b; // like in jai
+
+
+
+u = (f32)a + (f32)b; // random shit like in C/C++
+
+
+
+
 LOCAL SCOPE:
 
 1. Minimal language:

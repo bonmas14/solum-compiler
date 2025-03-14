@@ -28,7 +28,11 @@ enum expr_analyze_result_t {
     EXPR_VALID,
 };
 
-b32 analyze_unkn_stmt(compiler_t *compiler) {
+b32 analyze_unkn_stmt(compiler_t *compiler, ast_node_t *node) {
+
+
+    // get name and register it 
+
     return compiler->is_valid;
 }
 
@@ -44,9 +48,22 @@ b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
 
     switch (root->subtype) {
         case SUBTYPE_AST_UNKN_DEF:
+
+            // we check for expressions
+
+            return analyze_unkn_stmt(compiler, root);
             break;
 
         case SUBTYPE_AST_STRUCT_DEF:
+            return false;
+            break;
+
+        case SUBTYPE_AST_UNION_DEF:
+            return false;
+            break;
+
+        case SUBTYPE_AST_ENUM_DEF:
+            return false;
             break;
 
         default:

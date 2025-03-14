@@ -28,11 +28,24 @@ struct scope_entry_t {
     };
 };
 
+enum type_flags_t {
+    TYPE_FLAG_ERROR  = 0x0, 
+    TYPE_FLAG_STRUCT = 0x1, 
+    TYPE_FLAG_UNION  = 0x2, 
+    TYPE_FLAG_ENUM   = 0x4, 
+    TYPE_FLAG_STD    = 0x8, 
+};
+
+struct types_t {
+    u32 type_flags;
+
+};
+
 struct scope_tuple_t {
     b32 is_global;
     u64 parent_scope;
     hashmap_t<scope_entry_t> scope;
-    list_t<string_t> user_types_lookup_list; 
+    list_t<types_t> user_types_lookup_list; 
 };
 
 struct analyzer_t {

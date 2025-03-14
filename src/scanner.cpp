@@ -137,7 +137,7 @@ static b32 process_string(scanner_t *state, token_t *token, arena_t *allocator) 
         //
         // we will parse it later
         if (ch == '\\') {
-            advance_char(state);
+            // advance_char(state);
         }
 
         i++;
@@ -153,12 +153,17 @@ static b32 process_string(scanner_t *state, token_t *token, arena_t *allocator) 
     identifier.size = i;
     identifier.data = (u8*)state->file.data + string_start;
 
-    u8 *data = (u8*)arena_allocate(allocator, identifier.size);
+    if (identifier.size != 0) {
+        u8 *data = (u8*)arena_allocate(allocator, identifier.size);
 
-    memcpy(data, identifier.data, identifier.size);
+        memcpy(data, identifier.data, identifier.size);
 
-    token->data.string.size = identifier.size;
-    token->data.string.data = data;
+        token->data.string.size = identifier.size;
+        token->data.string.data = data;
+    } else {
+        token->data.string.size = identifier.size;
+        token->data.string.data = NULL;
+    }
 
     return true;
 }
@@ -790,10 +795,10 @@ void get_token_name(u8 *buffer, token_t token) {
 void get_token_info(u8 *buffer, token_t token) {
     switch (token.type) {
         case TOKEN_CONST_INT:
-            sprintf((char*)buffer, "%zu", token.data.const_int);
+            sprintf((char*)buffer, "%zu", (size_t)token.data.const_int);
             break;
         case TOKEN_CONST_FP:
-            sprintf((char*)buffer, "%f", token.data.const_double);
+            sprintf((char*)buffer, "%lf", token.data.const_double);
             break;
         case TOKEN_CONST_STRING:
             sprintf((char*)buffer, "%s", "string");

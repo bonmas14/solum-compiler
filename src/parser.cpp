@@ -11,6 +11,7 @@
 // rewrite this parser to something normal that doesnt use BNF 
 // because it is too complicated
 
+ast_node_t parse_type(compiler_t *state);
 ast_node_t parse_expression(compiler_t *state);
 ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_struct_declaration(compiler_t *state, token_t *name);
@@ -562,8 +563,43 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
     return result;
 }
 
+ast_node_t parse_cast_exression(compiler_t *state) {
+    token_t    cast_token = {};
+    ast_node_t result     = {};
+
+    if (consume_token(TOK_CAST, state->scanner, &cast_token, state->string_allocator)) {
+        check_value(consume_token('(', state->scanner, NULL, state->string_allocator));
+        ast_node_t type = parse_type(state);
+        check_value(consume_token(')', state->scanner, NULL, state->string_allocator));
+
+        ast_node_t expr = parse_logic_or_expression(state);
+
+        result.type  = AST_BIN;
+        result.token = cast_token;
+
+        if (expr.type == AST_EMPTY) {
+            result.type = AST_ERROR;
+            log_error_token(STR("Error while parsing cast. No expression found."), state->scanner, result.token, 0);
+            return result;
+        }
+
+        result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+        *result.left  = type;
+
+        result.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+        *result.right = expr;
+
+        //create left 
+        //
+
+        return result;
+    }
+
+    return parse_logic_or_expression(state);
+}
+
 ast_node_t parse_separated_expressions(compiler_t *state) {
-    ast_node_t result = parse_logic_or_expression(state);
+    ast_node_t result = parse_cast_exression(state);
     if (result.type == AST_EMPTY) return result;
 
     // @todo change to an ast list later
@@ -670,7 +706,6 @@ ast_node_t parse_primary_type(compiler_t *state) {
 }
 
 
-// @todo dont forget about generics when creating type!
 ast_node_t parse_type(compiler_t *state) {
     ast_node_t result = {};
 

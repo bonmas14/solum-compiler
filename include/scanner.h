@@ -84,6 +84,8 @@ enum token_type_t {
     TOK_BOOL32,
     TOK_DEFAULT,
 
+    TOK_CAST,
+
     TOK_IF,
     TOK_ELSE,
     TOK_WHILE,
@@ -125,6 +127,8 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "b32", 
 
     "default",
+
+    "cast",
 
     "if", "else", "while", "for", "ret",
 

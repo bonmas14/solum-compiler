@@ -1,53 +1,3 @@
-
-first_struct : struct = {
-    what_a_sigma : s32;
-}
-
-
-Token : struct = {
-    type : u32;
-
-    c0 : u32;
-    c1 : u32;
-    l0 : u32;
-    l1 : u32;
-
-    data : union = {
-        const_int    : u64;
-        const_double : f64;
-        string       : String;
-    };
-}
-
-Ast_Node : struct = {
-    type    : s32;
-    subtype : s32;
-
-    token  : Token;
-
-    left   : ^Ast_Node;
-    center : ^Ast_Node;
-    right  : ^Ast_Node;
-
-    start : ^Ast_Node;
-    next  : ^Ast_Node;
-    child_count : u64;
-}
-
-
-test_of_no_args_func : () = {
-    test_of_no_args_func();
-}
-
-function_that_just_returns : (a : s32, b : s32) -> s32 = {
-    a, b = b, a; // not supported in C++ so we need to change that
-                 // we will do that on analyze step 
-}
-
-test_for_multiple_dots_access_inside : (var : s32) = {
-    var.a.b.c.d; 
-}
-
 c_string_length : (c_string : ^u8) -> u64 = {
     current_pos : ^u8 = c_string;
 
@@ -60,7 +10,7 @@ c_string_length : (c_string : ^u8) -> u64 = {
 }
 
 get_string : (c_string : ^u8) -> String = {
-    str : string_t = default;
+    str : String = default;
 
     // we cant automatically dereference
     // thats also what we do on analyzer step,
@@ -79,9 +29,10 @@ main : (argc : Int, argv : ^^ Char) -> Int = {
         ret -1;
     }
 
-    str : String = get_string(argv[0]);
+    str : String = get_string(cast(^u8) argv[0]);
+
+    printf(cast(^Char)("%.*s"), cast(Int)str.size, cast(^Char) str.data);
+    puts(cast(^Char)(""));
 
     ret str.size;
 }
-
-

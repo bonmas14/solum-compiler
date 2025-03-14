@@ -207,6 +207,15 @@ void generate_expression_token(compiler_t *compiler, token_t token) {
 }
 
 void generate_expression(compiler_t *compiler, ast_node_t *expression) {
+    if (expression->token.type == TOK_CAST) {
+        fprintf(compiler->codegen->file, "(");
+        generate_type(compiler, expression->left);  
+        fprintf(compiler->codegen->file, ")");
+
+        generate_expression(compiler, expression->right);
+        return;
+    }
+
     assert(expression->subtype == SUBTYPE_AST_EXPR);
 
     switch (expression->type) {
