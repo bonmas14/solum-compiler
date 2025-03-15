@@ -16,5 +16,6 @@ obj
 *.out
 
 /temp/output.cpp
+/temp/main
 /output.cpp
 /temp/output.ir
