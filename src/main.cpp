@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "stddefines.h"
 #include "scanner.h"
 #include "parser.h"
@@ -6,13 +7,6 @@
 #include "area_alloc.h"
 #include "arena.h"
 #include "hashmap.h"
-
-#ifdef _WIN32
-#include <conio.h>
-#include <windows.h>
-#else 
-#include <stdio.h>
-#endif
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c)
