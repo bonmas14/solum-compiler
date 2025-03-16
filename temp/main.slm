@@ -20,18 +20,41 @@ State : struct = {
 ;
 // allocate : (size : u64) -> ^s = { } 
 
-main : () -> Int = {
-    puts(cast(^Char)"Hello!");
 
+// we need ',' in cases:
+
+// calling functions
+    // calling_funciton(a,b,c,d,e,f);
+
+// function definition returns
+    // f : () -> s32, s32 = {}
+
+// expressions? 
+    // there could be only one '=' if we do ','
+    // a, b = b, a;
+    // a, b = 3, 1;
+
+// return statements (through expressions, currently)
+    // return a, b;
+
+// initialization?
+    // a, b : s32 = 1, 2;
+
+
+main : () -> Int = {
     gol : State = create_state(32, 32);
 
-    ret 0;
+
+    // this is doesnt work but we will check
+    a, b : s32 = 1000;
+
+    return 0;
 }
 
 create_state : (w : u32, h : u32) -> State, b32 = {
     state : State = default;
 
-    state.buffer = cast(u8) calloc(1, w * h);
+    state.buffer = cast(^u8) calloc(1, w * h);
     
     if (gol.buffer == default) {
         return default, false;

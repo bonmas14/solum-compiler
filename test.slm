@@ -6,7 +6,7 @@ c_string_length : (c_string : ^u8) -> u64 = {
         current_pos = current_pos + 1;
     }
 
-    ret current_pos - c_string;
+    return current_pos - c_string;
 }
 
 get_string : (c_string : ^u8) -> String = {
@@ -21,18 +21,18 @@ get_string : (c_string : ^u8) -> String = {
     str.size = c_string_length(c_string);
     str.data = c_string;
 
-    ret str;
+    return str;
 }
 
 main : (argc : Int, argv : ^^ Char) -> Int = {
     if (argc < 1) {
-        ret -1;
+        return -1;
     }
 
     str : String = get_string(cast(^u8) argv[0]);
 
-    printf(cast(^Char)("%.*s"), cast(Int)str.size, cast(^Char) str.data);
+    printf(cast(^Char)("%.*s"), cast(Int) str.size, cast(^Char) str.data);
     puts(cast(^Char)(""));
 
-    ret str.size;
+    return str.size;
 }

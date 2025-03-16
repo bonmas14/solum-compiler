@@ -1,6 +1,10 @@
 #define SCANNER_DEFINITION
 #include "scanner.h"
 
+
+// @todo for scanner:
+// create string builder and replace all of defines
+
 typedef enum {
     PARSE_DIGIT_INT,
     PARSE_HEX_INT,
@@ -244,7 +248,7 @@ static b32 char_is_typed_digit(int_parsing_params parse_type, u8 ch) {
 
 static b32 parse_const_integer(scanner_t *state, string_t *buffer, token_t *token, int_parsing_params parse_type) {
     u64 index = 0;
-    u8 ch     = peek_char(state);
+    u8  ch    = peek_char(state);
 
     while (ch != 0) {
         if (!char_is_typed_digit(parse_type, ch))
@@ -310,6 +314,8 @@ static b32 process_number(scanner_t *state, token_t *token) {
 
     if (!parse_const_integer(state, &not_parsed_constant, token, type)) {
         token->type = TOKEN_ERROR; 
+
+        log_error(STR("Couldn't parse integer."), 0);
 
         return false;
     }
@@ -523,6 +529,7 @@ token_t advance_token(scanner_t *state, arena_t *allocator) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
             } else {
+                log_error(STR("Unexpected symbol in code."), 0);
                 token.type = TOKEN_ERROR;
             }
         } break;
@@ -735,7 +742,7 @@ void get_token_name(u8 *buffer, token_t token) {
         case TOK_FOR:
             sprintf((char*)buffer, "%s", "keyword for");
             break;
-        case TOK_RET:
+        case TOK_RETURN:
             sprintf((char*)buffer, "%s", "keyword ret");
             break;
         case TOK_PROTOTYPE:
@@ -822,25 +829,21 @@ void print_token_info(token_t token, u64 left_pad) {
 }
 
 void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad) {
-    if (token.type == TOKEN_ERROR || token.type == TOKEN_EOF) {
-        return;
-    }
+    assert(token.type != TOKEN_ERROR);
+    assert(token.type != TOKEN_EOF);
 
-    u64 start_line = token.l0 - 2;
-
-    if (start_line > token.l0) {
-        start_line = 0;
+    u64 start_line = 0;
+    if (token.l0 >= 2) {
+        start_line = token.l0 - 2;
     }
 
     u64 stop_line = token.l1 + 1; 
-    b32 add_newline = false;
+
+    b32 cancel_empty_line_skip = false;
 
     if (stop_line > state->lines.count) {
         stop_line = state->lines.count;
-        add_newline = true;
     }
-
-    b32 cancel_skip = false;
 
     for (u64 i = start_line; i < stop_line; i++) {
         line_tuple_t line = *list_get(&state->lines, i);
@@ -853,19 +856,16 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
         for (u64 j = 0; j < len; j++) {
             if (*(start + j) != ' ' && *(start + j) != '\n' && *(start + j) != '\r') {
                 skip_line   = false;
-                cancel_skip = true;
+                cancel_empty_line_skip = true;
             }
         }
         
-        if (!cancel_skip && skip_line && i < token.l0) { 
-            cancel_skip = true;
+        if (!cancel_empty_line_skip && skip_line && i < token.l0) { 
+            cancel_empty_line_skip = true;
             continue;
         }
 
-        for (u64 j = 0; j < left_pad; j++) {
-            log_update_color();
-            fprintf(stderr, " ");
-        }
+        log_write(STR(""), left_pad);
 
         if (i < token.l0 || i > token.l1) {
             log_update_color();
@@ -884,7 +884,6 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
                     log_update_color();
                     fprintf(stderr, "| %.*s", (int)token.c0, start);
                     len -= token.c0;
-
                     fprintf(stderr, "%.*s", (int)len, start + token.c0);
                     log_pop_color();
                 } else if (i == token.l1) {
@@ -916,8 +915,8 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
         }
     }
 
-    if (add_newline) {
-        fprintf(stderr, "\n");
+    if (stop_line == state->lines.count) {
+        log_write(STR("\n"), 0);
     }
 }
 
@@ -927,7 +926,7 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
 
     log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR(""), left_pad);
+    log_write(STR("\n"), left_pad);
 
     log_pop_color();
     log_pop_color();
@@ -942,7 +941,7 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
 
     log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR(""), left_pad);
+    log_write(STR("\n"), left_pad);
 
     log_pop_color();
     log_pop_color();
@@ -956,7 +955,7 @@ void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
 
     log_push_color(255, 255, 255);
     print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR(""), left_pad);
+    log_write(STR("\n"), left_pad);
 
     log_pop_color();
     log_pop_color();

@@ -1,15 +1,11 @@
 #include "parser.h"
 
-// @todo
+// @todo for parser:
+// rewrite expression parser, because it is too complex and plain
 //
-// 1. parse this file
-// 2. create export/import tables
-// 3. parse all files from import table = go to 1 for all new files
-// 4. analyze types and finish parsing
-// 5. codegen
-
-// rewrite this parser to something normal that doesnt use BNF 
-// because it is too complicated
+// @note:
+// we need to process all errors on the spot,
+// but if it is trailing error, we dont append any logs
 
 ast_node_t parse_type(compiler_t *state);
 ast_node_t parse_expression(compiler_t *state);
@@ -217,7 +213,6 @@ ast_node_t parse_unary(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = parse_function_call(state);
@@ -257,7 +252,6 @@ ast_node_t parse_shift(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -293,7 +287,6 @@ ast_node_t parse_and(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -329,7 +322,6 @@ ast_node_t parse_or(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -365,7 +357,6 @@ ast_node_t parse_xor(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -404,7 +395,6 @@ ast_node_t parse_mul(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -441,7 +431,6 @@ ast_node_t parse_add(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -481,7 +470,6 @@ ast_node_t parse_compare_expression(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -517,7 +505,6 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -553,7 +540,6 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
         default: {
             result = left;
@@ -655,7 +641,6 @@ ast_node_t parse_expression(compiler_t *state) {
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
             result.type = AST_ERROR;
-            log_error_token(STR("Parser: Error token"), state->scanner, token, 0);
         } break;
 
         default: {
@@ -975,7 +960,6 @@ ast_node_t parse_declaration_type(compiler_t *state) {
     node.token = token;
 
     switch (token.type) {
-        case '<':
         case '(': { 
             node = parse_function_type(state);
         } break;
@@ -992,10 +976,74 @@ ast_node_t parse_declaration_type(compiler_t *state) {
     return node;
 }
 
+ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
+    log_error(STR("multiple variable declaration doesnt work currently. so please dont use it"), 0);
+    ast_node_t node = {};
+    return node;
+
+    node.type    = AST_TERN; 
+    node.subtype = SUBTYPE_AST_UNKN_DEF;
+
+    // parse_multiple_types
+    ast_node_t type = parse_declaration_type(state);
+
+    if (type.type == AST_ERROR) {
+        node.type = AST_ERROR;
+        panic_skip(state);
+        return node;
+    }
+
+    if (type.token.type == TOKEN_GEN_FUNC_DEF) {
+        node.type = AST_ERROR;
+        log_error_token(STR("You can't define multiple funcitons in same statement."), state->scanner, type.token, 0);
+        panic_skip(state);
+        return node;
+    }
+
+    // left is our type, right is our expression (or multiple), center is variables
+
+    node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+    *node.left = type;
+
+    node.center  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+    *node.center = *expr;
+
+ 
+    // a, b : s32, s64 = ;
+
+
+    if (peek_token(state->scanner, state->string_allocator).type == ';') {
+        node.type = AST_BIN; // ????  it will break how we handle Binary definitions
+        return node;
+    }
+
+    if (!consume_token('=', state->scanner, NULL, state->string_allocator)) {
+        node.type = AST_ERROR;
+        log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
+        panic_skip(state);
+        return node;
+    }
+    
+    ast_node_t data = parse_expression(state);
+
+    if (data.type == AST_ERROR || data.type == AST_EMPTY) {
+        node.type = AST_ERROR;
+        panic_skip(state);
+        return node;
+    }
+
+    node.right  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+    *node.right = data;
+
+    return node;
+}
+
 ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
     ast_node_t node = {};
-    node.token      = *name;
-    node.type       = AST_BIN; 
+
+    node.type    = AST_BIN; 
+    node.subtype = SUBTYPE_AST_UNKN_DEF;
+    node.token   = *name;
 
     ast_node_t type = parse_declaration_type(state);
 
@@ -1007,8 +1055,6 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
 
     node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     *node.left = type;
-
-    node.subtype = SUBTYPE_AST_UNKN_DEF;
 
     if (peek_token(state->scanner, state->string_allocator).type == ';') {
         node.type = AST_UNARY; 
@@ -1137,6 +1183,19 @@ ast_node_t parse_statement(compiler_t *state) {
                 ignore_semicolon = true;
             } break;
         }
+    } else if (name.type == TOKEN_IDENT && next.type == ',') {
+        ast_node_t expr = parse_expression(state);
+        assert(expr.type != AST_EMPTY);
+
+        next = peek_token(state->scanner, state->string_allocator);
+
+        if (next.type == ':') {
+            advance_token(state->scanner, state->string_allocator);
+            node = parse_multiple_var_declaration(state, &expr);
+        } else {
+            node = expr;
+        }
+
     } else switch (name.type) {
         case  '{': {
             ignore_semicolon = true;
@@ -1196,7 +1255,7 @@ ast_node_t parse_statement(compiler_t *state) {
             *node.right = stmt;
         } break;
 
-        case TOK_RET: {
+        case TOK_RETURN: {
             node.type    = AST_UNARY;
             node.subtype = SUBTYPE_AST_RET_STMT;
             node.token   = advance_token(state->scanner, state->string_allocator);
@@ -1218,10 +1277,7 @@ ast_node_t parse_statement(compiler_t *state) {
         if (!consume_token(';', state->scanner, &semicolon, state->string_allocator)) {
             node.type = AST_ERROR;
 
-            node.token.c1 = semicolon.c1;
-            node.token.l1 = semicolon.l1;
-
-            log_error_token(STR("Missing semicolon after statement."), state->scanner, node.token, 0);
+            log_error_token(STR("We expected semicolon after this token."), state->scanner, node.token, 0);
             panic_skip(state);
         }
     }

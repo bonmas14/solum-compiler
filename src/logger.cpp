@@ -1,21 +1,27 @@
 #include "logger.h"
 
-#define LOGGER_COLOR_STACK_SIZE 128
+#define LOGGER_COLOR_STACK_SIZE 256
 
+static b32 update_requested;
 static u32 current_index;
 static u32 stack[LOGGER_COLOR_STACK_SIZE];
 
 void log_push_color(u8 r, u8 g, u8 b) {
     stack[current_index] = r | (g << 8) | (b << 16);
     current_index = (current_index + 1) % LOGGER_COLOR_STACK_SIZE;
+    update_requested = true;
 }
 
 void log_pop_color(void) {
     current_index = (current_index - 1) % LOGGER_COLOR_STACK_SIZE;
     stack[current_index] = 0;
+    update_requested = true;
 }
 
 void log_update_color(void) {
+    if (!update_requested) return;
+    update_requested = false;
+
     u32 index = (current_index - 1) % LOGGER_COLOR_STACK_SIZE;
 
     u8 r = stack[index];
@@ -32,7 +38,7 @@ void add_left_pad(FILE * file, u64 amount) {
 void log_write(u8 *text, u64 left_pad) {
     add_left_pad(stderr, left_pad);
     log_update_color();
-    fprintf(stderr, "%s\n", text);
+    fprintf(stderr, "%s", text);
 }
 
 void log_info(u8 *text, u64 left_pad) {

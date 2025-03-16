@@ -7,7 +7,7 @@ vim.api.nvim_create_autocmd("BufRead", {
     -- Define keywords and other syntax elements
     vim.cmd([[
       syntax match slmIdent /[A-Za-z_]\w*/
-      syntax keyword slmKeyword ret if else while for module use prototype external struct union enum cast default
+      syntax keyword slmKeyword return if else while for module use prototype external struct union enum cast default
       syntax keyword slmType  u8 u16 u32 u64 s8 s16 s32 s64 b32 f32 f64 
       syntax match slmType /\v[A-Z][a-z0-9]*(_[A-Z][a-z0-9]*)*\v/
     ]])

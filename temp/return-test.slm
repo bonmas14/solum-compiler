@@ -1,0 +1,8 @@
+mul_rets : () -> s32, s32 = {
+    a : s32 = 1;
+    b : s32 = 4;
+
+    if (true) {
+        return default, false;
+    }
+}
