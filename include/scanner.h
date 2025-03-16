@@ -24,7 +24,6 @@ struct scanner_t {
     u64 current_char;
 
     list_t<line_tuple_t> lines; 
-    b32 is_dynamic;
     string_t file;
 }; 
 

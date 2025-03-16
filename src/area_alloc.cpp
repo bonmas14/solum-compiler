@@ -3,12 +3,12 @@
 void list_tests(void) {
     list_t<u64> list = {};
 
-    list_create(&list, 100);
+    list_create(&list, 3);
 
     assert(list.data != 0);
     assert(list.count == 0);
-    assert(list.raw_size == 100);
-    assert(list.grow_size == 200);
+    assert(list.current_size == 3);
+    assert(list.grow_size == 6);
 
     u64 data1 = 404;
     u64 data2 = 804;
@@ -22,8 +22,14 @@ void list_tests(void) {
     assert(data2 == *list_get(&list, 1));
     assert(data3 == *list_get(&list, 2));
 
+    // adding multiple elements + there will be allocation inside
     u64 index = 0;
     list_allocate(&list, 100, &index);
+
+    // checking if allocating didnt erase all of the values
+    assert(data1 == *list_get(&list, 0));
+    assert(data2 == *list_get(&list, 1));
+    assert(data3 == *list_get(&list, 2));
 
     u64 test[100];
     memset(test, 0xab, 100);

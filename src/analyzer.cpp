@@ -23,10 +23,14 @@
     // block in general := structure is not allowed if it is not an function def
 
 
-enum expr_analyze_result_t {
-    EXPR_GENERAL_ERROR,
-    EXPR_VALID,
-};
+
+// It is just check of all top-level symbols only after 
+// it resolved we start to generate IR and when we generate IR
+// we typecheck. Easy!
+//
+// So we just need to create global hashtable and after that 
+// when we will be generating IR we will generate all of the other things
+// like lambdas?
 
 b32 analyze_unkn_stmt(compiler_t *compiler, ast_node_t *node) {
 
@@ -48,9 +52,6 @@ b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
 
     switch (root->subtype) {
         case SUBTYPE_AST_UNKN_DEF:
-
-            // we check for expressions
-
             return analyze_unkn_stmt(compiler, root);
             break;
 

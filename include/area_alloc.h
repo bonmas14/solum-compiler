@@ -44,7 +44,7 @@ struct list_t {
     u64 count;
     DataType *data;
 
-    u64 raw_size;
+    u64 current_size;
     u64 grow_size;
 };
 
@@ -88,7 +88,7 @@ b32 list_grow_fit(list_t<DataType> *area);
 template<typename DataType>
 b32 list_create(list_t<DataType> *container, u64 init_size) {
     container->count     = 0;
-    container->raw_size  = init_size;
+    container->current_size  = init_size;
     container->grow_size = init_size * 2;
     container->data      = (DataType*)ALLOC(init_size * sizeof(DataType));
 
@@ -189,12 +189,12 @@ b32 list_grow(list_t<DataType> *area) {
 
     (void)memset(data, 0, area->grow_size * sizeof(DataType));
 
-    (void)memcpy(data, area->data, area->raw_size);
+    (void)memcpy(data, area->data, area->current_size * sizeof(DataType));
 
     FREE(area->data);
     area->data = data;
-    area->raw_size  = area->grow_size;
-    area->grow_size = area->raw_size * 2;
+    area->current_size  = area->grow_size;
+    area->grow_size = area->current_size * 2;
 
     return true;
 }
@@ -203,10 +203,10 @@ template<typename DataType>
 b32 list_grow_fit(list_t<DataType> *area, u64 fit_elements) {
     assert(fit_elements > 0);
 
-    if ((area->count + fit_elements - 1) < area->raw_size) {
+    if ((area->count + fit_elements - 1) < area->current_size) {
         return true;
     } else {
-        while ((area->count + fit_elements) >= area->raw_size) {
+        while ((area->count + fit_elements) >= area->current_size) {
             if (!list_grow(area)) {
                 return false;
             }
