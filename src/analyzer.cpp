@@ -28,58 +28,62 @@ enum expr_analyze_result_t {
     EXPR_VALID,
 };
 
-b32 analyze_unkn_stmt(compiler_t *compiler, ast_node_t *node) {
-
-
+b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
     // get name and register it 
-
     return compiler->is_valid;
 }
 
 b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
-    check_value(compiler != NULL);
-    check_value(root     != NULL);
+    assert(compiler != NULL);
+    assert(root     != NULL);
 
     if (root->type == AST_EMPTY)
         return true;
 
-    if (root->type == AST_ERROR)
+    if (root->type == AST_ERROR) {
+        log_error(STR("Got unexpected value @error"), 0);
+        assert(false);
         return false;
+    }
 
     switch (root->subtype) {
         case SUBTYPE_AST_UNKN_DEF:
-
-            // we check for expressions
-
-            return analyze_unkn_stmt(compiler, root);
-            break;
+            return analyze_unkn_def(compiler, root);
 
         case SUBTYPE_AST_STRUCT_DEF:
-            return false;
             break;
 
         case SUBTYPE_AST_UNION_DEF:
-            return false;
             break;
 
         case SUBTYPE_AST_ENUM_DEF:
-            return false;
+            break;
+
+        case SUBTYPE_AST_EXPR:
+            log_error_token(STR("Expression is not valid construct in global scope."), compiler->scanner, root->token, 0);
             break;
 
         default:
-            log_error_token(STR("Expression or invalid type of statement"), compiler->scanner, root->token, 0);
-            return false;
+            log_error_token(STR("Wrong type of construct in global scope."), compiler->scanner, root->token, 0);
+            assert(false);
+            break;
     }
 
-    return compiler->is_valid;
+    return false;
 }
+
+// first thing we do is add all of symbols in table
+// then we can set 'ast_node_t.analyzed' to 'true'
+// and then we can already analyze the code
 
 b32 analyze_code(compiler_t *compiler) {
     for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
 
         if (!analyze_root_stmt(compiler, node)) {
-            log_error(STR("Error"), 0);
+            // we got error there
+            // it was already reported
+            // so we just quit
             return false;
         }
     }

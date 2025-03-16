@@ -7,6 +7,7 @@
 struct ast_node_t {
     s32 type;
     s32 subtype;
+    b32 analyzed;
 
     token_t token;
 
@@ -16,6 +17,7 @@ struct ast_node_t {
 
     ast_node_t *list_next;
     ast_node_t *list_start;
+
     u64 child_count;
 };
 
