@@ -32,9 +32,83 @@
 // when we will be generating IR we will generate all of the other things
 // like lambdas?
 
+/*
+b32 analyze_type(compiler_t *compiler, ast_node_t *node) {
+    assert(node.type != AST_ERROR);
+
+    switch (node.subtype) {
+        case SUBTYPE_AST_STD_TYPE:
+        case SUBTYPE_AST_AUTO_TYPE:
+            return true;
+            
+        case SUBTYPE_AST_UNKN_TYPE:
+            hashmap_contains();
+            break;
+
+        case SUBTYPE_AST_FUNC_TYPE:
+            break;
+        case SUBTYPE_AST_ARR_TYPE:
+            break;
+        case SUBTYPE_AST_PTR_TYPE:
+            break;
+
+        default:
+            log_error(STR("Not supported yet."), 0);
+            break;
+    }
+}
+*/
+
 b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
-    // get name and register it 
-    return compiler->is_valid;
+    scope_tuple_t *scope = list_get(&compiler->analyzer->scopes, 0); // @todo replace to variable if need
+
+    assert(scope->is_global);
+
+    string_t key = node->token.data.string;
+
+    if (hashmap_contains(&scope->table, key)) {
+        return false;
+    } else {
+        scope_entry_t entry = {};
+        ast_node_t *type = node->left;
+
+        // b32 result = analyze_type(compiler, node->left);
+
+        entry.node = node;
+
+        if (node->right->subtype == AST_BLOCK_IMPERATIVE) {
+            entry.type = ENTRY_FUNC;
+            // entry.func = ;
+        } else if (node->right->subtype == SUBTYPE_AST_EXPR) {
+            check_value(type->subtype == SUBTYPE_AST_STD_TYPE || type->subtype == SUBTYPE_AST_AUTO_TYPE || type->subtype == SUBTYPE_AST_UNKN_TYPE);
+            // process type somehow
+
+            entry.type = ENTRY_VAR;
+            entry.var.is_const = false;
+
+        } else assert(false);
+
+        // entry.var.type = 
+
+        
+
+
+        hashmap_add(&scope->table, key, &entry);
+    }
+
+    /*
+    if (node->type == AST_BIN || node->type == AST_UNARY) {
+        
+
+        scope->table
+
+    } else if (node->type == AST_TERN) { 
+        
+    }
+
+    */
+
+    return false;
 }
 
 b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
@@ -83,6 +157,8 @@ b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
 b32 analyze_code(compiler_t *compiler) {
     for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
+
+        if (node->analyzed) continue;
 
         if (!analyze_root_stmt(compiler, node)) {
             // we got error there

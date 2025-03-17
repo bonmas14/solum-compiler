@@ -15,26 +15,9 @@
 
 #define MAX_HASHMAP_LOAD 0.75
 
-// -------------------- 
-//
-//  Simple hashmap for using in compiler.
-//  Never using arrays inside again
-//                                     - bonmas14 (25.02.2025)
-//
-//  Full interface:
-//
-//   b32  hashmap_create(hashmap_t *container, u64 init_size);
-//   void hashmap_delete(hashmap_t *map);
-//
-//   b32 hashmap_add(hashmap_t *map, string_t key, T *value);
-//   T * hashmap_get(hashmap_t *map, string_t key);
-//   b32 hashmap_remove(hashmap_t   *map, string_t key);
-//   b32 hashmap_contains(hashmap_t *map, string_t key);
-//
-// -------------------- 
-
 struct hash_entry_t {
     string_t name;
+
     b32 occupied;
     b32 deleted;
 };

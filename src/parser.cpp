@@ -979,6 +979,7 @@ ast_node_t parse_declaration_type(compiler_t *state) {
 ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
     log_error(STR("multiple variable declaration doesnt work currently. so please dont use it"), 0);
     ast_node_t node = {};
+    node.token = expr->token;
     return node;
 
     node.type    = AST_TERN; 

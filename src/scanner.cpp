@@ -925,6 +925,7 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
+    log_write(STR("\n"), left_pad);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR("\n"), left_pad);
 
@@ -940,6 +941,7 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
+    log_write(STR("\n"), left_pad);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR("\n"), left_pad);
 
@@ -954,6 +956,7 @@ void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
+    log_write(STR("\n"), left_pad);
     print_decorated_lines_of_code(state, token, left_pad);
     log_write(STR("\n"), left_pad);
 
