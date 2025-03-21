@@ -1,8 +1,13 @@
 #ifndef USER_DEFINES
 #define USER_DEFINES
 
+
+#define KB(s) ((u64)(s) * 1024LL)
+#define MB(s) (KB(s) * 1024LL)
+#define GB(s) (MB(s) * 1024LL)
+
 // @todo: should be platform specific
-#define PAGE_SIZE ((u64)4096)
+#define PG(s) ((u64)(s) * KB(4))
 
 #include <stddef.h>
 #include <stdint.h>
@@ -34,7 +39,7 @@ struct string_t {
 struct arena_t;
 extern arena_t * default_allocator;
 
-#define STR(s) (u8[]) { s }
+#define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 
 #define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }
 

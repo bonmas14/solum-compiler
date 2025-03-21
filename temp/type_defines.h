@@ -28,9 +28,9 @@ struct String {
     u8 *data;
 };
 
-#define __internal_STR(s) (u8[]) { s }
+#define __internal_STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 
-#define __internal_STRING(s) (String) { .size = sizeof(s), .data = STR(s) }
+// #define __internal_STRING(s) (String) { .size = sizeof(s), .data = STR(s) }
 
 #define Char char
 #define Int int

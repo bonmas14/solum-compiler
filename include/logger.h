@@ -46,7 +46,7 @@ void debug_break(void);
     } \
 }
 #else 
-#define assert(result)
+#define assert(...)
 #endif
 
 // @todo log_token also should be here

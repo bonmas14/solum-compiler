@@ -67,3 +67,28 @@ void log_error(u8 *text, u64 left_pad) {
     fprintf(stderr, "ERROR: %s\n", text);
     log_pop_color();
 }
+
+/*
+string_t string_concat(string_t a, string_t b) {
+    assert(default_allocator != NULL);
+    assert(a.data != NULL);
+    assert(b.data != NULL);
+
+    // @todo: change all allocators to one interface.
+    // right now we know that we use memory allocation 
+    temp_allocate(a.size + b.size);
+
+
+}
+
+string_t log_sprintf(string_t string, void * data, ...) {
+    va_list parameters;
+
+    va_start(parameters, data);
+    
+    long p1 = va_arg(parameters, char);
+    va_arg(parameters, long long);
+
+    va_end();
+}
+*/

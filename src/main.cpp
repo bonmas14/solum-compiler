@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include "stddefines.h"
+
 #include "scanner.h"
 #include "parser.h"
 #include "analyzer.h"
 #include "backend.h"
+
 #include "area_alloc.h"
+#include "temp_allocator.h"
 #include "arena.h"
 #include "hashmap.h"
 
@@ -35,25 +38,28 @@ void print_node(compiler_t *compiler, ast_node_t* node, u32 depth) {
 }
 
 void debug_tests(void) {
-#ifdef DEBUG
     hashmap_tests();
     list_tests();
     arena_tests();
-#endif
+    temp_tests();
 }
 
-int main(int argc, char **argv) {
+#ifdef NDEBUG
+#define debug_tests(...)
+#endif
 
+int main(int argc, char **argv) {
     debug_tests();
+
+    temp_init(PG(32));
+
     log_push_color(255, 255, 255);
 
-    default_allocator   = arena_create(PAGE_SIZE * 10);
+    default_allocator   = arena_create(PG(10));
     compiler_t compiler = create_compiler_instance();
 
-
     string_t file = {};
-
-    u8* filename = NULL;
+    u8* filename  = NULL;
 
     if (argc <= 1) {
         filename = STR("test.slm");
@@ -61,7 +67,7 @@ int main(int argc, char **argv) {
         filename = (u8*)argv[1];
     }
 
-    if (!read_file_into_string(filename, &file)) {
+    if (!read_file_into_string((u8*)filename, &file)) {
         log_error(STR("Main: couldn't open file."), 0);
         return -1;
     }
