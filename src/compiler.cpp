@@ -25,7 +25,7 @@ analyzer_t *analyzer_create(arena_t *allocator) {
     global_scope->is_global    = true;
     global_scope->parent_scope = 0;
 
-    check_value(hashmap_create(&global_scope->scope, 100));
+    check_value(hashmap_create(&global_scope->table, 100));
     check_value(list_create(&global_scope->user_types_lookup_list, 100));
 
     // populate hashmap with standart types
