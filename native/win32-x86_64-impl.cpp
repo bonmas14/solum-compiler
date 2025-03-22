@@ -99,7 +99,7 @@ void generate_type(compiler_t *compiler, ast_node_t *type) {
 
                     generate_type(compiler, next);
 
-                    fprintf(compiler->codegen->file, " rval%zu", i);
+                    fprintf(compiler->codegen->file, " rval%zu", (size_t)i);
                     next = next->list_next;
                 }
                 fprintf(compiler->codegen->file, "}");
@@ -143,7 +143,7 @@ void print_primary_value(compiler_t *compiler, token_t token) {
             fprintf(compiler->codegen->file, "%f", token.data.const_double);
             break;
         case TOKEN_CONST_INT:
-            fprintf(compiler->codegen->file, "%zu", token.data.const_int);
+            fprintf(compiler->codegen->file, "%zu", (size_t)token.data.const_int);
             break;
         case TOKEN_CONST_STRING:
             fprintf(compiler->codegen->file, "__internal_STR(\"%.*s\")", (int)token.data.string.size, token.data.string.data);

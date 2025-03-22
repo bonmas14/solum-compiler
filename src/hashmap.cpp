@@ -15,20 +15,56 @@ u32 get_hash(u64 size, void *data) {
     return hash;
 }
 
-u32 get_string_hash(string_t symbol) {
-    assert(symbol.data != NULL);
-    return get_hash(symbol.size, (void*)symbol.data);
+COMPUTE_HASH(get_hash_std) {
+    assert(key != NULL);
+    assert(size > 0);
+
+    return get_hash(size, key);
 }
 
-b32 compare_strings(string_t a, string_t b) {
-    if (a.size != b.size) return false;
+COMPARE_KEYS(compare_keys_std) {
+    assert(a != NULL);
+    assert(b != NULL);
 
-    b32 hash_comp = get_string_hash(a) == get_string_hash(b);
+    if (a_size != b_size) return false;
+
+    b32 hash_comp = get_hash_std(a_size, a) == get_hash_std(b_size, b);
 
     if (!hash_comp) return hash_comp;
 
-    for (u64 i = 0; i < a.size; i++) {
-        if (a.data[i] != b.data[i]) {
+    for (u64 i = 0; i < a_size; i++) {
+        if (((u8*)a)[i] != ((u8*)b)[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+COMPUTE_HASH(get_string_hash) {
+    assert(key != NULL);
+    assert(size > 0);
+
+    string_t *symbol = (string_t*)key;
+    assert(symbol->data != NULL);
+    return get_hash(symbol->size, (void*)symbol->data);
+}
+
+COMPARE_KEYS(compare_string_keys) {
+    assert(a != NULL);
+    assert(b != NULL);
+
+    string_t a_str = *(string_t*)a;
+    string_t b_str = *(string_t*)b;
+
+    if (a_str.size != b_str.size) return false;
+
+    b32 hash_comp = get_string_hash(a_size, a) == get_string_hash(b_size, b);
+
+    if (!hash_comp) return hash_comp;
+
+    for (u64 i = 0; i < a_str.size; i++) {
+        if (a_str.data[i] != b_str.data[i]) {
             return false;
         }
     }
@@ -38,50 +74,85 @@ b32 compare_strings(string_t a, string_t b) {
 
 
 void hashmap_tests(void) {
-    hashmap_t<u32> map = {};
+    {
+        hashmap_t<string_t, u32> map = {};
 
-    b32 result = hashmap_create(&map, 256);
+        b32 result = hashmap_create(&map, 256, get_string_hash, compare_string_keys);
 
-    assert(result);
-    map.capacity = 3;
+        assert(result);
+        map.capacity = 3;
+
+        u8 name1[] = { "hashmap1" };
+        u8 name2[] = { "hashmap2" };
+
+        string_t key1 = (string_t){ .size = sizeof(name1), .data = name1 };
+        string_t key2 = (string_t){ .size = sizeof(name2), .data = name2 };
+
+        u32 size = 8;
+
+        void* ref;
+
+        ref = hashmap_get(&map, key1);
+        assert(ref == NULL);
+
+        assert(hashmap_add(&map, key1, &size));
+        ref = hashmap_get(&map, key1);
+        assert(ref != NULL);
+
+        assert(hashmap_add(&map, key2, &size));
+
+        ref = hashmap_get(&map, key2);
+        assert(ref != NULL);
+
+        assert(!hashmap_add(&map, key2, &size));
+
+        assert(hashmap_contains(&map, key1));
+        assert(hashmap_contains(&map, key2));
+
+        assert(hashmap_remove(&map, key1));
+        assert(!hashmap_contains(&map, key1));
+
+        assert(hashmap_remove(&map, key2));
+        assert(!hashmap_contains(&map, key2));
+
+        assert(hashmap_add(&map, key1, &size));
+        assert(hashmap_contains(&map, key1));
+
+        hashmap_delete(&map);
+    }
+
+    {
+        hashmap_t<u32, u32> map = {};
+        b32 result = hashmap_create(&map, 256, NULL, NULL);
+
+        assert(result);
+
+        u32 a = 0x08;
+        u32 b = 0x80;
+
+        u32 data = 100;
+
+        void* ref;
+
+        ref = hashmap_get(&map, a);
+        assert(ref == NULL);
+
+        assert(hashmap_add(&map, a, &data));
+        ref = hashmap_get(&map, a);
     
-    u8 name1[] = { "hashmap1" };
-    u8 name2[] = { "hashmap2" };
+        assert(ref != NULL);
+        assert(*(u32*)ref == data);
 
-    string_t key1 = (string_t){ .size = sizeof(name1), .data = name1 };
-    string_t key2 = (string_t){ .size = sizeof(name2), .data = name2 };
+        ref = hashmap_get(&map, b);
+        assert(ref == NULL);
 
-    u32 size = 8;
-
-    void* ref;
-
-    ref = hashmap_get(&map, key1);
-    assert(ref == NULL);
+        data = 12312;
+        assert(hashmap_add(&map, b, &data));
+        ref = hashmap_get(&map, b);
     
-    assert(hashmap_add(&map, key1, &size));
-    ref = hashmap_get(&map, key1);
-    assert(ref != NULL);
-
-    assert(hashmap_add(&map, key2, &size));
-
-    ref = hashmap_get(&map, key2);
-    assert(ref != NULL);
-
-    assert(!hashmap_add(&map, key2, &size));
-
-    assert(hashmap_contains(&map, key1));
-    assert(hashmap_contains(&map, key2));
-
-    assert(hashmap_remove(&map, key1));
-    assert(!hashmap_contains(&map, key1));
-
-    assert(hashmap_remove(&map, key2));
-    assert(!hashmap_contains(&map, key2));
-
-    assert(hashmap_add(&map, key1, &size));
-    assert(hashmap_contains(&map, key1));
-
-    hashmap_delete(&map);
+        assert(ref != NULL);
+        assert(*(u32*)ref == data);
+    }
 
     log_info(STR("hashmap: OK"), 0);
 }

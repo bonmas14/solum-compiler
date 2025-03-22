@@ -21,6 +21,8 @@ void log_info(u8 *text, u64 left_pad);
 void log_warning(u8 *text, u64 left_pad);
 void log_error(u8 *text, u64 left_pad);
 
+string_t string_concat(string_t a, string_t b);
+
 void debug_break(void);
 
 #define check_value(value) {\

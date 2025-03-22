@@ -84,7 +84,7 @@ b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
             // process type somehow
 
             entry.type = ENTRY_VAR;
-            entry.var.is_const = false;
+            entry.data.var.is_const = false;
 
         } else assert(false);
 
@@ -138,7 +138,7 @@ b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
             break;
 
         case SUBTYPE_AST_EXPR:
-            log_error_token(STR("Expression is not valid construct in global scope."), compiler->scanner, root->token, 0);
+            log_error_token(STR("Expression is not valid construct in the global scope."), compiler->scanner, root->token, 0);
             break;
 
         default:

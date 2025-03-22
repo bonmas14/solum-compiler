@@ -1,10 +1,10 @@
 workspace "solum"
     configurations { "Debug", "Release" }
+    platforms { "x64", "x32" }
 
     startproject "native-solum-compiler"
 
     warnings "Extra"
- --    architecture "x86_64"
 
     filter "configurations:Debug"
         defines "DEBUG"
@@ -15,6 +15,14 @@ workspace "solum"
     filter "configurations:Release"
         defines "NDEBUG"
         optimize "Full"
+    filter {}
+
+    filter "platforms:x64"
+        architecture "x86_64"
+    filter {}
+
+    filter "platforms:x32"
+        architecture "x86"
     filter {}
 
 project "native-solum-compiler"

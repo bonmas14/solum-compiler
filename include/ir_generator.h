@@ -7,6 +7,8 @@
 
 struct ir_opcode_t {
     u32 operation;
+    u32 type;
+
     union {
         struct {
             u64 math_l;
@@ -87,7 +89,6 @@ enum ir_opcodes_t {
     IR_BRANCH_FLAG = 0x00040000,
     
     IR_JUMP,
-
 };
 
 #endif // IR_GEN_H

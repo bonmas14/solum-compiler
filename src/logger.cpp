@@ -1,4 +1,6 @@
 #include "logger.h"
+#include "temp_allocator.h"
+#include <memory.h>
 
 #define LOGGER_COLOR_STACK_SIZE 256
 
@@ -68,7 +70,6 @@ void log_error(u8 *text, u64 left_pad) {
     log_pop_color();
 }
 
-/*
 string_t string_concat(string_t a, string_t b) {
     assert(default_allocator != NULL);
     assert(a.data != NULL);
@@ -76,9 +77,17 @@ string_t string_concat(string_t a, string_t b) {
 
     // @todo: change all allocators to one interface.
     // right now we know that we use memory allocation 
-    temp_allocate(a.size + b.size);
+    u8* data = (u8*)temp_allocate(a.size + b.size);
 
+    memcpy((void*)data,            a.data, a.size);
+    memcpy((void*)(data + a.size), b.data, b.size);
 
+    return (string_t) {.size = a.size + b.size, .data = (u8*) data };
+}
+
+/*
+string_t log_sprintf(string_t string, void * data, ...) {
+    va_list parameters;
 }
 
 string_t log_sprintf(string_t string, void * data, ...) {
