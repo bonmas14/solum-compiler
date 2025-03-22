@@ -3,7 +3,7 @@
 #include "parser.h"
 #include "scanner.h"
 #include "logger.h"
-#include "area_alloc.h"
+#include "list.h"
 #include "hashmap.h"
 
 // plan @todo:
@@ -32,37 +32,10 @@
 // when we will be generating IR we will generate all of the other things
 // like lambdas?
 
-/*
-b32 analyze_type(compiler_t *compiler, ast_node_t *node) {
-    assert(node.type != AST_ERROR);
+b32 scan_unkn_def(compiler_t *compiler, ast_node_t *node) {
+    scope_t *scope = list_get(&compiler->analyzer->scopes, 0);
 
-    switch (node.subtype) {
-        case SUBTYPE_AST_STD_TYPE:
-        case SUBTYPE_AST_AUTO_TYPE:
-            return true;
-            
-        case SUBTYPE_AST_UNKN_TYPE:
-            hashmap_contains();
-            break;
-
-        case SUBTYPE_AST_FUNC_TYPE:
-            break;
-        case SUBTYPE_AST_ARR_TYPE:
-            break;
-        case SUBTYPE_AST_PTR_TYPE:
-            break;
-
-        default:
-            log_error(STR("Not supported yet."), 0);
-            break;
-    }
-}
-*/
-
-b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
-    scope_tuple_t *scope = list_get(&compiler->analyzer->scopes, 0); // @todo replace to variable if need
-
-    assert(scope->is_global);
+    assert(scope->parent_scope == 0);
 
     string_t key = node->token.data.string;
 
@@ -72,26 +45,17 @@ b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
         scope_entry_t entry = {};
         ast_node_t *type = node->left;
 
-        // b32 result = analyze_type(compiler, node->left);
-
         entry.node = node;
 
-        if (node->right->subtype == AST_BLOCK_IMPERATIVE) {
+        if (type->type == SUBTYPE_AST_FUNC_TYPE) {
             entry.type = ENTRY_FUNC;
-            // entry.func = ;
-        } else if (node->right->subtype == SUBTYPE_AST_EXPR) {
-            check_value(type->subtype == SUBTYPE_AST_STD_TYPE || type->subtype == SUBTYPE_AST_AUTO_TYPE || type->subtype == SUBTYPE_AST_UNKN_TYPE);
-            // process type somehow
-
+        } else {
             entry.type = ENTRY_VAR;
-            entry.data.var.is_const = false;
+        }
 
-        } else assert(false);
-
-        // entry.var.type = 
-
-        
-
+        if (node->right->subtype == SUBTYPE_AST_EXPR) {
+            check_value(type->subtype == SUBTYPE_AST_STD_TYPE || type->subtype == SUBTYPE_AST_AUTO_TYPE || type->subtype == SUBTYPE_AST_UNKN_TYPE);
+        } 
 
         hashmap_add(&scope->table, key, &entry);
     }
@@ -111,7 +75,7 @@ b32 analyze_unkn_def(compiler_t *compiler, ast_node_t *node) {
     return false;
 }
 
-b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
+b32 scan_root_node(compiler_t *compiler, ast_node_t *root) {
     assert(compiler != NULL);
     assert(root     != NULL);
 
@@ -126,7 +90,7 @@ b32 analyze_root_stmt(compiler_t *compiler, ast_node_t *root) {
 
     switch (root->subtype) {
         case SUBTYPE_AST_UNKN_DEF:
-            return analyze_unkn_def(compiler, root);
+            return scan_unkn_def(compiler, root);
 
         case SUBTYPE_AST_STRUCT_DEF:
             break;
@@ -158,15 +122,30 @@ b32 analyze_code(compiler_t *compiler) {
     for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
 
-        if (node->analyzed) continue;
+        if (node->type == AST_ERROR) {
+            log_error(STR("Parser error, couldn't analyze code."), 0);
+            return false;
+        }
 
-        if (!analyze_root_stmt(compiler, node)) {
-            // we got error there
-            // it was already reported
-            // so we just quit
+        if (node->analyzed) {
+            continue;
+        }
+
+        if (!scan_root_node(compiler, node)) {
             return false;
         }
     }
+
+
+
+
+    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
+        ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
+
+        if (node->analyzed) continue;
+    }
+
+    // process_all_functions here, one pass, doing everything
 
     return false;
 }

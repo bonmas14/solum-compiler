@@ -3,7 +3,7 @@
 
 #include "compiler.h"
 #include "parser.h"
-#include "area_alloc.h"
+#include "list.h"
 #include "hashmap.h"
 #include "scanner.h"
 
@@ -40,15 +40,13 @@ enum entry_type_t {
     ENTRY_FUNC,
 };
 
-struct scope_tuple_t {
-    b32 is_global;
+struct scope_t {
     u64 parent_scope;
     hashmap_t<string_t, scope_entry_t> table;
 };
 
 struct analyzer_t {
-    list_t<scope_tuple_t> scopes;
-    // hashmap_t<u64, types_t> type_lookup;
+    list_t<scope_t> scopes;
 };
 
 enum funciton_flags_t {

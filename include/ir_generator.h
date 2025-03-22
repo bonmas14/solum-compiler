@@ -2,7 +2,7 @@
 #define IR_GEN_H
 
 #include "compiler.h"
-#include "area_alloc.h"
+#include "list.h"
 #include "hashmap.h"
 
 struct ir_opcode_t {

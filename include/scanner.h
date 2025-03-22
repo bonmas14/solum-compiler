@@ -2,7 +2,7 @@
 #define SCANNER_H
 
 #include "compiler.h"
-#include "area_alloc.h"
+#include "list.h"
 #include "arena.h"
 
 #define APPROX_CHAR_PER_LINE (25)

@@ -13,10 +13,8 @@ analyzer_t *analyzer_create(arena_t *allocator) {
     u64 index = {};
     list_allocate(&analyzer->scopes, 1, &index);
 
-    scope_tuple_t *global_scope = list_get(&analyzer->scopes, index);
-
-    global_scope->is_global    = true;
-    global_scope->parent_scope = 0;
+    scope_t *global_scope = list_get(&analyzer->scopes, index);
+    assert(index == 0);
 
     check_value(hashmap_create(&global_scope->table, 100, get_string_hash, compare_string_keys));
     return analyzer;

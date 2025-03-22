@@ -8,7 +8,7 @@
 #include "analyzer.h"
 #include "backend.h"
 
-#include "area_alloc.h"
+#include "list.h"
 #include "temp_allocator.h"
 #include "arena.h"
 #include "hashmap.h"
@@ -95,6 +95,7 @@ int main(int argc, char **argv) {
 
     parse(&compiler);
     analyze_code(&compiler);
+
     generate_code(&compiler);
 
     log_update_color();
