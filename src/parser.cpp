@@ -46,42 +46,48 @@ void panic_skip_until_token(u32 value, compiler_t *state) {
     }
 }
 
-void add_left_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
+void add_left_node(compiler_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
+    assert(node != NULL);
 
-    check_value(node.type != AST_ERROR);
-    check_value(node.type != AST_EMPTY);
+    check_value(node->type != AST_ERROR);
 
     root->left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     assert(root->left != NULL);
-    *root->left = node;
+    *root->left = *node;
 }
 
-void add_right_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
-    check_value(node.type != AST_ERROR);
-    // check_value(node.type != AST_EMPTY);
+void add_right_node(compiler_t *state, ast_node_t *root, ast_node_t *node) {
+    assert(root != NULL);
+    assert(node != NULL);
+
+    check_value(node->type != AST_ERROR);
 
     root->right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     assert(root->right != NULL);
-    *root->right = node;
+    *root->right = *node;
 }
 
-void add_center_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
-    check_value(node.type != AST_ERROR);
-    check_value(node.type != AST_EMPTY);
+void add_center_node(compiler_t *state, ast_node_t *root, ast_node_t *node) {
+    assert(root != NULL);
+    assert(node != NULL);
+
+    check_value(node->type != AST_ERROR);
 
     root->right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     assert(root->right != NULL);
-    *root->right = node;
+    *root->right = *node;
 }
 
-void add_list_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
-    check_value(node.type != AST_ERROR);
-    check_value(node.type != AST_EMPTY);
+void add_list_node(compiler_t *state, ast_node_t *root, ast_node_t *node) {
+    assert(root != NULL);
+    assert(node != NULL);
+
+    check_value(node->type != AST_ERROR);
 
     if (root->list_start == NULL) {
         root->list_start  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-        *root->list_start = node;
+        *root->list_start = *node;
         root->child_count++;
         return;
     }
@@ -93,7 +99,7 @@ void add_list_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
     }
 
     list_node->list_next  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    *list_node->list_next = node;
+    *list_node->list_next = *node;
 
     root->child_count++;
 }
@@ -158,11 +164,11 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         advance_token(state->scanner, state->string_allocator);
 
-        add_left_node(state, &result, node);
+        add_left_node(state, &result, &node);
         node = parse_expression(state);
 
         check_value(node.type != AST_ERROR); // @todo: better messages
-        add_right_node(state, &result, node);
+        add_right_node(state, &result, &node);
             
         check_value(consume_token(')', state->scanner, NULL, state->string_allocator));
     } else if (next.type == '.') {
@@ -171,21 +177,21 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         advance_token(state->scanner, state->string_allocator);
 
-        add_left_node(state, &result, node);
+        add_left_node(state, &result, &node);
         node = parse_function_call(state);
             
         check_value(node.type != AST_EMPTY);
         check_value(node.type != AST_ERROR);
         check_value(node.token.type == TOKEN_IDENT || node.type == AST_MEMBER_ACCESS);
 
-        add_right_node(state, &result, node);
+        add_right_node(state, &result, &node);
     } else if (next.type == '[') {
         result.type  = AST_ARRAY_ACCESS;
         result.token = next;
 
         advance_token(state->scanner, state->string_allocator);
 
-        add_left_node(state, &result, node);
+        add_left_node(state, &result, &node);
 
         node = parse_expression(state);
             
@@ -193,7 +199,7 @@ ast_node_t parse_function_call(compiler_t *state) {
         check_value(node.type != AST_EMPTY);
         check_value(node.type != AST_ERROR);
 
-        add_right_node(state, &result, node);
+        add_right_node(state, &result, &node);
     } else {
         result = node;
     }
@@ -221,7 +227,7 @@ ast_node_t parse_unary(compiler_t *state) {
                 check_value(false); // @todo better logging and parsing
             }
 
-            add_left_node(state, &result, child);
+            add_left_node(state, &result, &child);
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
@@ -252,10 +258,10 @@ ast_node_t parse_shift(compiler_t *state) {
         case TOKEN_RSHIFT: {
             advance_token(state->scanner, state->string_allocator);
 
-            add_left_node(state, &result, left);
+            add_left_node(state, &result, &left);
             right = parse_shift(state); 
             // @todo error check_value
-            add_right_node(state, &result, right);
+            add_right_node(state, &result, &right);
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
@@ -284,9 +290,9 @@ ast_node_t parse_and(compiler_t *state) {
         case '&': {
             advance_token(state->scanner, state->string_allocator);
 
-            add_left_node(state, &result, left);
+            add_left_node(state, &result, &left);
             right = parse_and(state);
-            add_right_node(state, &result, right);
+            add_right_node(state, &result, &right);
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
@@ -315,9 +321,9 @@ ast_node_t parse_or(compiler_t *state) {
         case '|': {
             advance_token(state->scanner, state->string_allocator);
 
-            add_left_node(state, &result, left);
+            add_left_node(state, &result, &left);
             right = parse_or(state);
-            add_right_node(state, &result, right);
+            add_right_node(state, &result, &right);
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
@@ -346,9 +352,9 @@ ast_node_t parse_xor(compiler_t *state) {
         case '^': {
             advance_token(state->scanner, state->string_allocator);
 
-            add_left_node(state, &result, left);
+            add_left_node(state, &result, &left);
             right = parse_xor(state);
-            add_right_node(state, &result, right);
+            add_right_node(state, &result, &right);
         } break;
         case TOKEN_ERROR: {
             advance_token(state->scanner, state->string_allocator);
@@ -392,9 +398,9 @@ ast_node_t parse_mul(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_mul(state);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 }
@@ -427,9 +433,9 @@ ast_node_t parse_add(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_add(state);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 }
@@ -472,9 +478,9 @@ ast_node_t parse_compare_expression(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_compare_expression(state);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 };
@@ -502,9 +508,9 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_logic_and_expression(state);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 
@@ -532,9 +538,9 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_logic_or_expression(state);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 }
@@ -559,8 +565,8 @@ ast_node_t parse_cast_exression(compiler_t *state) {
             return result;
         }
 
-        add_left_node(state, &result, type);
-        add_right_node(state, &result, expr);
+        add_left_node(state, &result, &type);
+        add_right_node(state, &result, &expr);
         return result;
     }
 
@@ -583,9 +589,9 @@ ast_node_t parse_separated_expressions(compiler_t *state) {
         result.type    = AST_BIN_SEPARATION;
         result.token   = expression_separator;
 
-        add_left_node(state, &result, node);
+        add_left_node(state, &result, &node);
         node = parse_separated_expressions(state);
-        add_right_node(state, &result, node);
+        add_right_node(state, &result, &node);
     }
 
     return result;
@@ -614,10 +620,10 @@ ast_node_t parse_expression(compiler_t *state) {
 
     advance_token(state->scanner, state->string_allocator);
 
-    add_left_node(state, &result, node);
+    add_left_node(state, &result, &node);
     node = parse_expression(state); 
     check_value(node.type != AST_EMPTY);
-    add_right_node(state, &result, node);
+    add_right_node(state, &result, &node);
 
     return result;
 }
@@ -682,7 +688,7 @@ ast_node_t parse_type(compiler_t *state) {
                 break;
             }
 
-            add_left_node(state, &result, size);
+            add_left_node(state, &result, &size);
             ast_node_t type = parse_type(state);
 
             if (type.type == AST_ERROR) {
@@ -690,7 +696,7 @@ ast_node_t parse_type(compiler_t *state) {
                 break;
             }
 
-            add_right_node(state, &result, type);
+            add_right_node(state, &result, &type);
         } break;
         case '^': {
             result.type  = AST_PTR_TYPE;
@@ -703,7 +709,7 @@ ast_node_t parse_type(compiler_t *state) {
                 break;
             }
 
-            add_left_node(state, &result, type);
+            add_left_node(state, &result, &type);
         } break;
 
         default: {
@@ -744,7 +750,7 @@ ast_node_t parse_param_declaration(compiler_t *state) {
         return node;
     }
 
-    add_left_node(state, &node, type);
+    add_left_node(state, &node, &type);
     return node;
 }
 
@@ -760,7 +766,7 @@ ast_node_t parse_parameter_list(compiler_t *state) {
         ast_node_t node = parse_param_declaration(state);
 
         // @todo check_value for errors
-        add_list_node(state, &result, node);
+        add_list_node(state, &result, &node);
 
         current = peek_token(state->scanner, state->string_allocator);
 
@@ -792,7 +798,7 @@ ast_node_t parse_return_list(compiler_t *state) {
         ast_node_t node = parse_type(state);
 
         // @todo check_value for errors
-        add_list_node(state, &result, node);
+        add_list_node(state, &result, &node);
 
         current = peek_token(state->scanner, state->string_allocator);
 
@@ -821,7 +827,7 @@ ast_node_t parse_function_type(compiler_t *state) {
 
     ast_node_t parameters = parse_parameter_list(state);
     // @todo check_value for errors
-    add_left_node(state, &result, parameters);
+    add_left_node(state, &result, &parameters);
 
     if (!consume_token(')', state->scanner, NULL, state->string_allocator)) {
         result.type = AST_ERROR;
@@ -835,7 +841,7 @@ ast_node_t parse_function_type(compiler_t *state) {
         log_warning_token(STR("couldn't parse return list in function."), state->scanner, result.token, 0);
     }
 
-    add_right_node(state, &result, returns);
+    add_right_node(state, &result, &returns);
 
     return result;
 }
@@ -849,10 +855,10 @@ ast_node_t parse_multiple_types(compiler_t *state) {
         result.type  = AST_MUL_TYPES;
         result.token = node.token;
 
-        add_left_node(state, &result, node);
+        add_left_node(state, &result, &node);
         node = parse_multiple_types(state);
         check_value(node.type != AST_ERROR);
-        add_right_node(state, &result, node);
+        add_right_node(state, &result, &node);
 
         return result;
     }
@@ -908,8 +914,8 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
 
     // left is our type, right is names expressions, center is expression
 
-    add_left_node(state, &node, type);
-    add_right_node(state, &node, *expr);
+    add_left_node(state, &node, &type);
+    add_right_node(state, &node, expr);
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
@@ -932,7 +938,7 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
         return node;
     }
 
-    add_center_node(state, &node, data);
+    add_center_node(state, &node, &data);
     return node;
 }
 
@@ -950,8 +956,7 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
         return node;
     }
 
-    node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    *node.left = type;
+    add_left_node(state, &node, &type);
 
     if (peek_token(state->scanner, state->string_allocator).type == ';') {
         node.type = AST_UNARY_VAR_DEF; 
@@ -979,8 +984,7 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
         return node;
     }
 
-    node.right  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    *node.right = data;
+    add_right_node(state, &node, &data);
 
     return node;
 }
@@ -1106,12 +1110,8 @@ ast_node_t parse_statement(compiler_t *state) {
             check_value(expr.type != AST_EMPTY);
             
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
-
-            node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-            *node.left = expr;
-
-            node.right  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-            *node.right = stmt;
+            add_left_node(state, &node, &expr);
+            add_right_node(state, &node, &stmt);
         } break;
 
         case TOK_ELSE: {
@@ -1125,8 +1125,7 @@ ast_node_t parse_statement(compiler_t *state) {
                 node.type = AST_ELSE_STMT;
 
                 ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
-                node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-                *node.left = stmt;
+                add_left_node(state, &node, &stmt);
             }
         } break;
 
@@ -1139,12 +1138,8 @@ ast_node_t parse_statement(compiler_t *state) {
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
-
-            node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-            *node.left = expr;
-
-            node.right  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-            *node.right = stmt;
+            add_left_node(state, &node, &expr);
+            add_right_node(state, &node, &stmt);
         } break;
 
         case TOK_RETURN: {
@@ -1152,13 +1147,11 @@ ast_node_t parse_statement(compiler_t *state) {
             node.token = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
-
-            node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-            *node.left = expr;
+            add_left_node(state, &node, &expr);
         } break;
 
         default: {
-            node = parse_expression(state); // @todo add check_value for AST_EMPTY
+            node = parse_expression(state);
         } break;
     }
 
@@ -1183,9 +1176,6 @@ ast_node_t parse_imperative_block(compiler_t *state) {
 
     token_t current = peek_token(state->scanner, state->string_allocator);
 
-    b32 start = true;
-    ast_node_t *previous_node;
-
     while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_statement(state);
 
@@ -1194,18 +1184,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
             continue;
         }
 
-        ast_node_t *list = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t)); *list = node;
-        *list = node;
-
-        if (start) {
-            start = false;
-            result.list_start = list;
-            previous_node = result.list_start;
-        } else { 
-            previous_node->list_next = list;
-            previous_node = previous_node->list_next;
-        }
-
+        add_list_node(state, &result, &node);
         current = peek_token(state->scanner, state->string_allocator);
     }
 

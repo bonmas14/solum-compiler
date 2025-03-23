@@ -32,30 +32,58 @@
 // when we will be generating IR we will generate all of the other things
 // like lambdas?
 
-#if 0
-b32 scan_unkn_def(compiler_t *compiler, ast_node_t *node) {
-    scope_t *scope = list_get(&compiler->analyzer->scopes, 0);
-
+scope_t *get_global_scope(compiler_t *state) {
+    assert(state != NULL);
+    scope_t *scope = list_get(&state->analyzer->scopes, 0);
     assert(scope->parent_scope == 0);
+    return scope;
+}
 
-    string_t key = node->token.data.string;
+b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
+
+}
+
+b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
+    assert(node->type == AST_BIN_UNKN_DEF);
+
+    scope_t *scope = get_global_scope(state);
+    string_t key   = node->token.data.string;
 
     if (hashmap_contains(&scope->table, key)) {
+        log_error_token(STR("Symbol was already used before"), state->scanner, node->token, 0);
         return false;
     } else {
         scope_entry_t entry = {};
         ast_node_t *type = node->left;
-
         entry.node = node;
 
-        if (type->type == SUBTYPE_AST_FUNC_TYPE) {
-            entry.type = ENTRY_FUNC;
-        } else {
-            entry.type = ENTRY_VAR;
-        }
+        if (type->type == AST_UNKN_TYPE) {
+            entry.type = ENTRY_UNKN;
+        } else switch (type->type) {
+            case AST_FUNC_TYPE:
+                entry.type = ENTRY_FUNC;
 
-        if (node->right->subtype == SUBTYPE_AST_EXPR) {
-            check_value(type->subtype == SUBTYPE_AST_STD_TYPE || type->subtype == SUBTYPE_AST_AUTO_TYPE || type->subtype == SUBTYPE_AST_UNKN_TYPE);
+                if (node->right->type != AST_BLOCK_IMPERATIVE) {
+                    log_error_token(STR("Function body should be in '{' '}' block"), state->scanner, node->right->token, 0);
+                    return false;
+                }
+                break;
+
+            case AST_AUTO_TYPE:
+            case AST_STD_TYPE:
+            case AST_ARR_TYPE:
+            case AST_PTR_TYPE:
+                entry.type = ENTRY_VAR;
+
+                if (node->right->type == AST_BLOCK_IMPERATIVE) {
+                    log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
+                    return false;
+                }
+                break;
+
+            default:
+                entry.type = ENTRY_ERROR;
+                break;
         } 
 
         hashmap_add(&scope->table, key, &entry);
@@ -76,8 +104,8 @@ b32 scan_unkn_def(compiler_t *compiler, ast_node_t *node) {
     return false;
 }
 
-b32 scan_root_node(compiler_t *compiler, ast_node_t *root) {
-    assert(compiler != NULL);
+b32 scan_root_node(compiler_t *state, ast_node_t *root) {
+    assert(state != NULL);
     assert(root     != NULL);
 
     if (root->type == AST_EMPTY)
@@ -89,25 +117,27 @@ b32 scan_root_node(compiler_t *compiler, ast_node_t *root) {
         return false;
     }
 
-    switch (root->subtype) {
-        case SUBTYPE_AST_UNKN_DEF:
-            return scan_unkn_def(compiler, root);
+    switch (root->type) {
+        case AST_UNARY_VAR_DEF:
+        case AST_BIN_MULT_DEF:
+        case AST_TERN_MULT_DEF:
+            return scan_var_defs(state, root);
 
-        case SUBTYPE_AST_STRUCT_DEF:
+        case AST_BIN_UNKN_DEF:
+            return scan_unkn_def(state, root);
             break;
 
-        case SUBTYPE_AST_UNION_DEF:
+        case AST_STRUCT_DEF:
             break;
 
-        case SUBTYPE_AST_ENUM_DEF:
+        case AST_UNION_DEF:
             break;
 
-        case SUBTYPE_AST_EXPR:
-            log_error_token(STR("Expression is not valid construct in the global scope."), compiler->scanner, root->token, 0);
+        case AST_ENUM_DEF:
             break;
 
         default:
-            log_error_token(STR("Wrong type of construct in global scope."), compiler->scanner, root->token, 0);
+            log_error_token(STR("Wrong type of construct in global scope."), state->scanner, root->token, 0);
             assert(false);
             break;
     }
@@ -115,16 +145,13 @@ b32 scan_root_node(compiler_t *compiler, ast_node_t *root) {
     return false;
 }
 
-#endif
-
 // first thing we do is add all of symbols in table
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
 
-b32 analyze_code(compiler_t *compiler) {
-    /*
-    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
-        ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
+b32 analyze_code(compiler_t *state) {
+    for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
+        ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
 
         if (node->type == AST_ERROR) {
             log_error(STR("Parser error, couldn't analyze code."), 0);
@@ -135,7 +162,7 @@ b32 analyze_code(compiler_t *compiler) {
             continue;
         }
 
-        if (!scan_root_node(compiler, node)) {
+        if (!scan_root_node(state, node)) {
             return false;
         }
     }
@@ -143,12 +170,11 @@ b32 analyze_code(compiler_t *compiler) {
 
 
 
-    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
-        ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
+    for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
+        ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
 
         if (node->analyzed) continue;
     }
-    */
 
     // process_all_functions here, one pass, doing everything
 

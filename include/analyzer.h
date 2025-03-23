@@ -8,29 +8,8 @@
 #include "scanner.h"
 
 struct scope_entry_t {
-    b32 resolved;
     u32 type;
     ast_node_t *node;
-
-    union {
-        struct {
-            u32 argc;
-            u32 retc;
-
-            u64 argv_types[MAX_COUNT_OF_PARAMS];
-            u64 retv_types[MAX_COUNT_OF_RETS];
-        } func;
-
-        struct {
-            b32 is_const;
-            u64 type;
-        } var;
-
-        struct {
-            u32 size;
-            u32 alignment;
-        } type;
-    } data;
 };
 
 enum entry_type_t {
@@ -38,6 +17,7 @@ enum entry_type_t {
     ENTRY_VAR,
     ENTRY_TYPE,
     ENTRY_FUNC,
+    ENTRY_UNKN,
 };
 
 struct scope_t {
