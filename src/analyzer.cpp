@@ -52,61 +52,51 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     if (hashmap_contains(&scope->table, key)) {
         log_error_token(STR("Symbol was already used before"), state->scanner, node->token, 0);
         return false;
-    } else {
-        scope_entry_t entry = {};
-        ast_node_t *type = node->left;
-        entry.node = node;
+    } 
 
-        if (type->type == AST_UNKN_TYPE) {
-            entry.type = ENTRY_UNKN;
-        } else switch (type->type) {
-            case AST_FUNC_TYPE:
-                entry.type = ENTRY_FUNC;
+    scope_entry_t entry = {};
+    entry.node = node;
 
-                if (node->right->type != AST_BLOCK_IMPERATIVE) {
-                    log_error_token(STR("Function body should be in '{' '}' block"), state->scanner, node->right->token, 0);
-                    return false;
-                }
-                break;
+    if (node->left->type == AST_UNKN_TYPE) {
+        entry.type = ENTRY_UNKN;
+    } else switch (node->left->type) {
+        case AST_FUNC_TYPE:
+            entry.type = ENTRY_FUNC;
 
-            case AST_AUTO_TYPE:
-            case AST_STD_TYPE:
-            case AST_ARR_TYPE:
-            case AST_PTR_TYPE:
-                entry.type = ENTRY_VAR;
+            if (node->right->type != AST_BLOCK_IMPERATIVE) {
+                log_error_token(STR("Function body should be in '{' '}' block"), state->scanner, node->right->token, 0);
+                return false;
+            }
+            break;
 
-                if (node->right->type == AST_BLOCK_IMPERATIVE) {
-                    log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
-                    return false;
-                }
-                break;
+        case AST_AUTO_TYPE:
+        case AST_STD_TYPE:
+        case AST_ARR_TYPE:
+        case AST_PTR_TYPE:
+            entry.type = ENTRY_VAR;
 
-            default:
-                entry.type = ENTRY_ERROR;
-                break;
-        } 
+            if (node->right->type == AST_BLOCK_IMPERATIVE) {
+                log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
+                return false;
+            }
+            break;
 
-        hashmap_add(&scope->table, key, &entry);
-    }
+        default:
+            entry.type = ENTRY_ERROR;
+            break;
+    } 
 
-    /*
-    if (node->type == AST_BIN || node->type == AST_UNARY) {
-        
+    check_value(hashmap_add(&scope->table, key, &entry));
 
-        scope->table
-
-    } else if (node->type == AST_TERN) { 
-        
-    }
-
-    */
-
-    return false;
+    return true;
 }
 
 b32 scan_root_node(compiler_t *state, ast_node_t *root) {
     assert(state != NULL);
-    assert(root     != NULL);
+    assert(root  != NULL);
+
+
+    b32 result = false;
 
     if (root->type == AST_EMPTY)
         return true;
@@ -121,10 +111,11 @@ b32 scan_root_node(compiler_t *state, ast_node_t *root) {
         case AST_UNARY_VAR_DEF:
         case AST_BIN_MULT_DEF:
         case AST_TERN_MULT_DEF:
-            return scan_var_defs(state, root);
+            result = scan_var_defs(state, root);
+            break;
 
         case AST_BIN_UNKN_DEF:
-            return scan_unkn_def(state, root);
+            result = scan_unkn_def(state, root);
             break;
 
         case AST_STRUCT_DEF:
@@ -138,11 +129,10 @@ b32 scan_root_node(compiler_t *state, ast_node_t *root) {
 
         default:
             log_error_token(STR("Wrong type of construct in global scope."), state->scanner, root->token, 0);
-            assert(false);
             break;
     }
 
-    return false;
+    return result;
 }
 
 // first thing we do is add all of symbols in table
