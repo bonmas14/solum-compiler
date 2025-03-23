@@ -19,26 +19,6 @@
 
 arena_t * default_allocator;
 
-void print_node(compiler_t *compiler, ast_node_t* node, u32 depth) {
-    log_info_token(compiler->scanner, node->token, depth * LEFT_PAD_STANDART_OFFSET);
-
-    if (node->type == AST_UNARY) {
-        print_node(compiler, node->left, depth + 1);
-    } else if (node->type == AST_BIN) {
-        print_node(compiler, node->left, depth + 1);
-        print_node(compiler, node->right, depth + 1);
-    } else if (node->type == AST_LIST) {
-        ast_node_t* child = node->list_start;
-
-        for (u64 i = 0; i < node->child_count; i++) {
-            assert(child != NULL);
-
-            print_node(compiler, child, depth + 1);
-            child = child->list_next;
-        }
-    }
-}
-
 void debug_tests(void) {
     hashmap_tests();
     list_tests();

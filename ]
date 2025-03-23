@@ -13,7 +13,7 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_struct_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_union_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_enum_declaration(compiler_t *state, token_t *name);
-ast_node_t parse_block(compiler_t* state, ast_types_t type);
+ast_node_t parse_block(compiler_t* state, ast_subtype_t subtype);
 
 /* helpers */
 
@@ -80,22 +80,14 @@ void add_list_node(compiler_t *state, ast_node_t *root, ast_node_t node) {
     check_value(node.type != AST_EMPTY);
 
     if (root->list_start == NULL) {
-        root->list_start  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-        *root->list_start = node;
-        root->child_count++;
-        return;
+
+        root.list_start  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+        *root.list_start = node;
+
+        root.list_start = list;
     }
 
-    ast_node_t *list_node = root->list_start;
-
-    while (list_node->list_next != NULL) {
-        list_node = list_node->list_next;
-    }
-
-    list_node->list_next  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
-    *list_node->list_next = node;
-
-    root->child_count++;
+    // go to al
 }
 
 /* parsing */
@@ -105,8 +97,9 @@ ast_node_t parse_primary(compiler_t *state) {
 
     ast_node_t result = {};
 
-    result.type  = AST_PRIMARY;
+    result.type  = AST_LEAF;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_CONST_FP:
@@ -159,7 +152,7 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         next = advance_token(state->scanner, state->string_allocator);
 
-        result.type  = AST_FUNC_CALL;
+        result.type  = AST_BIN;
 
         result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.left = left;
@@ -185,7 +178,7 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         next = advance_token(state->scanner, state->string_allocator);
 
-        result.type  = AST_MEMBER_ACCESS;
+        result.type  = AST_BIN;
 
         result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.left = left;
@@ -211,7 +204,7 @@ ast_node_t parse_function_call(compiler_t *state) {
 
         next = advance_token(state->scanner, state->string_allocator);
 
-        result.type  = AST_ARRAY_ACCESS;
+        result.type  = AST_BIN;
 
         result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.left = left;
@@ -244,6 +237,7 @@ ast_node_t parse_unary(compiler_t *state) {
 
     result.type  = AST_UNARY;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '@':
@@ -281,8 +275,9 @@ ast_node_t parse_shift(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_BIT_SHIFT; // @change
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LSHIFT: 
@@ -318,8 +313,9 @@ ast_node_t parse_and(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_BIT_AND;
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '&': {
@@ -352,8 +348,9 @@ ast_node_t parse_or(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_BIT_OR;
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '|': {
@@ -386,8 +383,9 @@ ast_node_t parse_xor(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_BIT_XOR;
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '^': {
@@ -421,8 +419,9 @@ ast_node_t parse_mul(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_MUL; // @change
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '*':
@@ -457,8 +456,9 @@ ast_node_t parse_add(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_ADD; // @change
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case '+':
@@ -492,8 +492,9 @@ ast_node_t parse_compare_expression(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_COMP; // @change
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_GR: 
@@ -530,8 +531,9 @@ ast_node_t parse_logic_and_expression(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_LOG_AND;
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LOGIC_AND: {
@@ -564,8 +566,9 @@ ast_node_t parse_logic_or_expression(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
-    result.type  = AST_BIN_LOG_OR;
+    result.type  = AST_BIN;
     result.token = token;
+    result.subtype = SUBTYPE_AST_EXPR;
 
     switch (token.type) {
         case TOKEN_LOGIC_OR: {
@@ -601,7 +604,7 @@ ast_node_t parse_cast_exression(compiler_t *state) {
 
         ast_node_t expr = parse_logic_or_expression(state);
 
-        result.type  = AST_BIN_CAST;
+        result.type  = AST_BIN;
         result.token = cast_token;
 
         if (expr.type == AST_EMPTY) {
@@ -638,7 +641,8 @@ ast_node_t parse_separated_expressions(compiler_t *state) {
 
         result = {};
 
-        result.type    = AST_BIN_SEPARATION;
+        result.type    = AST_BIN;
+        result.subtype = SUBTYPE_AST_EXPR;
         result.token   = expression_separator;
 
         result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
@@ -697,6 +701,7 @@ ast_node_t parse_primary_type(compiler_t *state) {
 
     token_t token = advance_token(state->scanner, state->string_allocator);
 
+    result.type  = AST_LEAF;
     result.token = token;
 
     switch (token.type) {
@@ -713,11 +718,11 @@ ast_node_t parse_primary_type(compiler_t *state) {
         case TOK_F32:
         case TOK_F64:
         case TOK_BOOL32:
-            result.type = AST_STD_TYPE;
+            result.subtype = SUBTYPE_AST_STD_TYPE;
             break;
 
         case TOKEN_IDENT:
-            result.type = AST_UNKN_TYPE;
+            result.subtype = SUBTYPE_AST_UNKN_TYPE;
             break;
 
         default: {
@@ -735,11 +740,14 @@ ast_node_t parse_type(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
+    result.type  = AST_UNARY;
+
     switch (token.type) {
         case '[': {
             advance_token(state->scanner, state->string_allocator);
 
-            result.type = AST_ARR_TYPE;
+            result.type = AST_BIN;
+            result.subtype = SUBTYPE_AST_ARR_TYPE;
             result.token.type = TOKEN_GEN_ARRAY_CALL;
 
             ast_node_t size   = parse_expression(state); 
@@ -772,7 +780,7 @@ ast_node_t parse_type(compiler_t *state) {
         } break;
         case '^': {
             result.token = advance_token(state->scanner, state->string_allocator);
-            result.type = AST_PTR_TYPE;
+            result.subtype = SUBTYPE_AST_PTR_TYPE;
 
             ast_node_t type = parse_type(state);
 
@@ -812,8 +820,9 @@ ast_node_t parse_param_declaration(compiler_t *state) {
         return node;
     }
 
-    node.token = name;
-    node.type  = AST_PARAM_DEF;
+    node.token   = name;
+    node.type    = AST_UNARY; 
+    node.subtype = SUBTYPE_AST_PARAM_DEF;
 
     ast_node_t type = parse_type(state);
 
@@ -832,7 +841,8 @@ ast_node_t parse_param_declaration(compiler_t *state) {
 ast_node_t parse_parameter_list(compiler_t *state) {
     ast_node_t result = {};
 
-    result.type = AST_FUNC_PARAMS;
+    result.type    = AST_LIST;
+    result.subtype = SUBTYPE_AST_FUNC_PARAMS;
 
     token_t current   = peek_token(state->scanner, state->string_allocator);
     result.token      = current;
@@ -882,10 +892,11 @@ ast_node_t parse_parameter_list(compiler_t *state) {
 ast_node_t parse_return_list(compiler_t *state) {
     ast_node_t result = {};
 
-    result.type = AST_FUNC_RETURNS;
+    result.type    = AST_LIST;
+    result.subtype = SUBTYPE_AST_FUNC_RETURNS;
 
     if (!consume_token(TOKEN_RET, state->scanner, &result.token, state->string_allocator)) {
-        result.type = AST_EMPTY;
+        result.type = AST_LEAF;
         return result;
     }
 
@@ -937,12 +948,12 @@ ast_node_t parse_function_type(compiler_t *state) {
     result.token.type = TOKEN_GEN_FUNC_DEF;
 
     if (token.type == '(') {
-        result.type = AST_FUNC_TYPE; 
+        result.type = AST_BIN; 
     } else {
         assert(false);
     }
 
-    result.type = AST_FUNC_TYPE;
+    result.subtype = SUBTYPE_AST_FUNC_TYPE;
     result.token.type = TOKEN_GEN_FUNC_DEF;
 
     if (!consume_token('(', state->scanner, NULL, state->string_allocator)) {
@@ -990,8 +1001,9 @@ ast_node_t parse_multiple_types(compiler_t *state) {
     if (consume_token(',', state->scanner, NULL, state->string_allocator)) {
         ast_node_t result = {};
 
-        result.type  = AST_MUL_TYPES;
-        result.token = node.token;
+        result.type    = AST_BIN;
+        result.subtype = SUBTYPE_AST_MUL_TYPES;
+        result.token   = node.token;
 
         result.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
         *result.left = node;
@@ -1016,6 +1028,7 @@ ast_node_t parse_declaration_type(compiler_t *state) {
 
     token_t token = peek_token(state->scanner, state->string_allocator);
 
+    node.type  = AST_LEAF;
     node.token = token;
 
     switch (token.type) {
@@ -1023,7 +1036,7 @@ ast_node_t parse_declaration_type(compiler_t *state) {
             return parse_function_type(state);
 
         case '=': 
-            node.type = AST_AUTO_TYPE;
+            node.subtype = SUBTYPE_AST_AUTO_TYPE;
             return node;
 
         default:
@@ -1034,13 +1047,15 @@ ast_node_t parse_declaration_type(compiler_t *state) {
 ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
     ast_node_t node = {}, type = {};
 
-    node.type = AST_TERN_UNKN_DEF;
+    node.type    = AST_TERN; 
+    node.subtype = SUBTYPE_AST_UNKN_DEF;
 
     if (peek_token(state->scanner, state->string_allocator).type == '=') {
         token_t token = peek_token(state->scanner, state->string_allocator);
 
-        type.type = AST_MUL_AUTO;
+        type.type  = AST_LEAF;
         type.token = token;
+        type.subtype = SUBTYPE_AST_MUL_AUTO_TYPES;
     } else {
         type = parse_multiple_types(state);
     }
@@ -1071,7 +1086,7 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
 
 
     if (peek_token(state->scanner, state->string_allocator).type == ';') {
-        // node.type = AST_BIN; // ????  it will break how we handle Binary definitions
+        node.type = AST_BIN; // ????  it will break how we handle Binary definitions
         return node;
     }
 
@@ -1099,8 +1114,9 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
 ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
     ast_node_t node = {};
 
-    node.type  = AST_BIN_UNKN_DEF;
-    node.token = *name;
+    node.type    = AST_BIN; 
+    node.subtype = SUBTYPE_AST_UNKN_DEF;
+    node.token   = *name;
 
     ast_node_t type = parse_declaration_type(state);
 
@@ -1110,11 +1126,11 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
         return node;
     }
 
-    node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+    node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     *node.left = type;
 
     if (peek_token(state->scanner, state->string_allocator).type == ';') {
-        node.type = AST_UNARY_UNKN_DEF; 
+        node.type = AST_UNARY; 
         return node;
     }
 
@@ -1152,7 +1168,8 @@ ast_node_t parse_union_declaration(compiler_t *state, token_t *name) {
 
     ast_node_t result = {};
 
-    result.type  = AST_UNION_DEF;
+    result.type = AST_UNARY;
+    result.subtype = SUBTYPE_AST_UNION_DEF;
     result.token = *name;
 
     result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
@@ -1168,9 +1185,10 @@ ast_node_t parse_struct_declaration(compiler_t *state, token_t *name) {
 
     ast_node_t result = {};
 
+    result.type = AST_UNARY;
 
-    result.type  = AST_STRUCT_DEF;
-    result.token = *name;
+    result.subtype = SUBTYPE_AST_STRUCT_DEF;
+    result.token   = *name;
 
     result.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
     // @todo add checks_value
@@ -1227,11 +1245,11 @@ ast_node_t parse_statement(compiler_t *state) {
             default: {
                 node = parse_func_or_var_declaration(state, &name);
 
-                if (node.type != AST_BIN_UNKN_DEF) {
+                if (node.type != AST_BIN) {
                     break;
                 }
 
-                if (node.right->type != AST_BLOCK_IMPERATIVE) {
+                if (node.right->subtype != AST_BLOCK_IMPERATIVE) {
                     break;
                 }
 
@@ -1259,8 +1277,9 @@ ast_node_t parse_statement(compiler_t *state) {
 
         case TOK_IF: {
             ignore_semicolon = true;
-            node.type = AST_IF_STMT;
-            node.token = advance_token(state->scanner, state->string_allocator);
+            node.type    = AST_BIN;
+            node.subtype = SUBTYPE_AST_IF_STMT;
+            node.token   = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
             check_value(expr.type != AST_EMPTY);
@@ -1279,37 +1298,40 @@ ast_node_t parse_statement(compiler_t *state) {
             node.token   = advance_token(state->scanner, state->string_allocator);
             if (peek_token(state->scanner, state->string_allocator).type == TOK_IF) {
                 node = parse_statement(state);
-                assert(node.type == AST_IF_STMT);
-                node.type = AST_ELIF_STMT;
+                assert(node.subtype == SUBTYPE_AST_IF_STMT);
+                node.subtype = SUBTYPE_AST_ELIF_STMT;
             } else {
-                node.type = AST_ELSE_STMT;
+                node.type    = AST_UNARY; 
+                node.subtype = SUBTYPE_AST_ELSE_STMT;
 
                 ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
-                node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+                node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
                 *node.left = stmt;
             }
         } break;
 
         case TOK_WHILE: {
             ignore_semicolon = true;
-            node.type  = AST_WHILE_STMT;
-            node.token = advance_token(state->scanner, state->string_allocator);
+            node.type    = AST_BIN;
+            node.subtype = SUBTYPE_AST_WHILE_STMT;
+            node.token   = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
 
-            node.left  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+            node.left = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
             *node.left = expr;
 
-            node.right  = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
+            node.right = (ast_node_t*)arena_allocate(state->node_allocator, sizeof(ast_node_t));
             *node.right = stmt;
         } break;
 
         case TOK_RETURN: {
-            node.type  = AST_RET_STMT;
-            node.token = advance_token(state->scanner, state->string_allocator);
+            node.type    = AST_UNARY;
+            node.subtype = SUBTYPE_AST_RET_STMT;
+            node.token   = advance_token(state->scanner, state->string_allocator);
 
             ast_node_t expr = parse_expression(state);
 
@@ -1339,7 +1361,8 @@ ast_node_t parse_statement(compiler_t *state) {
 ast_node_t parse_imperative_block(compiler_t *state) {
     ast_node_t result = {};
 
-    result.type = AST_BLOCK_IMPERATIVE;
+    result.type    = AST_LIST;
+    result.subtype = AST_BLOCK_IMPERATIVE;
 
     token_t current = peek_token(state->scanner, state->string_allocator);
 
@@ -1373,7 +1396,7 @@ ast_node_t parse_imperative_block(compiler_t *state) {
     return result;
 }
 
-ast_node_t parse_block(compiler_t *state, ast_types_t type) {
+ast_node_t parse_block(compiler_t *state, ast_subtype_t subtype) {
     token_t start, stop, final = {};
 
     ast_node_t result = {};
@@ -1384,9 +1407,9 @@ ast_node_t parse_block(compiler_t *state, ast_types_t type) {
         return result;
     }
 
-    if (type == AST_BLOCK_IMPERATIVE) {
+    if (subtype == AST_BLOCK_IMPERATIVE) {
         result = parse_imperative_block(state);
-    } else if (type == AST_BLOCK_ENUM) {
+    } else if (subtype == AST_BLOCK_ENUM) {
         assert(false);
     } else {
         assert(false);

@@ -6,7 +6,6 @@
 
 struct ast_node_t {
     s32 type;
-    s32 subtype;
     b32 analyzed;
 
     token_t token;
@@ -26,48 +25,74 @@ struct parser_t {
 };
 
 enum ast_types_t {
+    AST_ERROR,
     AST_EMPTY,
-    AST_LEAF,
+
+    AST_PRIMARY,
+
+    AST_BIN_ASSIGN,
+    AST_BIN_SEPARATION,
+
+    AST_BIN_CAST,
+    AST_BIN_COMP,
+
+    AST_BIN_LOG_OR,
+    AST_BIN_LOG_AND,
+
+    AST_BIN_ADD,
+    AST_BIN_MUL,
+
+    AST_BIN_BIT_XOR,
+    AST_BIN_BIT_OR,
+    AST_BIN_BIT_AND,
+    AST_BIN_BIT_SHIFT,
+
     AST_UNARY,
-    AST_BIN,
-    AST_TERN,
-    AST_LIST,
-    AST_ERROR = -1,
-};
 
-enum ast_subtype_t {
-    SUBTYPE_AST_EXPR       = 0x00,
-    SUBTYPE_AST_IF_STMT    = 0x01,
-    SUBTYPE_AST_ELSE_STMT  = 0x02,
-    SUBTYPE_AST_ELIF_STMT  = 0x03,
-    SUBTYPE_AST_WHILE_STMT = 0x04,
-    SUBTYPE_AST_RET_STMT   = 0x05,
+    AST_FUNC_CALL,
+    AST_MEMBER_ACCESS,
+    AST_ARRAY_ACCESS,
 
-    AST_BLOCK_IMPERATIVE   = 0x06,
-    AST_BLOCK_ENUM         = 0x07,
+
+    AST_IF_STMT,
+    AST_ELSE_STMT,
+    AST_ELIF_STMT,
+    AST_WHILE_STMT,
+    AST_RET_STMT,
+
+    AST_BLOCK_IMPERATIVE,
+    AST_BLOCK_ENUM,
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
 
-    SUBTYPE_AST_UNKN_DEF   = 0x10,
+    AST_PARAM_DEF, 
 
-    SUBTYPE_AST_STRUCT_DEF = 0x11,
-    SUBTYPE_AST_UNION_DEF  = 0x12,
-    SUBTYPE_AST_ENUM_DEF   = 0x13,
+    AST_UNARY_UNKN_DEF, // uninitialize definitions... never a function
+    AST_BIN_UNKN_DEF,
+    AST_TERN_UNKN_DEF, // multiple definitions... never a function
 
-    SUBTYPE_AST_PARAM_DEF  = 0x14, 
+    AST_STRUCT_DEF,
+    AST_UNION_DEF,
+    AST_ENUM_DEF,
+
 
     // types
-    SUBTYPE_AST_AUTO_TYPE = 0x20,
-    SUBTYPE_AST_STD_TYPE  = 0x21,
-    SUBTYPE_AST_UNKN_TYPE = 0x22,
-    SUBTYPE_AST_FUNC_TYPE = 0x23,
-    SUBTYPE_AST_ARR_TYPE  = 0x24,
-    SUBTYPE_AST_PTR_TYPE  = 0x25,
+    AST_MUL_AUTO,
+    AST_MUL_TYPES,
 
-    SUBTYPE_AST_FUNC_PARAMS   = 0x30,
-    SUBTYPE_AST_FUNC_RETURNS  = 0x31,
-    SUBTYPE_AST_FUNC_GENERICS = 0x32,
+    // 
+    AST_AUTO_TYPE,
+
+    AST_STD_TYPE,
+    AST_UNKN_TYPE,
+    AST_FUNC_TYPE,
+
+    AST_ARR_TYPE,
+    AST_PTR_TYPE,
+
+    AST_FUNC_PARAMS,
+    AST_FUNC_RETURNS,
 };
 
 b32 parse(compiler_t *compiler);

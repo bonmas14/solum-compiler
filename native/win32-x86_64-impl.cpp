@@ -48,8 +48,8 @@ void print_std_type(compiler_t *compiler, token_t token) {
 }
 
 void generate_type(compiler_t *compiler, ast_node_t *type) {
-    switch (type->subtype) {
-        case SUBTYPE_AST_FUNC_PARAMS:
+    switch (type->type) {
+        case AST_FUNC_PARAMS:
             {
                 ast_node_t * next = type->list_start;
                 fprintf(compiler->codegen->file, "(");
@@ -69,13 +69,13 @@ void generate_type(compiler_t *compiler, ast_node_t *type) {
                 fprintf(compiler->codegen->file, ")");
             } break;
 
-        case SUBTYPE_AST_PARAM_DEF:
+        case AST_PARAM_DEF:
             {
                 generate_type(compiler, type->left);
                 fprintf(compiler->codegen->file, " %.*s", (int)type->token.data.string.size, type->token.data.string.data);
             } break;
 
-        case SUBTYPE_AST_FUNC_RETURNS: 
+        case AST_FUNC_RETURNS: 
             {
                 ast_node_t * next = type->list_start;
 
@@ -107,18 +107,18 @@ void generate_type(compiler_t *compiler, ast_node_t *type) {
             } break;
 
 
-        case SUBTYPE_AST_PTR_TYPE:
+        case AST_PTR_TYPE:
             {
                 generate_type(compiler, type->left);
                 fprintf(compiler->codegen->file, " *");
             } break;
 
-        case SUBTYPE_AST_STD_TYPE: 
+        case AST_STD_TYPE: 
             {
                 print_std_type(compiler, type->token);
             } break;
 
-        case SUBTYPE_AST_FUNC_TYPE:
+        case AST_FUNC_TYPE:
             {
                 generate_type(compiler, type->right);
 
@@ -128,7 +128,7 @@ void generate_type(compiler_t *compiler, ast_node_t *type) {
 
             } break;
 
-        case SUBTYPE_AST_UNKN_TYPE:
+        case AST_UNKN_TYPE:
             {
                 fprintf(compiler->codegen->file, "%.*s", (int)type->token.data.string.size, type->token.data.string.data);
             } break;
@@ -216,10 +216,10 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
         return;
     }
 
-    assert(expression->subtype == SUBTYPE_AST_EXPR);
+    // assert(expression->type == AST_EXPR);
 
     switch (expression->type) {
-        case AST_LEAF:
+        case AST_PRIMARY:
             print_primary_value(compiler, expression->token);
             break;
 
@@ -230,7 +230,7 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             // fprintf(compiler->codegen->file, ")");
             break;
 
-        case AST_BIN:
+        default:
             // fprintf(compiler->codegen->file, "(");
             generate_expression(compiler, expression->left);
             generate_expression_token(compiler, expression->token);
@@ -255,32 +255,33 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
 void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
     add_left_pad(compiler->codegen->file, depth * LEFT_PAD_STANDART_OFFSET);
 
-    switch (stmt->subtype) {
+    switch (stmt->type) {
 
         case AST_BLOCK_IMPERATIVE:
             generate_block(compiler, stmt, depth);
             fprintf(compiler->codegen->file, "\n");
             return;
-        case SUBTYPE_AST_STRUCT_DEF:
+
+        case AST_STRUCT_DEF:
             generate_struct_def(compiler, stmt, depth);
             return;
-        case SUBTYPE_AST_UNION_DEF:
+
+        case AST_UNION_DEF:
             generate_union_def(compiler, stmt, depth);
             return;
-        case SUBTYPE_AST_UNKN_DEF:
+
+        case AST_UNARY_UNKN_DEF: // uninitialize definitions... never a function
+        case AST_BIN_UNKN_DEF:
+        case AST_TERN_UNKN_DEF: // multiple definitions... never a function
             generate_unkn_def(compiler, stmt, depth);
             return;
 
-        case SUBTYPE_AST_EXPR:
-            generate_expression(compiler, stmt);
-            break;
-
-        case SUBTYPE_AST_RET_STMT:
+        case AST_RET_STMT:
             fprintf(compiler->codegen->file, "return ");
             generate_expression(compiler, stmt->left);
             break;
 
-        case SUBTYPE_AST_IF_STMT:
+        case AST_IF_STMT:
             fprintf(compiler->codegen->file, "if (");
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
@@ -288,7 +289,7 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             fprintf(compiler->codegen->file, "\n");
             return;
 
-        case SUBTYPE_AST_ELIF_STMT:
+        case AST_ELIF_STMT:
             fprintf(compiler->codegen->file, "else if (");
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
@@ -296,13 +297,13 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             fprintf(compiler->codegen->file, "\n");
             return;
 
-        case SUBTYPE_AST_ELSE_STMT:
+        case AST_ELSE_STMT:
             fprintf(compiler->codegen->file, "else ");
             generate_block(compiler, stmt->left, depth);
             fprintf(compiler->codegen->file, "\n");
             return;
 
-        case SUBTYPE_AST_WHILE_STMT:
+        case AST_WHILE_STMT:
             fprintf(compiler->codegen->file, "while (");
             generate_expression(compiler, stmt->left);
             fprintf(compiler->codegen->file, ") ");
@@ -311,7 +312,8 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             return;
 
         default:
-            fprintf(compiler->codegen->file, "NOT_HERE_YET");
+            fprintf(compiler->codegen->file, "/*assuming this is an expression*/");
+            generate_expression(compiler, stmt);
             break;
     }
 
@@ -338,7 +340,7 @@ void generate_unkn_def(compiler_t *compiler, ast_node_t *root, u64 depth) {
 
     generate_type(compiler, root->left);
     
-    if (root->left->subtype != SUBTYPE_AST_FUNC_TYPE) {
+    if (root->left->type != AST_FUNC_TYPE) {
         fprintf(compiler->codegen->file, " %.*s", (int)root->token.data.string.size, root->token.data.string.data);
     }
 
@@ -347,7 +349,7 @@ void generate_unkn_def(compiler_t *compiler, ast_node_t *root, u64 depth) {
         return;
     }
 
-    if (root->right->subtype == AST_BLOCK_IMPERATIVE) {
+    if (root->right->type == AST_BLOCK_IMPERATIVE) {
         fprintf(compiler->codegen->file, " ");
         generate_block(compiler, root->right, depth);
     } else {
@@ -385,14 +387,16 @@ void generate_struct_def(compiler_t *compiler, ast_node_t *root, u64 depth) {
 
 
 void generate_root(compiler_t *compiler, ast_node_t *root) {
-    switch (root->subtype) {
-        case SUBTYPE_AST_UNION_DEF:
+    switch (root->type) {
+        case AST_UNION_DEF:
             generate_union_def(compiler, root, 0);
             break;
-        case SUBTYPE_AST_STRUCT_DEF:
+        case AST_STRUCT_DEF:
             generate_struct_def(compiler, root, 0);
             break;
-        case SUBTYPE_AST_UNKN_DEF:
+        case AST_UNARY_UNKN_DEF: // uninitialize definitions... never a function
+        case AST_BIN_UNKN_DEF:
+        case AST_TERN_UNKN_DEF: // multiple definitions... never a function
             generate_unkn_def(compiler, root, 0);
             break;
 

@@ -32,6 +32,7 @@
 // when we will be generating IR we will generate all of the other things
 // like lambdas?
 
+#if 0
 b32 scan_unkn_def(compiler_t *compiler, ast_node_t *node) {
     scope_t *scope = list_get(&compiler->analyzer->scopes, 0);
 
@@ -114,11 +115,14 @@ b32 scan_root_node(compiler_t *compiler, ast_node_t *root) {
     return false;
 }
 
+#endif
+
 // first thing we do is add all of symbols in table
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
 
 b32 analyze_code(compiler_t *compiler) {
+    /*
     for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&compiler->parser->parsed_roots, i);
 
@@ -144,6 +148,7 @@ b32 analyze_code(compiler_t *compiler) {
 
         if (node->analyzed) continue;
     }
+    */
 
     // process_all_functions here, one pass, doing everything
 
