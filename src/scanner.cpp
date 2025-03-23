@@ -764,31 +764,6 @@ void get_token_name(u8 *buffer, token_t token) {
             sprintf((char*)buffer, "%s", "Scanning error");
             break;
             
-        case TOKEN_GEN_FUNC_DEF:
-            sprintf((char*)buffer, "%s", "Func def");
-            break;
-        case TOKEN_GEN_GET_SET:
-            sprintf((char*)buffer, "%s", "get or set expression");
-            break;
-        case TOKEN_GEN_ARRAY_GET_SET:
-            sprintf((char*)buffer, "%s", "get or set array expression");
-            break;
-        case TOKEN_GEN_GENERIC_FUNC_DEF:
-            sprintf((char*)buffer, "%s", "Generic func def");
-            break;
-
-        case TOKEN_GEN_FUNC_CALL:
-            sprintf((char*)buffer, "%s", "Func call");
-            break;
-        case TOKEN_GEN_ARRAY_CALL:
-            sprintf((char*)buffer, "%s", "array call");
-            break;
-        case TOKEN_GEN_PARAM_LIST:
-            sprintf((char*)buffer, "%s", "param list");
-            break;
-        case TOKEN_GEN_BLOCK:
-            sprintf((char*)buffer, "%s", "code block");
-            break;
         default:
             if (!char_is_special((u8)token.type)) {
                 sprintf((char*)buffer, "%c", token.type);

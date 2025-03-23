@@ -66,10 +66,10 @@ create_state : (w : u32, h : u32) -> State, b32 = {
     return state, true;
 }
 
-update_state : (current : ^State) = {
+update_state : (current : ^State) -> void = {
     
 }
 
-draw_state : (current : ^State) = {
+draw_state : (current : ^State) -> void = {
 
 }

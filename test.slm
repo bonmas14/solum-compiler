@@ -1,7 +1,17 @@
 //
 
+test : struct = {
+    something1 : s32;
+    something2 : s32;
+};
 
+rand_func : (a : s32) -> s32 = {
+    return a * a;
+}
 
-main : (args : [0] string) -> s32 = {
-    a, b, c : s32, s64, u32 = 1, 232, 3;
+main : () -> s32 = {
+    t : test;
+    t.something1 = 32 * rand_func(210);
+
+    return 0;
 }

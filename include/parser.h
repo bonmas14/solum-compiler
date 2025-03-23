@@ -34,13 +34,14 @@ enum ast_types_t {
     AST_BIN_SEPARATION,
 
     AST_BIN_CAST,
-    AST_BIN_COMP,
+
+    AST_BIN_GR, AST_BIN_LS, AST_BIN_GEQ, AST_BIN_LEQ, AST_BIN_EQ, AST_BIN_NEQ,
 
     AST_BIN_LOG_OR,
     AST_BIN_LOG_AND,
 
-    AST_BIN_ADD,
-    AST_BIN_MUL,
+    AST_BIN_ADD, AST_BIN_SUB, 
+    AST_BIN_MUL, AST_BIN_DIV, AST_BIN_MOD, 
 
     AST_BIN_BIT_XOR,
     AST_BIN_BIT_OR,
@@ -68,14 +69,14 @@ enum ast_types_t {
 
     AST_PARAM_DEF, 
 
-    AST_UNARY_UNKN_DEF, // uninitialize definitions... never a function
+    AST_UNARY_VAR_DEF, // uninitialize definitions... never a function
     AST_BIN_UNKN_DEF,
-    AST_TERN_UNKN_DEF, // multiple definitions... never a function
+    AST_BIN_MULT_DEF,
+    AST_TERN_MULT_DEF, // multiple definitions... never a function
 
     AST_STRUCT_DEF,
     AST_UNION_DEF,
     AST_ENUM_DEF,
-
 
     // types
     AST_MUL_AUTO,

@@ -172,9 +172,6 @@ void generate_expression_token(compiler_t *compiler, token_t token) {
         case TOKEN_RSHIFT:
             fprintf(compiler->codegen->file, ">>");
             break;
-        case TOKEN_GEN_GET_SET:
-            fprintf(compiler->codegen->file, ".");
-            break;
         case TOKEN_GR: 
             fprintf(compiler->codegen->file, ">");
             break;
@@ -235,11 +232,11 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             generate_expression(compiler, expression->left);
             generate_expression_token(compiler, expression->token);
             
-            if (expression->token.type == TOKEN_GEN_FUNC_CALL) {
+            if (expression->token.type == '(') {
                 fprintf(compiler->codegen->file, "(");
                 generate_expression(compiler, expression->right);
                 fprintf(compiler->codegen->file, ")");
-            } else if (expression->token.type == TOKEN_GEN_ARRAY_GET_SET) {
+            } else if (expression->token.type == '[') {
                 fprintf(compiler->codegen->file, "[");
                 generate_expression(compiler, expression->right);
                 fprintf(compiler->codegen->file, "]");
@@ -270,9 +267,10 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
             generate_union_def(compiler, stmt, depth);
             return;
 
-        case AST_UNARY_UNKN_DEF: // uninitialize definitions... never a function
+        case AST_UNARY_VAR_DEF: // uninitialize definitions... never a function
         case AST_BIN_UNKN_DEF:
-        case AST_TERN_UNKN_DEF: // multiple definitions... never a function
+        case AST_BIN_MULT_DEF:
+        case AST_TERN_MULT_DEF: // multiple definitions... never a function
             generate_unkn_def(compiler, stmt, depth);
             return;
 
@@ -394,9 +392,10 @@ void generate_root(compiler_t *compiler, ast_node_t *root) {
         case AST_STRUCT_DEF:
             generate_struct_def(compiler, root, 0);
             break;
-        case AST_UNARY_UNKN_DEF: // uninitialize definitions... never a function
-        case AST_BIN_UNKN_DEF:
-        case AST_TERN_UNKN_DEF: // multiple definitions... never a function
+        case AST_UNARY_VAR_DEF: 
+        case AST_BIN_UNKN_DEF: // only here we could get a function
+        case AST_BIN_MULT_DEF:
+        case AST_TERN_MULT_DEF: 
             generate_unkn_def(compiler, root, 0);
             break;
 
