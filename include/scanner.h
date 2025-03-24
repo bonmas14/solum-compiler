@@ -3,7 +3,6 @@
 
 #include "compiler.h"
 #include "list.h"
-#include "arena.h"
 
 #define APPROX_CHAR_PER_LINE (25)
 #define MINIMAL_SIZE (50)
@@ -131,11 +130,11 @@ b32 read_file_into_string(u8 *filename, string_t *output);
 b32  scanner_open(string_t *string, scanner_t *state);
 void scanner_close(scanner_t *state);
 
-token_t advance_token(scanner_t *state, arena_t *allocator);
-b32     consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *allocator);
+token_t advance_token(scanner_t *state, allocator_t * allocator);
+b32     consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * allocator);
 
-token_t peek_token(scanner_t *state, arena_t *allocator);
-token_t peek_next_token(scanner_t *state, arena_t *allocator);
+token_t peek_token(scanner_t *state, allocator_t * allocator);
+token_t peek_next_token(scanner_t *state, allocator_t * allocator);
 
 // --- logging for scanner
 

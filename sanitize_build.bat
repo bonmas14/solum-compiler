@@ -1,1 +1,0 @@
-clang -o .\bin\slm-ed.exe .\src\analyzer.cpp .\src\list.cpp .\src\main.cpp .\src\arena.cpp .\src\hashmap.cpp .\src\ir_generator.cpp .\src\logger.cpp .\src\parser.cpp .\src\platform_break.cpp .\src\scanner.cpp .\native\win32-x86_64-impl.cpp -I.\include\ -fsanitize=address

@@ -10,10 +10,8 @@ struct codegen_t {
     string_t *current_identifier_name;
 };
 
-codegen_t *codegen_create(arena_t *allocator) {
-    assert(allocator != NULL);
-
-    codegen_t *result = (codegen_t*)arena_allocate(allocator, sizeof(codegen_t));
+codegen_t *codegen_create(allocator_t *allocator) {
+    codegen_t *result = (codegen_t*)mem_alloc(allocator, sizeof(codegen_t));
 
     assert(result != NULL);
 

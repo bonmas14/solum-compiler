@@ -6,7 +6,7 @@
 
 #include <memory.h> 
 
-#ifndef CUSTIOM_MEM_CTRL
+#ifndef CUSTOM_MEM_CTRL
 #define ALLOC(x)      calloc(1, x) 
 #define FREE(x)       free(x) 
 #endif

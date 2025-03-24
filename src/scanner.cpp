@@ -113,7 +113,7 @@ static inline b32 char_is_special(u8 in) {
 }
 
 // @todo we need to support escape codes
-static b32 process_string(scanner_t *state, token_t *token, arena_t *allocator) {
+static b32 process_string(scanner_t *state, token_t *token, allocator_t * allocator) {
     token->type = TOKEN_CONST_STRING;
     token->c0 = state->current_char;
     token->l0 = state->current_line;
@@ -158,7 +158,7 @@ static b32 process_string(scanner_t *state, token_t *token, arena_t *allocator) 
     identifier.data = (u8*)state->file.data + string_start;
 
     if (identifier.size != 0) {
-        u8 *data = (u8*)arena_allocate(allocator, identifier.size);
+        u8 *data = (u8*)mem_alloc(allocator, identifier.size);
 
         memcpy(data, identifier.data, identifier.size);
 
@@ -354,7 +354,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     return true;
 }
 
-static b32 process_word(scanner_t *state, token_t *token, arena_t *allocator) {
+static b32 process_word(scanner_t *state, token_t *token, allocator_t * allocator) {
     token->c0 = state->current_char;
     token->l0 = state->current_line;
 
@@ -390,7 +390,7 @@ static b32 process_word(scanner_t *state, token_t *token, arena_t *allocator) {
         return true;
     }
 
-    u8 *data = (u8*)arena_allocate(allocator, identifier.size);
+    u8 *data = (u8*)mem_alloc(allocator, identifier.size);
 
     memcpy(data, identifier.data, identifier.size);
 
@@ -409,7 +409,7 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state, arena_t *allocator) {
+token_t advance_token(scanner_t *state, allocator_t * allocator) {
     eat_all_spaces(state);
 
     token_t token = {};
@@ -542,7 +542,7 @@ token_t advance_token(scanner_t *state, arena_t *allocator) {
 }
 
 // @todo: add caching instead of just cleaning this up 
-token_t peek_token(scanner_t *state, arena_t *allocator) {
+token_t peek_token(scanner_t *state, allocator_t * allocator) {
     scanner_t peek_state = *state;
 
     token_t token  = advance_token(&peek_state, allocator);
@@ -550,7 +550,7 @@ token_t peek_token(scanner_t *state, arena_t *allocator) {
     return token;
 }
 
-token_t peek_next_token(scanner_t *state, arena_t *allocator) {
+token_t peek_next_token(scanner_t *state, allocator_t * allocator) {
     scanner_t peek_state = *state;
 
     advance_token(&peek_state, allocator);
@@ -559,7 +559,7 @@ token_t peek_next_token(scanner_t *state, arena_t *allocator) {
     return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token, arena_t *allocator) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * allocator) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
@@ -594,7 +594,7 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
 
     if (file_size == 0) return false;
 
-    output->data = (u8*)arena_allocate(default_allocator, file_size + 1);
+    output->data = (u8*)mem_alloc(default_allocator, file_size + 1);
 
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 

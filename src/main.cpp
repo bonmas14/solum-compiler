@@ -1,23 +1,29 @@
+
 #include <stdio.h>
 #include <string.h>
 
 #include "stddefines.h"
+
+#include "allocator.h"
+
+#include "list.h"
+#include "temp_allocator.h"
+#include "arena.h"
+
+#include "hashmap.h"
 
 #include "scanner.h"
 #include "parser.h"
 #include "analyzer.h"
 #include "backend.h"
 
-#include "list.h"
-#include "temp_allocator.h"
-#include "arena.h"
-#include "hashmap.h"
 
 #ifdef NDEBUG 
 #define log_info_token(a, b, c)
 #endif
 
-arena_t * default_allocator;
+allocator_t * default_allocator;
+allocator_t __allocator;
 
 void debug_tests(void) {
     hashmap_tests();
@@ -33,7 +39,7 @@ void debug_tests(void) {
 void init(void) {
     debug_tests();
     temp_init(PG(32));
-    default_allocator = arena_create(PG(10));
+    default_allocator = preserve_allocator_from_stack(create_arena_allocator(PG(10)));
 }
 
 int main(int argc, char **argv) {

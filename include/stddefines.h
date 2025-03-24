@@ -1,6 +1,7 @@
 #ifndef USER_DEFINES
 #define USER_DEFINES
 
+#define UNUSED(x) (void)(x)
 
 #define KB(s) ((u64)(s) * 1024LL)
 #define MB(s) (KB(s) * 1024LL)
@@ -36,8 +37,8 @@ struct string_t {
     u8 *data;
 };
 
-struct arena_t;
-extern arena_t * default_allocator;
+struct allocator_t;
+extern allocator_t * default_allocator;
 
 #define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 

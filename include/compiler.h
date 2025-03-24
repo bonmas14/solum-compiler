@@ -2,7 +2,7 @@
 #define COMPILER_H
 
 #include "stddefines.h"
-#include "arena.h"
+#include "allocator.h"
 #include "list.h"
 #include "hashmap.h"
 #include "logger.h"
@@ -21,8 +21,8 @@ struct codegen_t;
 struct compiler_t {
     b32 is_valid;
 
-    arena_t *string_allocator;
-    arena_t *node_allocator;
+    allocator_t *strings;
+    allocator_t *nodes;
 
     scanner_t  *scanner;
     parser_t   *parser;

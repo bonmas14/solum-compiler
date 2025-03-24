@@ -6,7 +6,7 @@
 #include "parser.h"
 #include "analyzer.h"
 
-codegen_t *codegen_create(arena_t *allocator);
+codegen_t *codegen_create(allocator_t *allocator);
 void generate_code(compiler_t *compiler);
 
 #endif // BACKEND_H

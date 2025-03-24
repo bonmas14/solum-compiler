@@ -1,17 +1,17 @@
 #include "arena.h"
 
-arena_t * arena_create(u64 init_size) {
-    arena_t * data = (arena_t*)ALLOC(init_size + sizeof(arena_t));
+arena_t *arena_create(u64 init_size) {
+    arena_t * arena = (arena_t*)ALLOC(init_size + sizeof(arena_t));
 
-    if (data == NULL) {
+    if (arena == NULL) {
         log_error(STR("Arena, couldn't create arena."), 0);
         return NULL;
     }
 
-    data->size  = init_size;
-    data->start = data + 1;
+    arena->size  = init_size;
+    arena->start = arena + 1;
 
-    return data;
+    return arena;
 }
 
 void arena_delete(arena_t *cont) {
@@ -20,7 +20,45 @@ void arena_delete(arena_t *cont) {
     if (cont->next != NULL)
         arena_delete(cont->next);
 
-    FREE(cont);
+	FREE(cont);
+}
+
+allocator_t create_arena_allocator(u64 init_size) {
+    allocator_t allocator = {};
+
+    allocator.proc = arena_allocator_proc;
+    allocator.data = arena_create(init_size);
+
+    return allocator;
+}
+
+void delete_arena_allocator(allocator_t allocator) {
+    assert(allocator.data != NULL);
+
+    arena_delete((arena_t*)allocator.data);
+}
+
+ALLOCATOR_PROC(arena_allocator_proc) {
+    UNUSED(p);
+
+    switch (message) {
+        case ALLOC_ALLOCATE:
+            assert(data != NULL);
+            return arena_allocate((arena_t*)data, size);
+
+        case ALLOC_REALLOCATE:
+            log_warning(STR("arena allocator doesn't reallocate."), 0);
+            return NULL;
+
+        case ALLOC_DEALLOCATE:
+            log_warning(STR("arena allocator doesn't deallocate allocated memory, deallocate the whole arena"), 0);
+            return NULL;
+
+        default:
+            log_error(STR("unexpected allocator message."), 0);
+            assert(false);
+            break;
+    }
 }
 
 // bad recursive design, can fail @fix
@@ -40,7 +78,7 @@ void * arena_allocate(arena_t *cont, u64 size) {
         return arena_allocate(cont->next, size);
     } 
 
-    cont->next = arena_create(cont->size * 2);
+    cont->next = (arena_t*)arena_create(cont->size * 2);
 
     check_value(cont->next != NULL);
 
@@ -79,10 +117,5 @@ void arena_tests(void) {
 
     arena_delete(arena);
     
-    arena_t *arena2 = arena_create(10);
-    u8*      arr    = (u8*)arena_allocate(arena2, 10);
-
-    memcpy(arr, "hello 10!", 10);
-
     log_info(STR("arena: OK"), 0);
 }
