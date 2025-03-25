@@ -612,8 +612,6 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
 }
 
 void scan_lines(scanner_t *state) {
-    assert(state->lines.data != NULL);
-
     line_tuple_t line = {};
 
     for (u64 i = 0; i < state->file.size; i++) {
@@ -640,12 +638,8 @@ b32 scanner_open(string_t *string, scanner_t *state) {
         init_size = MINIMAL_SIZE;
     }
 
-    if (!list_create(&state->lines, init_size)) {
-        log_error(STR("Scanner: Couldn't create list."));
-        return false;
-    }
-
     scan_lines(state);
+
     return true;
 }
 

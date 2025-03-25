@@ -7,7 +7,6 @@ The scope of a project:
    - or hydraulic erosion simulation
 
 
-BASIC POINTERS ARE NOT ARRAYS BY DEFAUT!
 But they can be accessed with []. But we also can override it!
 
 
@@ -17,6 +16,9 @@ arr : [s32] = default;
 
 arr = create_array_type(sizeof(s32));
 
+// one liners
+
+func : (x : f32) -> f32 = sin(x);
 
 
 how to cast?
@@ -43,8 +45,10 @@ LOCAL SCOPE:
 
 + math
 + variables, arrays and pointers
-~ blocks and scopes
-- function defines/calls (internal)
++ blocks and scopes
++ function defines/calls (internal)
+
+- generating assembly
 
 2. Expanding functionality:
 
@@ -66,35 +70,6 @@ LOCAL SCOPE:
 - type extension functions ("hello world".self_print())
 - SIMD
 
-
-// --- PARSER STUFF
-
-trees in arrays. but that is all for storing 
-
-VALUE
-UNARY
-BINARY
-TERNARY
-LIST
-EOF
-
-Align is 4 
-
-
-    0   1     2
-L|3|U|V|B|V|V|B|B|V|V|V|E|
-
-    0     1       2
-
-L:  u     b       b
-    |    / \     / \
-    v   v   v   b   v
-               / \
-              v   v 
-
-
-1. first is left then right, recursive
-
 // --------------------- behaviour 
 
 1. automatic dereference by '.'
@@ -115,44 +90,19 @@ addition : (f32 a, f32 b) -> f32 = prototype;
 
 e : enum(u64) = { INVALID = 0, VALID = 0x8000 };
 
-
 use "system";
-
-
-
-
-// -----------------
-
-
-
-
 
 // -----------------
 
 keywords:
-    - external:  for functions and variables (from c or anything) for linking (no definition, but specifiers like __stdcall, __fastcall).
+    - external:  for functions and variables (from c or anything) for linking .
     - default:   for returning 0 of specified in return/assignment type.
     - override:  for overriding operators
     - prototype: explicitly specify that function declaration is a prototype (alias) of function pointer.
     - module:    to organize work
     - use:       for acessing modules
     - noinit:    so specify explicitly that user doesnt need to initialize this variable
-
-    - export:    for exporting fuctions to a global export table (we will need to add different things like __stdcall __fastcall and so on)
-
-
-// --------------------- no initialization
-
-
-freq : float = noinit; // will skip memset to zero for this variable
-
-
-test : struct = {
-    hello : s32;
-    world : string;
-};
-
-t : test = noinit; // t has garbage in it
+    - export:    for exporting fuctions to a global export table
 
 
 // --------------------- pointers
@@ -167,78 +117,6 @@ if (freq == @@ptr2) {
     print("valid");
 }
 
-// --------------------- generics
-
-list : struct<value_type> = {
-    count : u64;
-    size  : u64;
-    data  : ^value_type;
-};
-
-create_list : <value_type>(size : s32) -> value_type, bool {
-    data : ^value_type = allocate<value_type>(size);
-
-    if (data == null) {
-        return default, false;
-    }
-
-    output : list<value_type> = default;
-
-    output.size = size;
-    output.data = data;
-
-    return output, true;
-};
-
-value, valid : list<s32>, bool = create_list<s32>(10);
-// or 
-value, valid := create_list<s32>(10);
-
-sum : <arr_type>(arr : ^arr_type, length : s64) -> arr_type = {
-    result : arr_type = 0;
-
-    for (i : s64 = 0; i < length; i++) {
-        result += arr[i];         // ------------- this will raise a operator override error
-                                  // for situation when override with this type doesnt exist
-                                  // or it returns different type that needed here.
-    }
-
-    return result;
-};
-
-arr : [4]s32 = { 0, 1, 2, 3 }; // multiple dimensions arrays? no.
-
-result := sum(arr, 4);
-// or
-result : s32 = sum<s32>(arr, 4);
-// or 
-result : s32;
-result = sum(arr, 4);
-
-// 
-<any_type, struct struct_type, prototype function_type, simple from_u8_to_f64>
-
-tuple : struct<A, B> = {
-    A a;
-    B b;
-}
-
-// only last can be variable
-var_t : struct<V> = {
-    V args;
-}
-
-
-a : var_t<s32[10]>; 
-
-a.args[0] = 23;
-a.args[1] = 1000;
-
-
-
-// variable type count???
-
-
 // --------------------- anonymous struct/union members
 
 some : struct<T> = { // this is type definition. this is why it cant be anon
@@ -246,7 +124,7 @@ some : struct<T> = { // this is type definition. this is why it cant be anon
 
       named_union : union = { // this is member definition
           test : s32;
-          struct = { // anon member definition
+          _ : struct = { // anon member definition
               same_test : s32;
           };
 
@@ -260,7 +138,7 @@ some : struct<T> = { // this is type definition. this is why it cant be anon
 
 // --------------------- function pointers
 
-result := { print("hello!"); };
+result : () = { print("hello!"); };
 
 callback : (a : s32, b : s32) -> s32, bool = prototype; 
 void_callback : () = prototype;
@@ -279,14 +157,14 @@ res, valid : s32, bool = get_callback().(4, 2);        // <<<<<<<
 
 // ------------- external functions
 
-InitWindow : () = external(__fastcall);
+InitWindow : () = external;
 
 InitWindow();
-
 
 callback : () = prototype;
 
 my : callback = {
+    
 };
 
 
@@ -339,51 +217,9 @@ override [,] : (type : List, command : string, index : u64) {
     }
 }
 
-
-// -------------
-
-list : struct<T> = {
-    count : u64;
-    size  : u64;
-    data  : ^T;
-}
-
-
-create : <T>(prealloc : u64) -> list<T>, bool = {
-    if (prealloc == 0) {
-        return default, false;
-    }
-
-    data : ^ T = allocate<T>(prealloc);
-
-    if (data == null) {
-        return default, false;
-    }
-
-    output : list<T> = default; 
-
-    output.size = size;
-    output.data = data;
-
-    return output, true;
-}
-
-add : <T>(context : list<T>, value : T) -> bool = {
-}
-
-// start of file main.slm
-
-// should be in global scope for program to access them by name
-
-main : (argc : s32, argv : ^^i8) -> s32 = {
-    list = create<s32>(10);
-    add(list, 3);
-}
-
-
 // ------- enum
 
-tokens : enum<s32> = {
+tokens : enum s32 = {
     EOF   = 0, 
 
     Identifier = 256,
@@ -393,7 +229,7 @@ tokens : enum<s32> = {
 }
 
 token := tokens.EOF;
-token : tokens = tokens.Error;
+token : tokens = .Error;
 
 // ------- loops
 

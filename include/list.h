@@ -10,6 +10,8 @@
 #define FREE(x)       free(x) 
 #endif
 
+#define STANDART_LIST_SIZE 64
+
 template<typename DataType>
 struct list_t {
     u64 count;
@@ -55,6 +57,9 @@ b32 list_grow(list_t<DataType> *list);
 template<typename DataType>
 b32 list_grow_fit(list_t<DataType> *list);
 
+template<typename DataType>
+void create_if_needed(list_t<DataType> *list);
+
 
 // ----------- Implementation
 
@@ -97,7 +102,7 @@ b32 list_delete(list_t<DataType> *list) {
 // return index of a first element
 template<typename DataType>
 void list_allocate(list_t<DataType> *list, u64 elements_amount, u64 *start_index) {
-    assert(list != 0);
+    list_create_if_needed(list);
     assert(elements_amount > 0);
 
     if (!list_grow_fit(list, elements_amount)) {
@@ -112,6 +117,7 @@ void list_allocate(list_t<DataType> *list, u64 elements_amount, u64 *start_index
 
 template<typename DataType> 
 void list_fill(list_t<DataType> *list, DataType *data, u64 elements_amount, u64 start_index) {
+    list_create_if_needed(list);
 
     DataType *start_address = list_get(list, start_index);
     
@@ -125,7 +131,7 @@ void list_fill(list_t<DataType> *list, DataType *data, u64 elements_amount, u64 
 // add element to an list, and advance
 template<typename DataType>
 void list_add(list_t<DataType> *list, DataType *data) {
-    assert(list != 0);
+    list_create_if_needed(list);
     assert(data != 0);
 
     u64 index = 0;
@@ -137,9 +143,7 @@ void list_add(list_t<DataType> *list, DataType *data) {
 // get element by index
 template<typename DataType>
 DataType *list_get(list_t<DataType> *list, u64 index) {
-    assert(list != 0);
-
-    assert(index < list->count);
+    list_create_if_needed(list);
 
     if (index >= list->count) {
         log_error(STR("Area: Index is greater than count of elements."));
@@ -150,6 +154,13 @@ DataType *list_get(list_t<DataType> *list, u64 index) {
 }
 
 // -------------- local functions
+
+template<typename DataType>
+void list_create_if_needed(list_t<DataType> *list) {
+    if (list->data == NULL && !list_create(list, STANDART_LIST_SIZE)) {
+        log_error(STR("tried to create list but failed."));
+    }
+}
 
 template<typename DataType>
 b32 list_grow(list_t<DataType> *list) {

@@ -8,6 +8,8 @@
 #include "scanner.h"
 
 struct scope_entry_t {
+    b8 resolved;
+    b8 can_be_used;
     u32 type;
     ast_node_t *node;
 };
@@ -27,11 +29,6 @@ struct scope_t {
 
 struct analyzer_t {
     list_t<scope_t> scopes;
-};
-
-enum funciton_flags_t {
-    SCOPE_FUNC_EXTERNAL = 0x00010000,
-    SCOPE_FUNC_PROTO    = 0x00020000,
 };
 
 b32 analyze_code(compiler_t *compiler);

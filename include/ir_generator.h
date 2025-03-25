@@ -6,17 +6,10 @@
 #include "hashmap.h"
 
 struct ir_opcode_t {
-    u32 operation;
-    u32 type;
-
-    union {
-        struct {
-            u64 math_l;
-            u64 math_r;
-        };
-
-        u64 offset;
-    };
+    u64 operation;
+    u64 arg1;
+    u64 arg2;
+    u64 arg3;
 };
 
 // IMM 
@@ -47,13 +40,22 @@ struct ir_opcode_t {
 //
 
 enum ir_opcodes_t {
-
-    IR_NOP       = 0x0,
-    IR_BREAK,
-    IR_CALL,
-    IR_RETURN,
+    IR_NOP = 0x0,
     
-    IR_MATH_FLAG = 0x00010000,
+    IR_PUSH, // [1] value
+    IR_POP,  // [0]
+             
+    IR_IF,   // [2] comp, cjump ...
+    IR_ELSE, // [1] jump ...
+    IR_ELIF, // [3] jump comp cjump ...
+    IR_RET,  // [0]
+
+    IR_WHILE, // [2] cond, cjump .... <jump
+    
+    IR_SET,  
+    IR_GET,
+
+    IR_INVERT,
 
     IR_ADD,
     IR_SUB,
@@ -73,22 +75,16 @@ enum ir_opcodes_t {
 
     IR_COMPARE,
 
-    IR_MEM_FLAG  = 0x00020000,
-
-
     IR_LOAD,
     IR_STORE,
     IR_IMM,
     IR_MOVE,
 
-    IR_PUSH,
-    IR_POP,
 
-    // get value from pointer + offset
-
-    IR_BRANCH_FLAG = 0x00040000,
-    
     IR_JUMP,
 };
+
+list_t<ir_opcode_t> generate_ir(compiler_t *state);
+void print_ir_opcode(ir_opcode_t *code);
 
 #endif // IR_GEN_H

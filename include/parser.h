@@ -30,8 +30,10 @@ enum ast_types_t {
 
     AST_PRIMARY,
 
+    AST_SEPARATION, // list
+
     AST_BIN_ASSIGN,
-    AST_BIN_SEPARATION,
+    AST_BIN_SWAP,
 
     AST_BIN_CAST,
 
@@ -48,7 +50,10 @@ enum ast_types_t {
     AST_BIN_BIT_AND,
     AST_BIN_BIT_SHIFT,
 
-    AST_UNARY,
+    AST_UNARY_DEREF,
+    AST_UNARY_REF,
+    AST_UNARY_NEGATE,
+    AST_UNARY_NOT,
 
     AST_FUNC_CALL,
     AST_MEMBER_ACCESS,
@@ -84,6 +89,8 @@ enum ast_types_t {
 
     // 
     AST_AUTO_TYPE,
+
+    AST_VOID_TYPE,
 
     AST_STD_TYPE,
     AST_UNKN_TYPE,

@@ -66,6 +66,8 @@ enum token_type_t {
     TOK_UNION,
     TOK_ENUM,
 
+    TOK_VOID,
+
     TOK_U8,
     TOK_U16,
     TOK_U32,
@@ -79,6 +81,7 @@ enum token_type_t {
     TOK_F32,
     TOK_F64,
 
+    TOK_BOOL8,
     TOK_BOOL32,
     TOK_DEFAULT,
 
@@ -107,11 +110,13 @@ enum token_type_t {
 u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "struct", "union", "enum",
 
+    "void",
+
     "u8", "u16", "u32", "u64",
     "s8", "s16", "s32", "s64", 
     "f32", "f64",
 
-    "b32", 
+    "b8", "b32", 
 
     "default",
 

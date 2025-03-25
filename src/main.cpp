@@ -15,6 +15,7 @@
 #include "scanner.h"
 #include "parser.h"
 #include "analyzer.h"
+#include "ir_generator.h"
 #include "backend.h"
 
 
@@ -91,6 +92,9 @@ int main(int argc, char **argv) {
         log_update_color();
         return -1;
     }
+
+    log_info(STR("IR..."));
+    generate_ir(&compiler);
 
     log_info(STR("Generating..."));
     generate_code(&compiler);

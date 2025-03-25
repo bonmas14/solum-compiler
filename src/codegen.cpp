@@ -218,14 +218,37 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             print_primary_value(compiler, expression->token);
             break;
 
-        case AST_UNARY:
+        case AST_UNARY_DEREF:
+        case AST_UNARY_REF:
+        case AST_UNARY_NEGATE:
+        case AST_UNARY_NOT:
             // fprintf(compiler->codegen->file, "(");
             generate_expression_token(compiler, expression->token);
             generate_expression(compiler, expression->left);
             // fprintf(compiler->codegen->file, ")");
             break;
 
-        default:
+        case AST_SEPARATION:
+            break;
+
+        case AST_BIN_ADD:
+        case AST_BIN_SUB:
+        case AST_BIN_ASSIGN:
+        case AST_BIN_GR:
+        case AST_BIN_LS:
+        case AST_BIN_GEQ:
+        case AST_BIN_LEQ:
+        case AST_BIN_EQ:
+        case AST_BIN_NEQ:
+        case AST_BIN_LOG_OR:
+        case AST_BIN_LOG_AND:
+        case AST_BIN_MUL:
+        case AST_BIN_DIV:
+        case AST_BIN_MOD:
+        case AST_BIN_BIT_XOR:
+        case AST_BIN_BIT_OR:
+        case AST_BIN_BIT_AND:
+        case AST_BIN_BIT_SHIFT:
             // fprintf(compiler->codegen->file, "(");
             generate_expression(compiler, expression->left);
             generate_expression_token(compiler, expression->token);
@@ -243,6 +266,10 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             }
 
             // fprintf(compiler->codegen->file, ")");
+            break;
+        default:
+
+            log_error(STR("what is this token"));
             break;
     }
 }

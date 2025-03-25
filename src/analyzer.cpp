@@ -39,34 +39,57 @@ scope_t *get_global_scope(compiler_t *state) {
     return scope;
 }
 
+b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *entry) {
+    scope_t * scope = get_global_scope(state);
+
+    if (hashmap_contains(&scope->table, key)) {
+        if (!memcmp(entry, hashmap_get(&scope->table, key), sizeof(scope_entry_t))) {
+            return true;
+        }
+
+        log_error_token(STR("Symbol already used before."), state->scanner, entry->node->token, 0);
+        return false;
+    }
+
+    if (!hashmap_add(&scope->table, key, entry)) {
+        log_error(STR("Couldn't reserve symbol..."));
+        assert(false);
+    }
+
+    return true;
+}
+
+
+
 b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
+    // left type / types / auto
+    // center -- assignments (expr
+    // right expr, for names
+
+    // check validity
+
+    // while (true) {
+        // AST_BIN_SEPARATION
+    // }
+    
 
 }
 
 b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     assert(node->type == AST_BIN_UNKN_DEF);
 
-    scope_t *scope = get_global_scope(state);
-    string_t key   = node->token.data.string;
-
-    if (hashmap_contains(&scope->table, key)) {
-        log_error_token(STR("Symbol was already used before"), state->scanner, node->token, 0);
-        return false;
-    } 
-
     scope_entry_t entry = {};
+    entry.type = ENTRY_ERROR;
     entry.node = node;
 
     if (node->left->type == AST_UNKN_TYPE) {
         entry.type = ENTRY_UNKN;
-    } else switch (node->left->type) {
+        return add_symbol_to_global_scope(state, node->token.data.string, &entry);
+    } 
+
+    switch (node->left->type) {
         case AST_FUNC_TYPE:
             entry.type = ENTRY_FUNC;
-
-            if (node->right->type != AST_BLOCK_IMPERATIVE) {
-                log_error_token(STR("Function body should be in '{' '}' block"), state->scanner, node->right->token, 0);
-                return false;
-            }
             break;
 
         case AST_AUTO_TYPE:
@@ -74,24 +97,19 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
         case AST_ARR_TYPE:
         case AST_PTR_TYPE:
             entry.type = ENTRY_VAR;
-
-            if (node->right->type == AST_BLOCK_IMPERATIVE) {
-                log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
-                return false;
-            }
             break;
 
         default:
-            entry.type = ENTRY_ERROR;
-            break;
+            log_error(STR("unexpected type of ast node. in scan unkn def"));
+            return false;
     } 
 
-    if (!hashmap_add(&scope->table, key, &entry)) {
-        log_error(STR("something"));
-        assert(false);
+    if (entry.type == ENTRY_VAR && node->right->type == AST_BLOCK_IMPERATIVE) {
+        log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
+        return false;
     }
 
-    return true;
+    return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
 // first thing we do is add all of symbols in table

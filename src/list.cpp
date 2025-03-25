@@ -3,13 +3,6 @@
 void list_tests(void) {
     list_t<u64> list = {};
 
-    list_create(&list, 3);
-
-    assert(list.data != 0);
-    assert(list.count == 0);
-    assert(list.current_size == 3);
-    assert(list.grow_size == 6);
-
     u64 data1 = 404;
     u64 data2 = 804;
     u64 data3 = 104;

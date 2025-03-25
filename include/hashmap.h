@@ -11,6 +11,7 @@
 #define FREE(x)       free(x) 
 #endif
 
+#define STANDART_MAP_SIZE 128
 #define MAX_HASHMAP_LOAD 0.75
 
 #define COMPUTE_HASH(name) b32 name(u64 size, void * key)
@@ -71,6 +72,9 @@ u32  get_hash(u64 size, void *data);
 void hashmap_tests(void);
 
 template<typename KeyType, typename DataType>
+void create_map_if_needed(hashmap_t<KeyType, DataType> *map);
+
+template<typename KeyType, typename DataType>
 b32 rebuild_map(hashmap_t<KeyType, DataType> *map);
 
 // ----------- Implementation
@@ -79,15 +83,11 @@ template<typename KeyType, typename DataType>
 b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func) {
     assert(init_size > 0);
 
-    if (hash_func)
-        map->hash_func = hash_func;
-    else
-        map->hash_func = get_hash_std;
+    if (hash_func) map->hash_func = hash_func;
+    else           map->hash_func = get_hash_std;
 
-    if (compare_func)
-        map->compare_func = compare_func;
-    else
-        map->compare_func = compare_keys_std;
+    if (compare_func) map->compare_func = compare_func;
+    else              map->compare_func = compare_keys_std;
 
     map->capacity  = init_size;
     map->entries   = (kv_pair_t<KeyType, DataType>*)ALLOC(sizeof(kv_pair_t<KeyType, DataType>) * init_size);
@@ -106,8 +106,11 @@ b32 hashmap_delete(hashmap_t<KeyType, DataType> *map) {
     return true;
 }
 
+
 template<typename KeyType, typename DataType>
 b32 hashmap_contains(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    create_map_if_needed(map);
+
     u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
     u32 index = hash % map->capacity;
 
@@ -128,6 +131,8 @@ b32 hashmap_contains(hashmap_t<KeyType, DataType> *map, KeyType key) {
 
 template<typename KeyType, typename DataType>
 DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    create_map_if_needed(map);
+
     u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
     u32 index = hash % map->capacity;
 
@@ -148,6 +153,8 @@ DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
 // note about implication
 template<typename KeyType, typename DataType>
 b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value) {
+    create_map_if_needed(map);
+
     if (map->load > (map->capacity * MAX_HASHMAP_LOAD)) {
         if (!rebuild_map(map)) {
             log_error(STR("Map is full't insert element to but we resize it and still failed."));
@@ -179,6 +186,8 @@ b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value)
 
 template<typename KeyType, typename DataType>
 b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    create_map_if_needed(map);
+
     u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
     u32 index = hash % map->capacity;
 
@@ -199,6 +208,12 @@ b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
     return false;
 }
 
+template<typename KeyType, typename DataType>
+void create_map_if_needed(hashmap_t<KeyType, DataType> *map) {
+    if (map->entries == NULL && !hashmap_create(map, STANDART_MAP_SIZE, map->hash_func, map->compare_func)) {
+        log_error(STR("tried to create hashmap and failed."));
+    }
+}
 
 template<typename KeyType, typename DataType>
 b32 rebuild_map(hashmap_t<KeyType, DataType> *map) {

@@ -75,11 +75,10 @@ COMPARE_KEYS(compare_string_keys) {
 
 void hashmap_tests(void) {
     {
-        hashmap_t<string_t, u32> map = {};
+        hashmap_t<string_t, u32> map = { };
+        map.hash_func    = get_string_hash;
+        map.compare_func = compare_string_keys;
 
-        b32 result = hashmap_create(&map, 256, get_string_hash, compare_string_keys);
-
-        assert(result);
         map.capacity = 3;
 
         u8 name1[] = { "hashmap1" };
@@ -123,9 +122,6 @@ void hashmap_tests(void) {
 
     {
         hashmap_t<u32, u32> map = {};
-        b32 result = hashmap_create(&map, 256, NULL, NULL);
-
-        assert(result);
 
         u32 a = 0x08;
         u32 b = 0x80;

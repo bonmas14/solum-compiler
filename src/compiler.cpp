@@ -10,8 +10,6 @@
 analyzer_t *analyzer_create(allocator_t *allocator) {
     analyzer_t *analyzer = (analyzer_t*)mem_alloc(allocator, sizeof(analyzer_t));
 
-    check_value(list_create(&analyzer->scopes, 100));
-
     u64 index = {};
     list_allocate(&analyzer->scopes, 1, &index);
 
