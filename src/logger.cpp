@@ -1,5 +1,5 @@
 #include "logger.h"
-#include "temp_allocator.h"
+#include "talloc.h"
 #include <memory.h>
 
 #define LOGGER_COLOR_STACK_SIZE 256
@@ -37,47 +37,40 @@ void add_left_pad(FILE * file, u64 amount) {
     while (amount-- > 0) fprintf(file, " ");
 }
 
-void log_write(u8 *text, u64 left_pad) {
-    add_left_pad(stderr, left_pad);
+void log_write(u8 *text) {
     log_update_color();
     fprintf(stderr, "%s", text);
 }
 
-void log_info(u8 *text, u64 left_pad) {
-    add_left_pad(stderr, left_pad);
-
+void log_info(u8 *text) {
     log_push_color(INFO_COLOR);
     log_update_color();
     fprintf(stderr, "INFO: %s\n", text);
     log_pop_color();
 }
 
-void log_warning(u8 *text, u64 left_pad) {
-    add_left_pad(stderr, left_pad);
-
+void log_warning(u8 *text) {
     log_push_color(WARNING_COLOR);
     log_update_color();
     fprintf(stderr, "WARNING: %s\n", text);
     log_pop_color();
 }
 
-void log_error(u8 *text, u64 left_pad) {
-    add_left_pad(stderr, left_pad);
-
+void log_error(u8 *text) {
     log_push_color(ERROR_COLOR);
     log_update_color();
     fprintf(stderr, "ERROR: %s\n", text);
     log_pop_color();
 }
 
-string_t string_concat(string_t a, string_t b) {
+string_t string_temp_concat(string_t a, string_t b) {
     assert(default_allocator != NULL);
     assert(a.data != NULL);
     assert(b.data != NULL);
 
-    // @todo: change all allocators to one interface.
-    // right now we know that we use memory allocation 
-    u8* data = (u8*)temp_allocate(a.size + b.size);
+    allocator_t *alloc = get_temporary_allocator();
+
+    u8* data = (u8*)mem_alloc(alloc, a.size + b.size);
 
     memcpy((void*)data,            a.data, a.size);
     memcpy((void*)(data + a.size), b.data, b.size);

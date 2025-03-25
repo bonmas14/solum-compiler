@@ -7,7 +7,7 @@
 #include "allocator.h"
 
 #include "list.h"
-#include "temp_allocator.h"
+#include "talloc.h"
 #include "arena.h"
 
 #include "hashmap.h"
@@ -38,7 +38,6 @@ void debug_tests(void) {
 
 void init(void) {
     debug_tests();
-    temp_init(PG(32));
     default_allocator = preserve_allocator_from_stack(create_arena_allocator(PG(10)));
 }
 
@@ -52,9 +51,9 @@ int main(int argc, char **argv) {
     str2.data = STR("Right now!\n");
     str2.size = strlen((const char*)str2.data);
 
-    string_t str3 = string_concat(str1, str2);
+    string_t str3 = string_temp_concat(str1, str2);
 
-    log_info(str3.data, 0);
+    log_info(str3.data);
 
     log_push_color(255, 255, 255);
 
@@ -70,18 +69,30 @@ int main(int argc, char **argv) {
     }
 
     if (!read_file_into_string((u8*)filename, &file)) {
-        log_error(STR("Main: couldn't open file."), 0);
+        log_error(STR("Main: couldn't open file."));
         return -1;
     }
 
     if (!scanner_open(&file, compiler.scanner)) {
-        log_error(STR("Main: couldn't open file and load it into memory."), 0);
+        log_error(STR("Main: couldn't open file and load it into memory."));
         return -1;
     }
 
-    parse(&compiler);
-    analyze_code(&compiler);
+    log_info(STR("Parsing..."));
+    if (!parse(&compiler)) { 
+        log_info(STR("Parsing error"));
+        log_update_color();
+        return -1;
+    }
 
+    log_info(STR("Analyzing..."));
+    if (!analyze_code(&compiler)) {
+        log_info(STR("Analyzing error"));
+        log_update_color();
+        return -1;
+    }
+
+    log_info(STR("Generating..."));
     generate_code(&compiler);
 
     log_update_color();

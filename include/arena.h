@@ -10,15 +10,15 @@
 
 #include <memory.h> 
 
-#define ALLOC(x)      calloc(1, x) 
-#define FREE(x)       free(x) 
+#define ALLOC(x) calloc(1, x) 
+#define FREE(x)  free(x) 
 
 #endif
 
 #ifdef DEBUG
 #define ZERO_CHECK(ptr, size) \
         for (u64 i = 0; i < size; i++) \
-            { if ((*(((u8*)ptr) + i) != 0)) { log_error(STR("area block is not zero"), 0); assert(false); }}
+            { if ((*(((u8*)ptr) + i) != 0)) { log_error(STR("area block is not zero")); assert(false); }}
 #else
 #define ZERO_CHECK(ptr, size) 
 #endif
@@ -37,8 +37,6 @@ void * arena_allocate(arena_t *cont, u64 size);
 
 allocator_t create_arena_allocator(u64 init_size);
 void        delete_arena_allocator(allocator_t allocator);
-
-ALLOCATOR_PROC(arena_allocator_proc);
 
 void arena_tests(void);
 

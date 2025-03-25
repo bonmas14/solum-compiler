@@ -4,7 +4,7 @@ arena_t *arena_create(u64 init_size) {
     arena_t * arena = (arena_t*)ALLOC(init_size + sizeof(arena_t));
 
     if (arena == NULL) {
-        log_error(STR("Arena, couldn't create arena."), 0);
+        log_error(STR("Arena't create arena."));
         return NULL;
     }
 
@@ -23,6 +23,30 @@ void arena_delete(arena_t *cont) {
 	FREE(cont);
 }
 
+ALLOCATOR_PROC(arena_allocator_proc) {
+    UNUSED(p);
+
+    switch (message) {
+        case ALLOC_ALLOCATE:
+            assert(data != NULL);
+            return arena_allocate((arena_t*)data, size);
+
+        case ALLOC_REALLOCATE:
+            log_warning(STR("arena allocator doesn't reallocate."));
+            return NULL;
+
+        case ALLOC_DEALLOCATE:
+            log_warning(STR("arena allocator doesn't deallocate allocated memory the whole arena"));
+            return NULL;
+
+        default:
+            log_error(STR("unexpected allocator message."));
+            assert(false);
+            break;
+    }
+}
+
+
 allocator_t create_arena_allocator(u64 init_size) {
     allocator_t allocator = {};
 
@@ -36,29 +60,6 @@ void delete_arena_allocator(allocator_t allocator) {
     assert(allocator.data != NULL);
 
     arena_delete((arena_t*)allocator.data);
-}
-
-ALLOCATOR_PROC(arena_allocator_proc) {
-    UNUSED(p);
-
-    switch (message) {
-        case ALLOC_ALLOCATE:
-            assert(data != NULL);
-            return arena_allocate((arena_t*)data, size);
-
-        case ALLOC_REALLOCATE:
-            log_warning(STR("arena allocator doesn't reallocate."), 0);
-            return NULL;
-
-        case ALLOC_DEALLOCATE:
-            log_warning(STR("arena allocator doesn't deallocate allocated memory, deallocate the whole arena"), 0);
-            return NULL;
-
-        default:
-            log_error(STR("unexpected allocator message."), 0);
-            assert(false);
-            break;
-    }
 }
 
 // bad recursive design, can fail @fix
@@ -117,5 +118,5 @@ void arena_tests(void) {
 
     arena_delete(arena);
     
-    log_info(STR("arena: OK"), 0);
+    log_info(STR("arena: OK"));
 }

@@ -1224,7 +1224,7 @@ b32 parse(compiler_t *compiler) {
     }
 
     if (!list_create(&compiler->parser->parsed_roots, INIT_NODES_SIZE)) {
-        log_error(STR("Parser: Couldn't create root indices list."), 0);
+        log_error(STR("Parser: Couldn't create root indices list."));
         return false;
     }
 

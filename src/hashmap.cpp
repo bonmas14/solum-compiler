@@ -154,5 +154,5 @@ void hashmap_tests(void) {
         assert(*(u32*)ref == data);
     }
 
-    log_info(STR("hashmap: OK"), 0);
+    log_info(STR("hashmap: OK"));
 }

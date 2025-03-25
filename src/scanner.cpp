@@ -269,7 +269,7 @@ static b32 parse_const_integer(scanner_t *state, string_t *buffer, token_t *toke
 
     if (index >= (MAX_INT_CONST_SIZE - 1)) {
         // @todo better logging
-        log_warning(STR("Scanner: size of a constant is greater than maximum size."), 0);
+        log_warning(STR("Scanner: size of a constant is greater than maximum size."));
         buffer->size = (MAX_INT_CONST_SIZE - 1);
         return false;
     } else {
@@ -315,7 +315,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     if (!parse_const_integer(state, &not_parsed_constant, token, type)) {
         token->type = TOKEN_ERROR; 
 
-        log_error(STR("Couldn't parse integer."), 0);
+        log_error(STR("Couldn't parse integer."));
 
         return false;
     }
@@ -329,7 +329,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     } else if (char_is_typed_digit(type, peek_next_char(state))) {
         if (type != PARSE_DIGIT_INT) {
             // 0b0110.0101 @todo fix it?
-            log_warning(STR("Scanner: what? i allow this."), 0);
+            log_warning(STR("Scanner: what? i allow this."));
         }
 
         before_delimeter = parse_const_int(not_parsed_constant, type);
@@ -529,7 +529,7 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
             } else {
-                log_error(STR("Unexpected symbol in code."), 0);
+                log_error(STR("Unexpected symbol in code."));
                 token.type = TOKEN_ERROR;
             }
         } break;
@@ -583,8 +583,8 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
     FILE *file = fopen((char*)filename, "rb");
 
     if (file == NULL) {
-        log_error(STR("Scanner: Could not open file."), 0);
-        log_error(filename, 0); // @cleanup
+        log_error(STR("Scanner: Could not open file."));
+        log_error(filename); // @cleanup
         return false;
     }
 
@@ -599,8 +599,8 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
     if (bytes_read < file_size) {
-        log_error(STR("Scanner: Could not read file."), 0);
-        log_error(filename, 0); // @cleanup
+        log_error(STR("Scanner: Could not read file."));
+        log_error(filename); // @cleanup
         return false;
     }
 
@@ -641,7 +641,7 @@ b32 scanner_open(string_t *string, scanner_t *state) {
     }
 
     if (!list_create(&state->lines, init_size)) {
-        log_error(STR("Scanner: Couldn't create list."), 0);
+        log_error(STR("Scanner: Couldn't create list."));
         return false;
     }
 
@@ -800,27 +800,26 @@ void print_token_info(token_t token, u64 left_pad) {
     get_token_info(token_info, token);
     
     sprintf((char*)buffer, "line: %u, char: %u | Token: '%.50s'. Data: %.50s", token.l0 + 1, token.c0 + 1, token_name, token_info);
-    log_write(buffer, left_pad);
+    
+    add_left_pad(stderr, left_pad);
+    log_write(buffer);
 }
 
-void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad) {
-    assert(token.type != TOKEN_ERROR);
-    assert(token.type != TOKEN_EOF);
-
-    u64 start_line = 0;
-    if (token.l0 >= 2) {
-        start_line = token.l0 - 2;
-    }
-
-    u64 stop_line = token.l1 + 1; 
+void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 highlight_l0, u64 highlight_l1,  u64 highlight_c0, u64 highlight_c1) {
+    assert(line_stop >= line_start);
+    assert(highlight_c1 >= highlight_c0);
+    assert(highlight_l1 >= highlight_l0);
+    assert(highlight_l0 >= line_start);
+    assert(highlight_l1 <= line_stop);
 
     b32 cancel_empty_line_skip = false;
 
-    if (stop_line > state->lines.count) {
-        stop_line = state->lines.count;
+    u64 stop_pos = line_stop + 1;
+    if (stop_pos > state->lines.count) {
+        stop_pos = state->lines.count;
     }
 
-    for (u64 i = start_line; i < stop_line; i++) {
+    for (u64 i = line_start; i < stop_pos; i++) {
         line_tuple_t line = *list_get(&state->lines, i);
 
         u64 len   = line.stop - line.start + 1;
@@ -835,63 +834,63 @@ void print_decorated_lines_of_code(scanner_t *state, token_t token, u64 left_pad
             }
         }
         
-        if (!cancel_empty_line_skip && skip_line && i < token.l0) { 
+        if (!cancel_empty_line_skip && skip_line && i < highlight_l0) { 
             cancel_empty_line_skip = true;
             continue;
         }
 
-        log_write(STR(""), left_pad);
+        log_write(STR(""));
 
-        if (i < token.l0 || i > token.l1) {
+        if (i < highlight_l0 || i > highlight_l1) {
             log_update_color();
             fprintf(stderr, "| %.*s\n", (int)len - 1, start);
         } else {
-            u64 token_size = token.c1 - token.c0;
+            u64 token_size = highlight_c1 - highlight_c0;
 
-            if (token.l0 != token.l1) {
+            if (highlight_l0 != highlight_l1) {
                 log_push_color(ERROR_COLOR); 
 
-                if (i > token.l0 && i < token.l1) {
+                if (i > highlight_l0 && i < highlight_l1) {
                     log_update_color();
                     fprintf(stderr, "| %.*s", (int)len, start);
                     log_pop_color();
-                } else if (i == token.l0) {
+                } else if (i == highlight_l0) {
                     log_update_color();
-                    fprintf(stderr, "| %.*s", (int)token.c0, start);
-                    len -= token.c0;
-                    fprintf(stderr, "%.*s", (int)len, start + token.c0);
+                    fprintf(stderr, "| %.*s", (int)highlight_c0, start);
+                    len -= highlight_c0;
+                    fprintf(stderr, "%.*s", (int)len, start + highlight_c0);
                     log_pop_color();
-                } else if (i == token.l1) {
+                } else if (i == highlight_l1) {
                     log_update_color();
-                    fprintf(stderr, "| %.*s", (int)token.c1, start);
-                    len -= token.c1;
+                    fprintf(stderr, "| %.*s", (int)highlight_c1, start);
+                    len -= highlight_c1;
 
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int) len, start + token.c1);
+                    fprintf(stderr, "%.*s", (int) len, start + highlight_c1);
                 } else {
                     log_pop_color();
                 }
             } else {
                 log_update_color();
-                fprintf(stderr, "| %.*s", (int)token.c0, start);
-                len -= token.c0;
+                fprintf(stderr, "| %.*s", (int)highlight_c0, start);
+                len -= highlight_c0;
 
                 log_push_color(255, 64, 64); 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int)token_size, start + token.c0);
+                fprintf(stderr, "%.*s", (int)token_size, start + highlight_c0);
                 log_pop_color();
 
                 len -= token_size;
 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int) len, start + token.c0 + token_size);
+                fprintf(stderr, "%.*s", (int) len, start + highlight_c0 + token_size);
             }
         }
     }
 
-    if (stop_line == state->lines.count) {
-        log_write(STR("\n"), 0);
+    if (stop_pos == state->lines.count) {
+        log_write(STR("\n"));
     }
 }
 
@@ -900,9 +899,9 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
-    log_write(STR("\n"), left_pad);
-    print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR("\n"), left_pad);
+    log_write(STR("\n"));
+    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
+    log_write(STR("\n"));
 
     log_pop_color();
     log_pop_color();
@@ -911,14 +910,15 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
 void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(WARNING_COLOR);
 
-    log_warning(text, left_pad);
+    add_left_pad(stderr, left_pad);
+    log_warning(text);
 
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
-    log_write(STR("\n"), left_pad);
-    print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR("\n"), left_pad);
+    log_write(STR("\n"));
+    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
+    log_write(STR("\n"));
 
     log_pop_color();
     log_pop_color();
@@ -926,14 +926,15 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
 
 void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(ERROR_COLOR);
-    log_error(text, left_pad);
+    add_left_pad(stderr, left_pad);
+    log_error(text);
 
     print_token_info(token, left_pad);
 
     log_push_color(255, 255, 255);
-    log_write(STR("\n"), left_pad);
-    print_decorated_lines_of_code(state, token, left_pad);
-    log_write(STR("\n"), left_pad);
+    log_write(STR("\n"));
+    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
+    log_write(STR("\n"));
 
     log_pop_color();
     log_pop_color();

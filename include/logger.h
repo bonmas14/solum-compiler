@@ -16,12 +16,12 @@ void log_push_color(u8 r, u8 g, u8 b);
 void log_pop_color(void);
 void log_update_color(void);
 
-void log_write(u8 *text, u64 left_pad);
-void log_info(u8 *text, u64 left_pad);
-void log_warning(u8 *text, u64 left_pad);
-void log_error(u8 *text, u64 left_pad);
+void log_write(u8 *text);
+void log_info(u8 *text);
+void log_warning(u8 *text);
+void log_error(u8 *text);
 
-string_t string_concat(string_t a, string_t b);
+string_t string_temp_concat(string_t a, string_t b);
 
 void debug_break(void);
 
@@ -31,7 +31,7 @@ void debug_break(void);
         u64 line = __LINE__;\
         u8 buffer[512];\
         sprintf((char*)buffer, "check failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
-        log_error(buffer, 0);\
+        log_error(buffer);\
     }\
 }
 
@@ -43,7 +43,7 @@ void debug_break(void);
         u64 line = __LINE__;\
         u8 buffer[512];\
         sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
-        log_error(buffer, 0);\
+        log_error(buffer);\
         debug_break();\
     } \
 }

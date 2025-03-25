@@ -86,53 +86,12 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
             break;
     } 
 
-    check_value(hashmap_add(&scope->table, key, &entry));
+    if (!hashmap_add(&scope->table, key, &entry)) {
+        log_error(STR("something"));
+        assert(false);
+    }
 
     return true;
-}
-
-b32 scan_root_node(compiler_t *state, ast_node_t *root) {
-    assert(state != NULL);
-    assert(root  != NULL);
-
-
-    b32 result = false;
-
-    if (root->type == AST_EMPTY)
-        return true;
-
-    if (root->type == AST_ERROR) {
-        log_error(STR("Got unexpected value @error"), 0);
-        assert(false);
-        return false;
-    }
-
-    switch (root->type) {
-        case AST_UNARY_VAR_DEF:
-        case AST_BIN_MULT_DEF:
-        case AST_TERN_MULT_DEF:
-            result = scan_var_defs(state, root);
-            break;
-
-        case AST_BIN_UNKN_DEF:
-            result = scan_unkn_def(state, root);
-            break;
-
-        case AST_STRUCT_DEF:
-            break;
-
-        case AST_UNION_DEF:
-            break;
-
-        case AST_ENUM_DEF:
-            break;
-
-        default:
-            log_error_token(STR("Wrong type of construct in global scope."), state->scanner, root->token, 0);
-            break;
-    }
-
-    return result;
 }
 
 // first thing we do is add all of symbols in table
@@ -143,30 +102,55 @@ b32 analyze_code(compiler_t *state) {
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
 
-        if (node->type == AST_ERROR) {
-            log_error(STR("Parser error, couldn't analyze code."), 0);
-            return false;
-        }
-
         if (node->analyzed) {
             continue;
         }
 
-        if (!scan_root_node(state, node)) {
-            return false;
+        assert(node->type != AST_ERROR);
+
+        b32 result = false;
+
+        switch (node->type) {
+            case AST_UNARY_VAR_DEF:
+                
+
+            case AST_BIN_MULT_DEF:
+
+
+            case AST_TERN_MULT_DEF:
+                result = scan_var_defs(state, node);
+                break;
+
+            case AST_BIN_UNKN_DEF:
+                // only here we can find funcitons
+                result = scan_unkn_def(state, node);
+
+                break;
+
+            case AST_STRUCT_DEF:
+                break;
+
+            case AST_UNION_DEF:
+                break;
+
+            case AST_ENUM_DEF:
+                break;
+
+            default:
+                log_error_token(STR("Wrong type of construct in global scope."), state->scanner, node->token, 0);
+                break;
         }
     }
 
-
-
-
+    /*
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
 
         if (node->analyzed) continue;
     }
+    */
 
     // process_all_functions here, one pass, doing everything
 
-    return false;
+    return true;
 }
