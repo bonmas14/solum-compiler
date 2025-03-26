@@ -37,6 +37,13 @@ void add_left_pad(FILE * file, u64 amount) {
     while (amount-- > 0) fprintf(file, " ");
 }
 
+void log_print(string_t string) {
+    assert(string.data != NULL);
+    
+    log_update_color();
+    fprintf(stderr, "%.*s", string.size, string.data);
+}
+
 void log_write(u8 *text) {
     log_update_color();
     fprintf(stderr, "%s", text);

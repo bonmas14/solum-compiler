@@ -1043,6 +1043,10 @@ ast_node_t parse_func_or_var_declaration(compiler_t *state, token_t *name) {
 
     if (peek_token(state->scanner, state->strings).type == '{') {
         data = parse_block(state, AST_BLOCK_IMPERATIVE);
+    } else if (peek_token(state->scanner, state->strings).type == TOK_PROTOTYPE) {
+        node.type = AST_UNARY_PROTO_DEF;
+        advance_token(state->scanner, state->strings);
+        return node;
     } else {
         data = parse_assignment_expression(state);
     }

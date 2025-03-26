@@ -655,167 +655,11 @@ b32 scanner_open(string_t *string, scanner_t *state) {
     return true;
 }
 
-// @todo introspect later
-void get_token_name(u8 *buffer, token_t token) {
-    switch (token.type) {
-        case TOKEN_IDENT:
-            sprintf((char*)buffer, "%s", "identifier");
-            break;
-        case TOKEN_CONST_INT:
-            sprintf((char*)buffer, "%s", "constant integer");
-            break;
-        case TOKEN_CONST_FP:
-            sprintf((char*)buffer, "%s", "constant float");
-            break;
-        case TOKEN_CONST_STRING:
-            sprintf((char*)buffer, "%s", "constant string");
-            break;
-
-        case TOKEN_EQ:
-            sprintf((char*)buffer, "%s", "==");
-            break;
-        case TOKEN_NEQ:
-            sprintf((char*)buffer, "%s", "!=");
-            break;
-        case TOKEN_GEQ:
-            sprintf((char*)buffer, "%s", ">=");
-            break;
-        case TOKEN_LEQ:
-            sprintf((char*)buffer, "%s", "<=");
-            break;
-        case TOKEN_RET:
-            sprintf((char*)buffer, "%s", "->");
-            break;
-
-        case TOKEN_LOGIC_AND:
-            sprintf((char*)buffer, "%s", "&&");
-            break;
-        case TOKEN_LOGIC_OR:
-            sprintf((char*)buffer, "%s", "||");
-            break;
-
-        case TOK_STRUCT:
-            sprintf((char*)buffer, "%s", "keyword struct");
-            break;
-        case TOK_UNION:
-            sprintf((char*)buffer, "%s", "keyword union");
-            break;
-        case TOK_U8:
-            sprintf((char*)buffer, "%s", "keyword u8");
-            break;
-        case TOK_U16:
-            sprintf((char*)buffer, "%s", "keyword u16");
-            break;
-        case TOK_U32:
-            sprintf((char*)buffer, "%s", "keyword u32");
-            break;
-        case TOK_U64:
-            sprintf((char*)buffer, "%s", "keyword u64");
-            break;
-        case TOK_S8:
-            sprintf((char*)buffer, "%s", "keyword s8");
-            break;
-        case TOK_S16:
-            sprintf((char*)buffer, "%s", "keyword s16");
-            break;
-        case TOK_S32:
-            sprintf((char*)buffer, "%s", "keyword s32");
-            break;
-        case TOK_S64:
-            sprintf((char*)buffer, "%s", "keyword s64");
-            break;
-        case TOK_F32:
-            sprintf((char*)buffer, "%s", "keyword f32");
-            break;
-        case TOK_F64:
-            sprintf((char*)buffer, "%s", "keyword f64");
-            break;
-        case TOK_BOOL32:
-            sprintf((char*)buffer, "%s", "keyword bool");
-            break;
-        case TOK_DEFAULT:
-            sprintf((char*)buffer, "%s", "keyword default");
-            break;
-        case TOK_IF:
-            sprintf((char*)buffer, "%s", "keyword if");
-            break;
-        case TOK_ELSE:
-            sprintf((char*)buffer, "%s", "keyword else");
-            break;
-        case TOK_WHILE:
-            sprintf((char*)buffer, "%s", "keyword while");
-            break;
-        case TOK_FOR:
-            sprintf((char*)buffer, "%s", "keyword for");
-            break;
-        case TOK_RETURN:
-            sprintf((char*)buffer, "%s", "keyword ret");
-            break;
-        case TOK_PROTOTYPE:
-            sprintf((char*)buffer, "%s", "keyword prototype");
-            break;
-        case TOK_EXTERNAL:
-            sprintf((char*)buffer, "%s", "keyword external");
-            break;
-        case TOK_MODULE:
-            sprintf((char*)buffer, "%s", "keyword module");
-            break;
-        case TOK_USE:
-            sprintf((char*)buffer, "%s", "keyword use");
-            break;
-        case TOKEN_EOF:
-            sprintf((char*)buffer, "%s", "End Of File");
-            break;
-        case TOKEN_ERROR:
-            sprintf((char*)buffer, "%s", "Scanning error");
-            break;
-            
-        default:
-            if (!char_is_special((u8)token.type)) {
-                sprintf((char*)buffer, "%c", token.type);
-            } else {
-                sprintf((char*)buffer, "%s", "unknown token type");
-            }
-            break;
-    }
-}
-
-void get_token_info(u8 *buffer, token_t token) {
-    switch (token.type) {
-        case TOKEN_CONST_INT:
-            sprintf((char*)buffer, "%zu", (size_t)token.data.const_int);
-            break;
-        case TOKEN_CONST_FP:
-            sprintf((char*)buffer, "%lf", token.data.const_double);
-            break;
-        case TOKEN_CONST_STRING:
-            sprintf((char*)buffer, "%s", "string");
-            break;
-        default:
-            sprintf((char*)buffer, "no data");
-            break;
-    }
-}
-
-void print_token_info(token_t token, u64 left_pad) {
-    u8 buffer[256];
-    u8 token_name[50];
-    u8 token_info[50];
-
-    get_token_name(token_name, token);
-    get_token_info(token_info, token);
-    
-    sprintf((char*)buffer, "line: %u, char: %u | Token: '%.50s'. Data: %.50s", token.l0 + 1, token.c0 + 1, token_name, token_info);
-    
-    add_left_pad(stderr, left_pad);
-    log_write(buffer);
-}
-
-void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 highlight_l0, u64 highlight_l1,  u64 highlight_c0, u64 highlight_c1) {
+void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, token_t token, u64 left_pad) {
     assert(line_stop >= line_start);
-    assert(highlight_l1 >= highlight_l0);
-    assert(highlight_l0 >= line_start);
-    assert(highlight_l1 <= line_stop);
+    assert(token.l1 >= token.l0);
+    assert(token.l0 >= line_start);
+    assert(token.l1 <= line_stop);
 
     b32 cancel_empty_line_skip = false;
 
@@ -839,57 +683,57 @@ void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 hi
             }
         }
         
-        if (!cancel_empty_line_skip && skip_line && i < highlight_l0) { 
+        if (!cancel_empty_line_skip && skip_line && i < token.l0) { 
             cancel_empty_line_skip = true;
             continue;
         }
 
-        log_write(STR(""));
+        add_left_pad(stderr, left_pad);
 
-        if (i < highlight_l0 || i > highlight_l1) {
+        if (i < token.l0 || i > token.l1) {
             log_update_color();
-            fprintf(stderr, "| %.*s\n", (int)len - 1, start);
+            fprintf(stderr, "%4llu | %.*s\n", i + 1, (int)len - 1, start);
         } else {
-            u64 token_size = highlight_c1 - highlight_c0;
+            u64 token_size = token.c1 - token.c0;
 
-            if (highlight_l0 != highlight_l1) {
+            if (token.l0 != token.l1) {
                 log_push_color(ERROR_COLOR); 
 
-                if (i > highlight_l0 && i < highlight_l1) {
+                if (i > token.l0 && i < token.l1) {
                     log_update_color();
-                    fprintf(stderr, "| %.*s", (int)len, start);
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)len, start);
                     log_pop_color();
-                } else if (i == highlight_l0) {
+                } else if (i == token.l0) {
                     log_update_color();
-                    fprintf(stderr, "| %.*s", (int)highlight_c0, start);
-                    len -= highlight_c0;
-                    fprintf(stderr, "%.*s", (int)len, start + highlight_c0);
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start);
+                    len -= token.c0;
+                    fprintf(stderr, "%.*s", (int)len, start + token.c0);
                     log_pop_color();
-                } else if (i == highlight_l1) {
+                } else if (i == token.l1) {
                     log_update_color();
-                    fprintf(stderr, "| %.*s", (int)highlight_c1, start);
-                    len -= highlight_c1;
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c1, start);
+                    len -= token.c1;
 
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int) len, start + highlight_c1);
+                    fprintf(stderr, "%.*s", (int) len, start + token.c1);
                 } else {
                     log_pop_color();
                 }
             } else {
                 log_update_color();
-                fprintf(stderr, "| %.*s", (int)highlight_c0, start);
-                len -= highlight_c0;
+                fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start);
+                len -= token.c0;
 
                 log_push_color(255, 64, 64); 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int)token_size, start + highlight_c0);
+                fprintf(stderr, "%.*s", (int)token_size, start + token.c0);
                 log_pop_color();
 
                 len -= token_size;
 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int) len, start + highlight_c0 + token_size);
+                fprintf(stderr, "%.*s", (int) len, start + token.c0 + token_size);
             }
         }
     }
@@ -900,29 +744,18 @@ void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 hi
 }
 
 void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
-    log_push_color(INFO_COLOR);
-    print_token_info(token, left_pad);
-
     log_push_color(255, 255, 255);
+    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
     log_write(STR("\n"));
-    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
-    log_write(STR("\n"));
-
-    log_pop_color();
     log_pop_color();
 }
 
 void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(WARNING_COLOR);
-
-    add_left_pad(stderr, left_pad);
     log_warning(text);
 
-    print_token_info(token, left_pad);
-
     log_push_color(255, 255, 255);
-    log_write(STR("\n"));
-    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
+    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
     log_write(STR("\n"));
 
     log_pop_color();
@@ -931,14 +764,10 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
 
 void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(ERROR_COLOR);
-    add_left_pad(stderr, left_pad);
     log_error(text);
 
-    print_token_info(token, left_pad);
-
     log_push_color(255, 255, 255);
-    log_write(STR("\n"));
-    print_lines_of_code(state, token.l0, token.l1, token.l0, token.l1, token.c0, token.c1);
+    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
     log_write(STR("\n"));
 
     log_pop_color();

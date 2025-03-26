@@ -83,10 +83,11 @@ enum ast_types_t {
 
     AST_PARAM_DEF, 
 
-    AST_UNARY_VAR_DEF, // uninitialize definitions... never a function
+    AST_UNARY_VAR_DEF,
+    AST_UNARY_PROTO_DEF,
     AST_BIN_UNKN_DEF,
     AST_BIN_MULT_DEF,
-    AST_TERN_MULT_DEF, // multiple definitions... never a function
+    AST_TERN_MULT_DEF,
 
     AST_STRUCT_DEF,
     AST_UNION_DEF,
@@ -98,13 +99,11 @@ enum ast_types_t {
 
     AST_AUTO_TYPE,
 
-    // @todo
-    AST_VOID_TYPE,
-
     AST_STD_TYPE,
     AST_UNKN_TYPE,
     AST_FUNC_TYPE,
 
+    AST_VOID_TYPE,
     AST_ARR_TYPE,
     AST_PTR_TYPE,
 

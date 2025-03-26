@@ -16,6 +16,8 @@ void log_push_color(u8 r, u8 g, u8 b);
 void log_pop_color(void);
 void log_update_color(void);
 
+void log_print(string_t string);
+
 void log_write(u8 *text);
 void log_info(u8 *text);
 void log_warning(u8 *text);

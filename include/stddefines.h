@@ -43,6 +43,6 @@ extern allocator_t * default_allocator;
 
 #define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 
-#define STRING(s) (string_t) { .size = sizeof(s), .data = STR(s) }
+#define STRING(s) (string_t) { .size = sizeof(s) - 1, .data = STR(s) }
 
 #endif // USER_DEFINES

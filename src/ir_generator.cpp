@@ -171,6 +171,6 @@ void print_ir_opcode(ir_opcode_t *code) {
 
     u8* buffer = (u8*)mem_alloc(temp, 128);
 
-    sprintf((char*)buffer, "ir_code: OP: [%lu] [%lu],[%lu],[%lu]\n", code->operation, code->arg1, code->arg2, code->arg3);
+    sprintf((char*)buffer, "ir_code: OP: [%llu] [%llu],[%llu],[%llu]\n", code->operation, code->arg1, code->arg2, code->arg3);
     log_info(buffer);
 }

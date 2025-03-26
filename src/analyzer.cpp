@@ -7,20 +7,21 @@
 #include "hashmap.h"
 
 // plan @todo:
-    // error at every global scope expression
-    // scan tree and create all scopes + add all symbols
-    // create compile units and after that type check all of them
-    // create final IR of every scope
-    //
-    // codegen
-    //
-    //
-    // count elements on left and rignt in a, b = b, a;
-    // typecheck
-    //
-    // check functions to not contain assingment expresions! because it will break ','
-    //
-    // block in general := structure is not allowed if it is not an function def
+//
+// error at every global scope expression
+// scan tree and create all scopes + add all symbols
+// create compile units and after that type check all of them
+// create final IR of every scope
+//
+// codegen
+//
+//
+// count elements on left and rignt in a, b = b, a;
+// typecheck
+//
+// check functions to not contain assingment expresions! because it will break ','
+//
+// block in general := structure is not allowed if it is not an function def
 
 
 
@@ -32,6 +33,7 @@
 // when we will be generating IR we will generate all of the other things
 // like lambdas?
 
+// helpers
 scope_t *get_global_scope(compiler_t *state) {
     assert(state != NULL);
     scope_t *scope = list_get(&state->analyzer->scopes, 0);
@@ -59,43 +61,98 @@ b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *e
     return true;
 }
 
-b32 scan_var_def_unary(compiler_t *state, ast_node_t *node) {
+b32 get_entry_if_exists(compiler_t *state, string_t key, scope_entry_t **output) {
+    UNUSED(output);
+
+    scope_t *scope = get_global_scope(state);
+
+    if (hashmap_contains(&scope->table, key)) {
+        *output = hashmap_get(&scope->table, key);
+        return true;
+    }
+
+    return false;
+}
+
+// funcs
+b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
+    // why not add new scope and create all of the data anyways???
+    assert(node->type == AST_STRUCT_DEF);
+
+    scope_entry_t entry = {};
+    string_t key = node->token.data.string;
+
+    entry.type = ENTRY_TYPE;
+    entry.node = node;
+
+    return add_symbol_to_global_scope(state, key, &entry);
+}
+
+b32 scan_prototype_def(compiler_t *state, ast_node_t *node) {
+    assert(node->type == AST_UNARY_PROTO_DEF);
+
+    scope_entry_t entry = {};
+    string_t key = node->token.data.string;
+
+    entry.type = ENTRY_PROTOTYPE;
+    entry.node = node;
+
+    return add_symbol_to_global_scope(state, key, &entry);
+}
+
+b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
     scope_t *scope = get_global_scope(state);
     
+    string_t key = node->token.data.string;
+    scope_entry_t entry = {};
+
     if (node->left->type == AST_UNKN_TYPE) {
-        string_t key = node->token.data.string;
-        scope_entry_t entry = {};
+        string_t type_key = node->left->token.data.string;
 
-        if (!hashmap_contains(&scope->table, key)) {
-            entry.not_resolved = true;
-        } else {
-            scope_entry_t *recieved = hashmap_get(&scope->table, key);
+        scope_entry_t *type;
 
-            switch (recieved->type) {
-                case ENTRY_FUNC:
-                case ENTRY_VAR:
-                case ENTRY_ERROR:
-                    log_error(STR("Unexpected type..."));
-                    return false;
-
-                case ENTRY_PROTOTYPE:
-                    log_error(STR("Prototype should have a body."));
-                    return false;
-
+        if (get_entry_if_exists(state, type_key, &type)) {
+            switch (type->type) {
                 case ENTRY_UNKN:
                     entry.not_resolved = true;
                     break;
 
-                default:
+                case ENTRY_TYPE:
                     break;
+
+                case ENTRY_PROTOTYPE:
+                    {
+                    log_error_token(STR("Couldn't create prototype realization without body."), state->scanner, node->token, 0);
+                    
+                    log_push_color(INFO_COLOR);
+                    string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), key), STRING("' "));
+                    string_t info = string_temp_concat(decorated_name, STRING("is defined as a prototype of:\n\0"));
+
+                    log_print(info);
+                    log_pop_color();
+
+                    log_info_token(state->scanner, type->node->token, 0);
+                    } return false;
+
+                default:
+                    log_error(STR("Unexpected type..."));
+                    return false;
             }
+
+
+        } else {
+            entry.not_resolved = true;
         }
 
-        entry.type = ENTRY_VAR;
-        entry.node = node;
+    } else {
+        // AST_STD_TYPE
 
-        hashmap_add(&scope->table, key, &entry);
     }
+
+    entry.type = ENTRY_VAR;
+    entry.node = node;
+
+    hashmap_add(&scope->table, key, &entry);
 
     return true;
 }
@@ -154,9 +211,6 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
-b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
-    return false;
-}
 
 // first thing we do is add all of symbols in table
 // then we can set 'ast_node_t.analyzed' to 'true'
@@ -175,9 +229,26 @@ b32 analyze_code(compiler_t *state) {
         b32 result = false;
 
         switch (node->type) {
+            // finite things
+            
+            case AST_STRUCT_DEF:
+                result = scan_struct_def(state, node);
+                break;
+
+            case AST_UNION_DEF:
+                break;
+
+            case AST_ENUM_DEF:
+                break;
+
+            case AST_UNARY_PROTO_DEF: 
+                result = scan_prototype_def(state, node);
+                break;
+
+            // unfinite things
+
             case AST_UNARY_VAR_DEF:
-                log_info(STR("Analyzing ast_un_var"));
-                 result = scan_var_def_unary(state, node);
+                result = scan_unary_var_def(state, node);
                 break;
 
             case AST_BIN_MULT_DEF:
@@ -189,16 +260,6 @@ b32 analyze_code(compiler_t *state) {
             case AST_BIN_UNKN_DEF:
                 // only here we can find funcitons
                 result = scan_unkn_def(state, node);
-                break;
-
-            case AST_STRUCT_DEF:
-                result = scan_struct_def(state, node);
-                break;
-
-            case AST_UNION_DEF:
-                break;
-
-            case AST_ENUM_DEF:
                 break;
 
             default:
@@ -224,7 +285,7 @@ b32 analyze_code(compiler_t *state) {
         if (!pair.occupied) continue;
 
         log_update_color();
-        fprintf(stderr, "%llu -> %.*s\n", i, pair.key.size, pair.key.data);
+        fprintf(stderr, "%llu -> %.*s\n", i, (int)pair.key.size, pair.key.data);
     }
 
     return true;

@@ -7,6 +7,58 @@
 #include "analyzer.h"
 #include "backend.h"
 
+void create_standart_types(analyzer_t *analyzer) {
+    types_t type = {};
+
+    type.type = TYPE_STD;
+
+    type.std.is_void = true;
+    list_add(&analyzer->types, &type);
+    type.std.is_void = false;
+
+    // U8-64
+    type.std.is_unsigned = true;
+
+    for (u64 i = 1; i < 8; i++) {
+        type.size = i;
+        type.alignment = i;
+
+        list_add(&analyzer->types, &type);
+    }
+
+    // S8-64
+    type.std.is_unsigned = false;
+
+    for (u64 i = 1; i < 8; i++) {
+        type.size = i;
+        type.alignment = i;
+        list_add(&analyzer->types, &type);
+    }
+
+    // B8 B32
+    type.std.is_unsigned = true;
+    
+    type.size = 1;
+    type.alignment = 1;
+    list_add(&analyzer->types, &type);
+
+    type.size = 4;
+    type.alignment = 4;
+    list_add(&analyzer->types, &type);
+
+    // f32 f64
+    type.std.is_float    = true;
+    type.std.is_unsigned = false;
+
+    type.size      = 4;
+    type.alignment = 4;
+    list_add(&analyzer->types, &type);
+
+    type.size      = 8;
+    type.alignment = 8;
+    list_add(&analyzer->types, &type);
+}
+
 analyzer_t *analyzer_create(allocator_t *allocator) {
     analyzer_t *analyzer = (analyzer_t*)mem_alloc(allocator, sizeof(analyzer_t));
 
@@ -16,7 +68,9 @@ analyzer_t *analyzer_create(allocator_t *allocator) {
     scope_t *global_scope = list_get(&analyzer->scopes, index);
     assert(index == 0);
 
-    check_value(hashmap_create(&global_scope->table, 100, get_string_hash, compare_string_keys));
+    global_scope->table.hash_func    = get_string_hash;
+    global_scope->table.compare_func = compare_string_keys;
+
     return analyzer;
 }
 

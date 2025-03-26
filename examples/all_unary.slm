@@ -1,0 +1,11 @@
+func : () -> s32 = prototype;
+
+mult: struct = {
+    a: s32;
+    b: s32;
+};
+
+basic_std_type: s32; 
+struct_type:    mult; 
+not_valid_construct: func;
+
