@@ -1219,7 +1219,7 @@ ast_node_t parse_statement(compiler_t *state) {
             node.type  = AST_RET_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_assignment_expression(state);
+            ast_node_t expr = parse_separated_expressions(state);
             add_left_node(state, &node, &expr);
         } break;
 
