@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "arena.h"
 
 // @todo for parser:
 // rewrite expression parser, because it is too complex and plain
@@ -8,7 +9,6 @@
 // but if it is trailing error, we dont append any logs
 
 ast_node_t parse_type(compiler_t *state);
-
 
 // only for situations like 
 ast_node_t parse_swap_expression(compiler_t *state);
@@ -22,6 +22,7 @@ ast_node_t parse_union_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_enum_declaration(compiler_t *state, token_t *name);
 ast_node_t parse_block(compiler_t* state, ast_types_t type);
 
+// void print_node(compiler_t *state, ast_node_t *node);
 /* helpers */
 
 void panic_skip(compiler_t *state) {
@@ -979,15 +980,15 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
         return node;
     }
 
-    // left is our type, right is names expressions, center is expression
+    // center is our type, left is names expressions, right is expression
 
-    add_left_node(state, &node, &type);
-    add_right_node(state, &node, expr);
+    add_left_node(state, &node, expr);
 
     token_t token = peek_token(state->scanner, state->strings);
 
     if (token.type == ';') {
         node.type = AST_BIN_MULT_DEF; 
+        add_right_node(state, &node, &type);
         return node;
     } else if (token.type != '=') {
         node.type = AST_ERROR;
@@ -995,6 +996,7 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
         panic_skip(state);
         return node;
     }
+    add_center_node(state, &node, &type);
 
     advance_token(state->scanner, state->strings);
     ast_node_t data = parse_separated_expressions(state);
@@ -1005,7 +1007,7 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
         return node;
     }
 
-    add_center_node(state, &node, &data);
+    add_right_node(state, &node, &data);
     return node;
 }
 
@@ -1308,6 +1310,7 @@ b32 parse(compiler_t *compiler) {
 
         ast_node_t *root = (ast_node_t*)mem_alloc(compiler->nodes, sizeof(ast_node_t));
         *root = node;
+        // print_node(compiler, root);
 
         list_add(&compiler->parser->parsed_roots, &root);
         curr = peek_token(compiler->scanner, compiler->strings);

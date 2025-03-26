@@ -30,35 +30,46 @@ enum ast_types_t {
 
     AST_PRIMARY,
 
-    AST_SEPARATION, // list
+    // list
+    AST_SEPARATION, 
+    AST_BLOCK_IMPERATIVE,
+    AST_BLOCK_ENUM,
 
+    // unary
+    AST_UNARY_DEREF,
+    AST_UNARY_REF,
+    AST_UNARY_NEGATE,
+    AST_UNARY_NOT,
+
+    // bin
     AST_BIN_ASSIGN,
     AST_BIN_SWAP,
-
     AST_BIN_CAST,
 
-    AST_BIN_GR, AST_BIN_LS, AST_BIN_GEQ, AST_BIN_LEQ, AST_BIN_EQ, AST_BIN_NEQ,
+    AST_BIN_GR,
+    AST_BIN_LS,
+    AST_BIN_GEQ,
+    AST_BIN_LEQ,
+    AST_BIN_EQ,
+    AST_BIN_NEQ,
 
     AST_BIN_LOG_OR,
     AST_BIN_LOG_AND,
 
-    AST_BIN_ADD, AST_BIN_SUB, 
-    AST_BIN_MUL, AST_BIN_DIV, AST_BIN_MOD, 
+    AST_BIN_ADD,
+    AST_BIN_SUB, 
+    AST_BIN_MUL,
+    AST_BIN_DIV,
+    AST_BIN_MOD, 
 
     AST_BIN_BIT_XOR,
     AST_BIN_BIT_OR,
     AST_BIN_BIT_AND,
     AST_BIN_BIT_SHIFT,
 
-    AST_UNARY_DEREF,
-    AST_UNARY_REF,
-    AST_UNARY_NEGATE,
-    AST_UNARY_NOT,
-
     AST_FUNC_CALL,
     AST_MEMBER_ACCESS,
     AST_ARRAY_ACCESS,
-
 
     AST_IF_STMT,
     AST_ELSE_STMT,
@@ -66,8 +77,6 @@ enum ast_types_t {
     AST_WHILE_STMT,
     AST_RET_STMT,
 
-    AST_BLOCK_IMPERATIVE,
-    AST_BLOCK_ENUM,
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
@@ -87,9 +96,9 @@ enum ast_types_t {
     AST_MUL_AUTO,
     AST_MUL_TYPES,
 
-    // 
     AST_AUTO_TYPE,
 
+    // @todo
     AST_VOID_TYPE,
 
     AST_STD_TYPE,

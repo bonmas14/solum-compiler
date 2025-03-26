@@ -18,7 +18,6 @@
 #include "ir_generator.h"
 #include "backend.h"
 
-
 #ifdef NDEBUG 
 #define log_info_token(a, b, c)
 #endif

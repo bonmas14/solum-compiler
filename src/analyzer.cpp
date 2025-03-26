@@ -59,20 +59,61 @@ b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *e
     return true;
 }
 
+b32 scan_var_def_unary(compiler_t *state, ast_node_t *node) {
+    scope_t *scope = get_global_scope(state);
+    
+    if (node->left->type == AST_UNKN_TYPE) {
+        string_t key = node->token.data.string;
+        scope_entry_t entry = {};
 
+        if (!hashmap_contains(&scope->table, key)) {
+            entry.not_resolved = true;
+        } else {
+            scope_entry_t *recieved = hashmap_get(&scope->table, key);
+
+            switch (recieved->type) {
+                case ENTRY_FUNC:
+                case ENTRY_VAR:
+                case ENTRY_ERROR:
+                    log_error(STR("Unexpected type..."));
+                    return false;
+
+                case ENTRY_PROTOTYPE:
+                    log_error(STR("Prototype should have a body."));
+                    return false;
+
+                case ENTRY_UNKN:
+                    entry.not_resolved = true;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        entry.type = ENTRY_VAR;
+        entry.node = node;
+
+        hashmap_add(&scope->table, key, &entry);
+    }
+
+    return true;
+}
 
 b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
-    // left type / types / auto
-    // center -- assignments (expr
-    // right expr, for names
+    ast_node_t * next = node->left->list_start;
 
-    // check validity
+    // @todo entry.not_resolved = true; here
+    for (u64 i = 0; i < node->left->child_count; i++) {
+        scope_entry_t entry = {};
+        entry.type = ENTRY_VAR;
+        entry.node = node;
+        string_t key = next->token.data.string;
+        add_symbol_to_global_scope(state, key, &entry);
+        next = next->list_next;
+    }
 
-    // while (true) {
-        // AST_BIN_SEPARATION
-    // }
-    
-
+    return true;
 }
 
 b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
@@ -83,6 +124,7 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     entry.node = node;
 
     if (node->left->type == AST_UNKN_TYPE) {
+        entry.not_resolved = true;
         entry.type = ENTRY_UNKN;
         return add_symbol_to_global_scope(state, node->token.data.string, &entry);
     } 
@@ -112,6 +154,10 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
+b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
+    return false;
+}
+
 // first thing we do is add all of symbols in table
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
@@ -130,11 +176,12 @@ b32 analyze_code(compiler_t *state) {
 
         switch (node->type) {
             case AST_UNARY_VAR_DEF:
-                
+                log_info(STR("Analyzing ast_un_var"));
+                 result = scan_var_def_unary(state, node);
+                break;
 
             case AST_BIN_MULT_DEF:
-
-
+                break;
             case AST_TERN_MULT_DEF:
                 result = scan_var_defs(state, node);
                 break;
@@ -142,10 +189,10 @@ b32 analyze_code(compiler_t *state) {
             case AST_BIN_UNKN_DEF:
                 // only here we can find funcitons
                 result = scan_unkn_def(state, node);
-
                 break;
 
             case AST_STRUCT_DEF:
+                result = scan_struct_def(state, node);
                 break;
 
             case AST_UNION_DEF:
@@ -160,6 +207,8 @@ b32 analyze_code(compiler_t *state) {
         }
     }
 
+
+
     /*
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
@@ -169,6 +218,14 @@ b32 analyze_code(compiler_t *state) {
     */
 
     // process_all_functions here, one pass, doing everything
+
+    for (u64 i = 0; i < state->analyzer->scopes.data[0].table.capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = state->analyzer->scopes.data[0].table.entries[i];
+        if (!pair.occupied) continue;
+
+        log_update_color();
+        fprintf(stderr, "%llu -> %.*s\n", i, pair.key.size, pair.key.data);
+    }
 
     return true;
 }

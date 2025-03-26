@@ -426,8 +426,6 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
 
     if (ch == '/') {
         if (ch == peek_next_char(state)) {
-            // comment here 
-            
             while (!(match_char(state, 0) || match_char(state, '\n'))) {
                 advance_char(state);
             }
@@ -442,6 +440,21 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
     token.type = advance_char(state); 
 
     switch(ch) {
+        case '/': 
+            if ('*' != peek_char(state)) {
+                break;
+            }
+
+            advance_char(state);
+
+            while (!(match_char(state, 0) || ((peek_char(state) == '*') && (peek_next_char(state) == '/')))) {
+                ch = advance_char(state);
+            }
+
+            advance_char(state);
+            advance_char(state);
+
+            return advance_token(state, allocator);
         case '.': 
         case ',':
         case ':':
@@ -451,7 +464,6 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
         case ']': 
         case '+': 
         case '*':
-        case '/': 
         case '%':
 
         case '(':
@@ -801,7 +813,6 @@ void print_token_info(token_t token, u64 left_pad) {
 
 void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 highlight_l0, u64 highlight_l1,  u64 highlight_c0, u64 highlight_c1) {
     assert(line_stop >= line_start);
-    assert(highlight_c1 >= highlight_c0);
     assert(highlight_l1 >= highlight_l0);
     assert(highlight_l0 >= line_start);
     assert(highlight_l1 <= line_stop);

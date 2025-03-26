@@ -21,6 +21,7 @@ typedef int64_t s64;
 typedef float  f32;
 typedef double f64;
 
+typedef uint8_t  b8;
 typedef uint32_t b32;
 
 struct String {

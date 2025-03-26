@@ -143,6 +143,7 @@ token_t peek_next_token(scanner_t *state, allocator_t * allocator);
 
 // --- logging for scanner
 
+void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, u64 highlight_l0, u64 highlight_l1,  u64 highlight_c0, u64 highlight_c1);
 void log_info_token(scanner_t *state, token_t token, u64 left_pad);
 void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);
 void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);

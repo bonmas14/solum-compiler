@@ -8,7 +8,7 @@
 #include "scanner.h"
 
 struct scope_entry_t {
-    b8 resolved;
+    b8 not_resolved;
     b8 can_be_used;
     u32 type;
     ast_node_t *node;
@@ -18,6 +18,7 @@ enum entry_type_t {
     ENTRY_ERROR = 0,
     ENTRY_VAR,
     ENTRY_TYPE,
+    ENTRY_PROTOTYPE,
     ENTRY_FUNC,
     ENTRY_UNKN,
 };

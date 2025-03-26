@@ -295,7 +295,7 @@ void generate_statement(compiler_t *compiler, ast_node_t *stmt, u64 depth) {
         case AST_UNARY_VAR_DEF: // uninitialize definitions... never a function
         case AST_BIN_UNKN_DEF:
         case AST_BIN_MULT_DEF:
-        case AST_TERN_MULT_DEF: // multiple definitions... never a function
+        case AST_TERN_MULT_DEF:
             generate_unkn_def(compiler, stmt, depth);
             return;
 
