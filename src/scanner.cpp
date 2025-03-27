@@ -655,15 +655,18 @@ b32 scanner_open(string_t *string, scanner_t *state) {
     return true;
 }
 
-void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, token_t token, u64 left_pad) {
-    assert(line_stop >= line_start);
+void print_lines_of_code(scanner_t *state, s64 start_shift, s64 stop_shift, token_t token, u64 left_pad) {
+    assert(state != NULL);
     assert(token.l1 >= token.l0);
-    assert(token.l0 >= line_start);
-    assert(token.l1 <= line_stop);
 
     b32 cancel_empty_line_skip = false;
 
-    u64 stop_pos = line_stop + 1;
+    s64 line_start = (s64)token.l0;
+    s64 line_stop  = (s64)token.l1;
+
+    line_start = (line_start - start_shift) > 0 ? (line_start - start_shift) : line_start;
+
+    u64 stop_pos = line_stop + stop_shift + 1;
     if (stop_pos > state->lines.count) {
         stop_pos = state->lines.count;
     }
@@ -745,7 +748,7 @@ void print_lines_of_code(scanner_t *state, u64 line_start, u64 line_stop, token_
 
 void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(255, 255, 255);
-    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
+    print_lines_of_code(state, 0, 0, token, left_pad);
     log_write(STR("\n"));
     log_pop_color();
 }
@@ -755,7 +758,7 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
     log_warning(text);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
+    print_lines_of_code(state, 2, 0, token, left_pad);
     log_write(STR("\n"));
 
     log_pop_color();
@@ -767,7 +770,7 @@ void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_error(text);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(state, token.l0, token.l1, token, left_pad);
+    print_lines_of_code(state, 3, 0, token, left_pad);
     log_write(STR("\n"));
 
     log_pop_color();

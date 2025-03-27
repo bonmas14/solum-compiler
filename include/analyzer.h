@@ -8,7 +8,8 @@
 #include "scanner.h"
 
 struct scope_entry_t {
-    b32 not_resolved;
+    b32 not_resolved_type;
+
     u32 type;
     ast_node_t *node;
 

@@ -6,7 +6,6 @@
 
 struct ast_node_t {
     s32 type;
-    b32 analyzed;
 
     token_t token;
 

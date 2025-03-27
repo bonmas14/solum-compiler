@@ -114,7 +114,7 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
         if (get_entry_if_exists(state, type_key, &type)) {
             switch (type->type) {
                 case ENTRY_UNKN:
-                    entry.not_resolved = true;
+                    entry.not_resolved_type = true;
                     break;
 
                 case ENTRY_TYPE:
@@ -131,22 +131,40 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
                     log_print(info);
                     log_pop_color();
 
-                    log_info_token(state->scanner, type->node->token, 0);
+                    log_push_color(255, 255, 255);
+                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
+                    log_pop_color();
                     } return false;
+
+                case ENTRY_FUNC:
+                    {
+                    log_error_token(STR("Couldn't create variable that uses function name."), state->scanner, node->token, 0);
+                    
+                    log_push_color(INFO_COLOR);
+                    string_t decorated_name = string_temp_concat(string_temp_concat(STRING("'"), type_key), STRING("' "));
+                    string_t info = string_temp_concat(decorated_name, STRING("is defined as a function here:\n\0"));
+
+                    log_print(info);
+                    log_pop_color();
+                    log_push_color(255, 255, 255);
+                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
+                    log_pop_color();
+                    } return false;
+
+                    break;
 
                 default:
                     log_error(STR("Unexpected type..."));
                     return false;
             }
-
-
         } else {
-            entry.not_resolved = true;
+            entry.not_resolved_type = true;
         }
 
     } else {
         // AST_STD_TYPE
 
+        // here we will set std type or will try
     }
 
     entry.type = ENTRY_VAR;
@@ -160,7 +178,7 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
 b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
     ast_node_t * next = node->left->list_start;
 
-    // @todo entry.not_resolved = true; here
+    // @todo entry.not_resolved_type = true; here
     for (u64 i = 0; i < node->left->child_count; i++) {
         scope_entry_t entry = {};
         entry.type = ENTRY_VAR;
@@ -181,8 +199,7 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     entry.node = node;
 
     if (node->left->type == AST_UNKN_TYPE) {
-        entry.not_resolved = true;
-        entry.type = ENTRY_UNKN;
+        entry.not_resolved_type = true;
         return add_symbol_to_global_scope(state, node->token.data.string, &entry);
     } 
 
@@ -211,82 +228,91 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
+b32 scan_node(compiler_t *state, ast_node_t *node) {
+    switch (node->type) {
+        case AST_STRUCT_DEF:
+            return scan_struct_def(state, node);
+            break;
+
+        case AST_UNION_DEF:
+            break;
+
+        case AST_ENUM_DEF:
+            break;
+
+        case AST_UNARY_PROTO_DEF: 
+            return scan_prototype_def(state, node);
+            break;
+
+        case AST_UNARY_VAR_DEF:
+            return scan_unary_var_def(state, node);
+            break;
+
+        case AST_BIN_MULT_DEF:
+            break;
+        case AST_TERN_MULT_DEF:
+            return scan_var_defs(state, node);
+            break;
+
+        case AST_BIN_UNKN_DEF:
+            return scan_unkn_def(state, node);
+            break;
+
+        default:
+            log_error_token(STR("Wrong type of construct in global scope."), state->scanner, node->token, 0);
+            break;
+    }
+
+    return false;
+}
 
 // first thing we do is add all of symbols in table
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
 
 b32 analyze_code(compiler_t *state) {
+    b32 result = true;
+
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
-
-        if (node->analyzed) {
-            continue;
-        }
-
         assert(node->type != AST_ERROR);
 
-        b32 result = false;
-
-        switch (node->type) {
-            // finite things
-            
-            case AST_STRUCT_DEF:
-                result = scan_struct_def(state, node);
-                break;
-
-            case AST_UNION_DEF:
-                break;
-
-            case AST_ENUM_DEF:
-                break;
-
-            case AST_UNARY_PROTO_DEF: 
-                result = scan_prototype_def(state, node);
-                break;
-
-            // unfinite things
-
-            case AST_UNARY_VAR_DEF:
-                result = scan_unary_var_def(state, node);
-                break;
-
-            case AST_BIN_MULT_DEF:
-                break;
-            case AST_TERN_MULT_DEF:
-                result = scan_var_defs(state, node);
-                break;
-
-            case AST_BIN_UNKN_DEF:
-                // only here we can find funcitons
-                result = scan_unkn_def(state, node);
-                break;
-
-            default:
-                log_error_token(STR("Wrong type of construct in global scope."), state->scanner, node->token, 0);
-                break;
-        }
+        if (!scan_node(state, node)) 
+            result = false;
     }
 
+    for (u64 i = 0; i < state->analyzer->scopes.data[0].table.capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = state->analyzer->scopes.data[0].table.entries[i];
 
+        if (!pair.occupied) continue;
+        if (pair.deleted) continue;
+
+        scope_entry_t entry = pair.value;
+
+        if (!entry.not_resolved_type)
+            continue;
+
+        if (!hashmap_remove(&state->analyzer->scopes.data[0].table, pair.key)) 
+            assert(false);
+
+        if (!scan_node(state, entry.node)) 
+            result = false;
+    }
 
     /*
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t *node = *list_get(&state->parser->parsed_roots, i);
-
-        if (node->analyzed) continue;
     }
     */
-
-    // process_all_functions here, one pass, doing everything
 
     for (u64 i = 0; i < state->analyzer->scopes.data[0].table.capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> pair = state->analyzer->scopes.data[0].table.entries[i];
         if (!pair.occupied) continue;
+        if (pair.deleted) continue;
 
         log_update_color();
         fprintf(stderr, "%llu -> %.*s\n", i, (int)pair.key.size, pair.key.data);
     }
 
-    return true;
+    return result;
 }

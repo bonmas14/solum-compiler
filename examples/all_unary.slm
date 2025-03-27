@@ -1,4 +1,3 @@
-func : () -> s32 = prototype;
 
 mult: struct = {
     a: s32;
@@ -7,5 +6,20 @@ mult: struct = {
 
 basic_std_type: s32; 
 struct_type:    mult; 
+
+// before
+another_not_valid_construct : func;
+
+// definition
+func : () -> s32 = prototype;
+
+// after
 not_valid_construct: func;
 
+
+wrong_type_here: main;
+
+// here we define function
+main : () = { }
+
+valid_proto: func = { }
