@@ -14,13 +14,18 @@ struct scope_entry_t {
     ast_node_t *node;
 
     union {
-        u32 type_table_index;
+        u32 type_index;
 
         struct {
             u32 type;
             u32 pointer_depth;
             u32 array_dimensions;
         } variable_def;
+
+        struct {
+            list_t<u32> params;
+            list_t<u32> returns;
+        } func;
     };
 };
 
@@ -39,7 +44,6 @@ enum type_t {
     TYPE_STRUCT,
     TYPE_UNION,
     TYPE_ENUM,
-    TYPE_FUNC,
 };
 
 struct scope_t {
@@ -51,18 +55,11 @@ struct types_t {
     u32 type;
     u32 size;
     u32 alignment;
-    // b32 is_standart;
-
-    ast_node_t *declared_at;
 
     union {
         list_t<u32> struct_members;
         list_t<u32> union_members;
         list_t<u32> enum_members;
-        struct {
-            list_t<u32> params;
-            list_t<u32> returns;
-        } func;
 
         struct {
             b32 is_void;

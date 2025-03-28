@@ -6,32 +6,11 @@
 #include "list.h"
 #include "hashmap.h"
 
-// plan @todo:
+// @todo @fix
+// so in multiple definitions we getting multiple errors that are for one type
+// but it happens like this:
+//    a, a : s32 = 123;
 //
-// error at every global scope expression
-// scan tree and create all scopes + add all symbols
-// create compile units and after that type check all of them
-// create final IR of every scope
-//
-// codegen
-//
-//
-// count elements on left and rignt in a, b = b, a;
-// typecheck
-//
-// check functions to not contain assingment expresions! because it will break ','
-//
-// block in general := structure is not allowed if it is not an function def
-
-
-
-// It is just check of all top-level symbols only after 
-// it resolved we start to generate IR and when we generate IR
-// we typecheck. Easy!
-//
-// So we just need to create global hashtable and after that 
-// when we will be generating IR we will generate all of the other things
-// like lambdas?
 
 // helpers
 scope_t *get_global_scope(compiler_t *state) {
@@ -42,14 +21,26 @@ scope_t *get_global_scope(compiler_t *state) {
 }
 
 b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *entry) {
-    scope_t * scope = get_global_scope(state);
+    assert(entry != NULL);
+    assert(entry->node != NULL);
+
+    scope_t *scope = get_global_scope(state);
 
     if (hashmap_contains(&scope->table, key)) {
-        if (!memcmp(entry, hashmap_get(&scope->table, key), sizeof(scope_entry_t))) {
-            return true;
-        }
+        scope_entry_t *exists = hashmap_get(&scope->table, key);
 
-        log_error_token(STR("Symbol already used before."), state->scanner, entry->node->token, 0);
+        log_push_color(INFO_COLOR);
+        string_t decorated_name = string_temp_concat(string_temp_concat(STRING("The identifier '"), key), STRING("' "));
+        string_t info = string_temp_concat(decorated_name, STRING("is already used before.\n\0"));
+
+        log_error_token(info.data, state->scanner, entry->node->token, 0);
+
+        log_info(STR("Was used here:"));
+        log_pop_color();
+        log_push_color(255, 255, 255);
+        print_lines_of_code(state->scanner, 1, 1, exists->node->token, 0);
+        log_pop_color();
+
         return false;
     }
 
@@ -77,6 +68,10 @@ b32 get_entry_if_exists(compiler_t *state, string_t key, scope_entry_t **output)
 // funcs
 b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
     // why not add new scope and create all of the data anyways???
+    // because we will do it later, we just need the SYMBOL
+    //
+    // WE WILL MAKE IT A COMPILE UNIT AFTER, IDIOT,
+    // THEN WE WILL TYPE CHECK AND FINALIZE ALL TYPES
     assert(node->type == AST_STRUCT_DEF);
 
     scope_entry_t entry = {};
@@ -84,8 +79,19 @@ b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
 
     entry.type = ENTRY_TYPE;
     entry.node = node;
+    
+    b32 result = add_symbol_to_global_scope(state, key, &entry);
 
-    return add_symbol_to_global_scope(state, key, &entry);
+    if (!result) return false;
+
+    types_t type = {};
+    type.type = TYPE_STRUCT;
+
+    list_add(&state->analyzer->types, &type);
+    scope_t *scope = get_global_scope(state);
+    hashmap_get(&scope->table, key)->type_index = state->analyzer->types.count - 1;
+
+    return true;
 }
 
 b32 scan_prototype_def(compiler_t *state, ast_node_t *node) {
@@ -101,8 +107,6 @@ b32 scan_prototype_def(compiler_t *state, ast_node_t *node) {
 }
 
 b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
-    scope_t *scope = get_global_scope(state);
-    
     string_t key = node->token.data.string;
     scope_entry_t entry = {};
 
@@ -170,22 +174,69 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
     entry.type = ENTRY_VAR;
     entry.node = node;
 
-    hashmap_add(&scope->table, key, &entry);
-
-    return true;
+    return add_symbol_to_global_scope(state, key, &entry);
 }
 
-b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
-    ast_node_t * next = node->left->list_start;
+// b32 scan_var_def(compiler_t *state, )
 
+b32 scan_var_defs(compiler_t *state, ast_node_t *node) {
+
+    // ternary, CANNOT BE A FUNCTION AT ALL
+    //
+    // left is names
+    // center is types
+    // right is expressions
     // @todo entry.not_resolved_type = true; here
-    for (u64 i = 0; i < node->left->child_count; i++) {
-        scope_entry_t entry = {};
-        entry.type = ENTRY_VAR;
-        entry.node = node;
-        string_t key = next->token.data.string;
-        add_symbol_to_global_scope(state, key, &entry);
-        next = next->list_next;
+
+    b32 result = true;
+    b32 is_single = false;
+    b32 is_not_resolved = false;
+
+    switch (node->center->type) {
+        case AST_UNKN_TYPE:
+            is_single = true;
+            is_not_resolved = true;
+            // all are unknown... put them in and make them not resolved
+            break;
+
+        case AST_AUTO_TYPE:
+            // resolve_types_from_expr(state, node node->left->child_count);
+            break;
+
+        case AST_VOID_TYPE:
+        case AST_STD_TYPE:
+        case AST_ARR_TYPE:
+        case AST_PTR_TYPE:
+            is_single = true;
+            // we need to parse type anyway...
+            break;
+
+        case AST_MUL_TYPES:
+            // thats where we do worst case scenario...
+            // a,b : type_a, type_b = 1;
+            break;
+
+        default:
+            break;
+    }
+
+    // if (node->center->child_count == 0) 
+    
+    /*if (is_single) */ {
+        ast_node_t * next = node->left->list_start;
+        for (u64 i = 0; i < node->left->child_count; i++) {
+            scope_entry_t entry = {};
+            string_t key = next->token.data.string;
+
+            entry.type = ENTRY_VAR;
+            entry.node = node;
+            entry.not_resolved_type = is_not_resolved;
+
+            if (!add_symbol_to_global_scope(state, key, &entry)) 
+                result = false;
+
+            next = next->list_next;
+        }
     }
 
     return true;
@@ -250,6 +301,7 @@ b32 scan_node(compiler_t *state, ast_node_t *node) {
 
         case AST_BIN_MULT_DEF:
             break;
+
         case AST_TERN_MULT_DEF:
             return scan_var_defs(state, node);
             break;
@@ -270,6 +322,26 @@ b32 scan_node(compiler_t *state, ast_node_t *node) {
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
 
+void delete_scanned_defs(compiler_t *state, ast_node_t *node) {
+
+    switch (node->type) {
+        case AST_BIN_MULT_DEF:
+        case AST_TERN_MULT_DEF:
+            {
+                ast_node_t * next = node->left->list_start;
+                for (u64 i = 0; i < node->left->child_count; i++) {
+                    hashmap_remove(&state->analyzer->scopes.data[0].table, next->token.data.string);
+                    next = next->list_next;
+                }
+            } break;
+
+        default:
+            hashmap_remove(&state->analyzer->scopes.data[0].table, node->token.data.string);
+            break;
+    }
+
+}
+
 b32 analyze_code(compiler_t *state) {
     b32 result = true;
 
@@ -285,15 +357,14 @@ b32 analyze_code(compiler_t *state) {
         kv_pair_t<string_t, scope_entry_t> pair = state->analyzer->scopes.data[0].table.entries[i];
 
         if (!pair.occupied) continue;
-        if (pair.deleted) continue;
+        if (pair.deleted)   continue;
 
         scope_entry_t entry = pair.value;
 
         if (!entry.not_resolved_type)
             continue;
 
-        if (!hashmap_remove(&state->analyzer->scopes.data[0].table, pair.key)) 
-            assert(false);
+        delete_scanned_defs(state, pair.value.node);
 
         if (!scan_node(state, entry.node)) 
             result = false;
@@ -305,14 +376,16 @@ b32 analyze_code(compiler_t *state) {
     }
     */
 
+    log_write(STR("-------Definitions--------\n"));
     for (u64 i = 0; i < state->analyzer->scopes.data[0].table.capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> pair = state->analyzer->scopes.data[0].table.entries[i];
         if (!pair.occupied) continue;
         if (pair.deleted) continue;
 
         log_update_color();
-        fprintf(stderr, "%llu -> %.*s\n", i, (int)pair.key.size, pair.key.data);
+        fprintf(stderr, " %4llu -> %.*s\n", i, (int)pair.key.size, pair.key.data);
     }
+    log_write(STR("--------------------------\n"));
 
     return result;
 }

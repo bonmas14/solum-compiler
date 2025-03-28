@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "arena.h"
+#include "talloc.h"
 
 // @todo for parser:
 // rewrite expression parser, because it is too complex and plain
@@ -727,7 +728,7 @@ ast_node_t parse_primary_type(compiler_t *state) {
 
         default: {
             result.type = AST_ERROR;
-            log_error_token(STR("Type cannot be constant value or keyword"), state->scanner, token, 0);
+            log_error_token(STR("Couldn't use this token as type."), state->scanner, token, 0);
         } break;
     }
 
@@ -917,21 +918,35 @@ ast_node_t parse_function_type(compiler_t *state) {
 ast_node_t parse_multiple_types(compiler_t *state) {
     ast_node_t node = parse_type(state);
 
-    if (consume_token(',', state->scanner, NULL, state->strings)) {
-        ast_node_t result = {};
+    token_t current = peek_token(state->scanner, state->strings);
 
-        result.type  = AST_MUL_TYPES;
-        result.token = node.token;
-
-        add_left_node(state, &result, &node);
-        node = parse_multiple_types(state);
-        check_value(node.type != AST_ERROR);
-        add_right_node(state, &result, &node);
-
-        return result;
+    if (current.type != ',') {
+        return node;
     }
 
-    return node;
+    ast_node_t result = {};
+
+    result.type  = AST_MUL_TYPES;
+    result.token = node.token; // well... @fix
+
+    while (current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
+        advance_token(state->scanner, get_temporary_allocator());
+
+        ast_node_t node = parse_type(state);
+
+        if (node.type == AST_ERROR) {
+            result.type = AST_ERROR;
+            break;
+        }
+
+        add_list_node(state, &result, &node);
+        current = peek_token(state->scanner, get_temporary_allocator());
+        temp_reset();
+
+        if (current.type != ',') break;
+    }
+
+    return result;
 }
 
 ast_node_t parse_declaration_type(compiler_t *state) {
@@ -953,7 +968,7 @@ ast_node_t parse_declaration_type(compiler_t *state) {
     }
 }
 
-ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
+ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *names) {
     ast_node_t node = {}, type = {};
 
     node.type = AST_TERN_MULT_DEF;
@@ -982,7 +997,7 @@ ast_node_t parse_multiple_var_declaration(compiler_t *state, ast_node_t *expr) {
 
     // center is our type, left is names expressions, right is expression
 
-    add_left_node(state, &node, expr);
+    add_left_node(state, &node, names);
 
     token_t token = peek_token(state->scanner, state->strings);
 

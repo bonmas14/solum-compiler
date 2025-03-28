@@ -1,0 +1,10 @@
+a : struct = {
+    a, b : s32;
+    f : b;
+}
+
+b : struct = {
+    a, b : s32;
+}
+
+mult_a, mult_a : a = default;

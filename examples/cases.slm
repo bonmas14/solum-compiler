@@ -1,16 +1,22 @@
-b : s32;
+
+// valid 
+tern_a, tern_b : s32, u64 = 1, 4;
+// not valid
+tern_c, tern_d : proto = 1, 2;
+// ------ binary multiple
+bin_a, bin_b : s32; 
 
 
-// bin_a, bin_b : s32; 
-// tern_a, tern_b : s32, u64 = 1, 4;
-
-/*
 main : () -> s32 = {
     return 0;
 }
-*/
 
-// n, w : s32, u64 = -1;
-// a : s32 = 213, 123;
+should_work : () -> s32 = {};
 
+// this is not valid on typecheck step
+signed, unsigned : s32, u64 = -1;
+
+// auto binary
 a := 123;
+
+proto : () -> s32 = prototype;
