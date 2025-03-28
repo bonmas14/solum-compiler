@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include "type_defines.h"
+s32 unary_std;
 
-struct mult {
-    s32 a;
-    s32 b;
-};
+ unary_arr;
 
-s32 basic_std_type;
+s32 * unary_ptr;
 
-mult struct_type;
+ * unary_voidptr;
 
-func not_valid_construct;
+ unary_void;
+
+  = ;
 

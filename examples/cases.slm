@@ -20,3 +20,14 @@ signed, unsigned : s32, u64 = -1;
 a := 123;
 
 proto : () -> s32 = prototype;
+
+
+
+
+Ast_Type : struct = {
+    a : s32;
+    b : s32;
+}
+
+f : Ast_Type = { }
+

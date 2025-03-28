@@ -1,5 +1,6 @@
 #define SCANNER_DEFINITION
 #include "scanner.h"
+#include "allocator.h"
 
 
 // @todo for scanner:
@@ -328,8 +329,9 @@ static b32 process_number(scanner_t *state, token_t *token) {
         token->data.const_int = before_delimeter;
     } else if (char_is_typed_digit(type, peek_next_char(state))) {
         if (type != PARSE_DIGIT_INT) {
-            // 0b0110.0101 @todo fix it?
-            log_warning(STR("Scanner: what? i allow this."));
+            log_error_token(STR("floats can be declared only in decimal format."), state, *token, 0);
+            token->type = TOKEN_ERROR;
+            return false;
         }
 
         before_delimeter = parse_const_int(not_parsed_constant, type);
@@ -641,8 +643,16 @@ void scanner_close(scanner_t *state) {
     list_delete(&state->lines);
 }
 
-b32 scanner_open(string_t *string, scanner_t *state) {
+b32 scanner_open(string_t *filename, string_t *string, scanner_t *state) {
     state->file = *string;
+
+    u8* buff = (u8*)mem_alloc(default_allocator, filename->size);
+    memcpy(buff, filename->data, filename->size);
+
+    state->filename = {};
+    state->filename.size = filename->size;
+    state->filename.data = buff;
+
 
     u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
 
@@ -740,14 +750,19 @@ void print_lines_of_code(scanner_t *state, s64 start_shift, s64 stop_shift, toke
             }
         }
     }
+}
 
-    if (stop_pos == state->lines.count) {
-        log_write(STR("\n"));
-    }
+void print_info(scanner_t *state, token_t token) {
+    log_push_color(255, 255, 255);
+
+    log_update_color();
+    fprintf(stderr, "%*s (%zu;%zu)\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    log_pop_color();
 }
 
 void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(255, 255, 255);
+    print_info(state, token);
     print_lines_of_code(state, 0, 0, token, left_pad);
     log_write(STR("\n"));
     log_pop_color();
@@ -756,6 +771,7 @@ void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
 void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(WARNING_COLOR);
     log_warning(text);
+    print_info(state, token);
 
     log_push_color(255, 255, 255);
     print_lines_of_code(state, 2, 0, token, left_pad);
@@ -768,6 +784,7 @@ void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) 
 void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
     log_push_color(ERROR_COLOR);
     log_error(text);
+    print_info(state, token);
 
     log_push_color(255, 255, 255);
     print_lines_of_code(state, 3, 0, token, left_pad);

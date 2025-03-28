@@ -1,6 +1,7 @@
 local syntax = vim.api.nvim_create_augroup("slm_syntax", { clear = true })
 
-vim.api.nvim_create_autocmd("BufRead", {
+vim.api.nvim_create_autocmd({ 'BufEnter','BufRead','BufNewFile'}, {
+
   group = syntax,
   pattern = "*.slm",
   callback = function()
@@ -8,7 +9,7 @@ vim.api.nvim_create_autocmd("BufRead", {
     vim.cmd([[
       syntax match slmIdent /[A-Za-z_]\w*/
       syntax keyword slmKeyword return if else while for module use prototype external struct union enum cast default
-      syntax keyword slmType  u8 u16 u32 u64 s8 s16 s32 s64 b32 f32 f64 
+      syntax keyword slmType  u8 u16 u32 u64 s8 s16 s32 s64 b32 f32 f64 void
       syntax match slmType /\v[A-Z][a-z0-9]*(_[A-Z][a-z0-9]*)*\v/
     ]])
 

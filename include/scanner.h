@@ -23,6 +23,7 @@ struct scanner_t {
     u64 current_char;
 
     list_t<line_tuple_t> lines; 
+    string_t filename;
     string_t file;
 }; 
 
@@ -132,7 +133,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
 b32 read_file_into_string(u8 *filename, string_t *output);
 
-b32  scanner_open(string_t *string, scanner_t *state);
+b32  scanner_open(string_t *filename, string_t *string, scanner_t *state);
 void scanner_close(scanner_t *state);
 
 token_t advance_token(scanner_t *state, allocator_t * allocator);

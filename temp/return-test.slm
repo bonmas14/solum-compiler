@@ -1,4 +1,4 @@
-mul_rets : () -> s32, s32 = {
+mul_rets : () -> u32, s32 = {
     a : s32 = 1;
     b : s32 = 4;
 
@@ -6,3 +6,5 @@ mul_rets : () -> s32, s32 = {
         return default, false;
     }
 }
+
+a, b := mult_rets();

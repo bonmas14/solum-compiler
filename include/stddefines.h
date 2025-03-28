@@ -10,6 +10,9 @@
 // @todo: should be platform specific
 #define PG(s) ((u64)(s) * KB(4))
 
+#define MAX(a, b) (a) > (b) ? (a) : (b)
+#define MIN(a, b) (a) < (b) ? (a) : (b)
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

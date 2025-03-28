@@ -927,7 +927,9 @@ ast_node_t parse_multiple_types(compiler_t *state) {
     ast_node_t result = {};
 
     result.type  = AST_MUL_TYPES;
-    result.token = node.token; // well... @fix
+    result.token = current;
+    add_list_node(state, &result, &node);
+
 
     while (current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         advance_token(state->scanner, get_temporary_allocator());

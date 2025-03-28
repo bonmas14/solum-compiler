@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 
@@ -60,20 +59,23 @@ int main(int argc, char **argv) {
     compiler_t compiler = create_compiler_instance();
 
     string_t file = {};
-    u8* filename  = NULL;
+    string_t filename;
+
 
     if (argc <= 1) {
-        filename = STR("test.slm");
+        filename = STRING("test.slm");
     } else {
-        filename = (u8*)argv[1];
+        filename.size = strlen(argv[1]);
+        filename.data = (u8*)argv[1];
     }
 
-    if (!read_file_into_string((u8*)filename, &file)) {
+
+    if (!read_file_into_string(filename.data, &file)) {
         log_error(STR("Main: couldn't open file."));
         return -1;
     }
 
-    if (!scanner_open(&file, compiler.scanner)) {
+    if (!scanner_open(&filename, &file, compiler.scanner)) {
         log_error(STR("Main: couldn't open file and load it into memory."));
         return -1;
     }
@@ -82,21 +84,49 @@ int main(int argc, char **argv) {
     if (!parse(&compiler)) { 
         log_info(STR("Parsing error"));
         log_update_color();
+    }
+
+
+    string_t second;
+    second.size = strlen(argv[2]);
+    second.data = (u8*)argv[2];
+
+    if (!read_file_into_string(second.data, &file)) {
+        log_error(STR("Main: couldn't open file."));
         return -1;
     }
 
+    scanner_t  scanner = {};
+    compiler_t comp2   = compiler;
+
+    parser_t parser  = {};
+
+    comp2.scanner = &scanner;
+    comp2.parser  = &parser;
+
+    if (!scanner_open(&second, &file, &scanner)) {
+        log_error(STR("Main: couldn't open file and load it into memory."));
+        return -1;
+    }
+
+    log_info(STR("Parsing..."));
+    if (!parse(&comp2)) { 
+        log_info(STR("Parsing error"));
+        log_update_color();
+    }
+
     log_info(STR("Analyzing..."));
-    if (!analyze_code(&compiler)) {
+    if (!analyze_code(&comp2)) {
         log_info(STR("Analyzing error"));
         log_update_color();
         return -1;
     }
 
     log_info(STR("IR..."));
-    generate_ir(&compiler);
+    generate_ir(&comp2);
 
     log_info(STR("Generating..."));
-    generate_code(&compiler);
+    generate_code(&comp2);
 
     log_update_color();
     return 0;
