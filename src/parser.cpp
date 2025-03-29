@@ -190,7 +190,19 @@ ast_node_t parse_function_call(compiler_t *state) {
             
         check_value(node.type != AST_EMPTY);
         check_value(node.type != AST_ERROR);
-        check_value(node.token.type == TOKEN_IDENT || node.type == AST_MEMBER_ACCESS);
+
+        switch (node.token.type) {
+            case TOKEN_IDENT:
+                break;
+
+            case TOKEN_CONST_FP:
+            case TOKEN_CONST_INT:
+            case TOKEN_CONST_STRING:
+            case TOK_DEFAULT:
+                result.type = AST_ERROR;
+                // @todo logging...
+                break;
+        }
 
         add_right_node(state, &result, &node);
     } else if (next.type == '[') {
@@ -1191,9 +1203,36 @@ ast_node_t parse_statement(compiler_t *state) {
             node = parse_block(state, AST_BLOCK_IMPERATIVE);
         } break;
 
+        case TOK_USE: 
+        {
+            advance_token(state->current_scanner, state->strings);
+            token_t token = peek_token(state->current_scanner, state->strings);
+
+            if (token.type == ':') {
+                node.type = AST_UNNAMED_MODULE;
+                advance_token(state->current_scanner, state->strings);
+                check_value(consume_token(TOKEN_CONST_STRING, state->current_scanner, &node.token, state->strings));
+            } else if (token.type == TOKEN_IDENT) {
+                node.type  = AST_NAMED_MODULE;
+                node.token = advance_token(state->current_scanner, state->strings);
+                check_value(consume_token(':', state->current_scanner, NULL, state->strings));
+                ast_node_t import = {};
+
+                import.type = AST_PRIMARY;
+                check_value(consume_token(TOKEN_CONST_STRING, state->current_scanner, &import.token, state->strings));
+                add_left_node(state, &node, &import);
+            } else {
+                check_value(false);
+                node.type = AST_ERROR;
+            }
+
+
+
+        } break;
+
         case TOK_IF: {
             ignore_semicolon = true;
-            node.type = AST_IF_STMT;
+            node.type  = AST_IF_STMT;
             node.token = advance_token(state->current_scanner, state->strings);
 
             ast_node_t expr = parse_assignment_expression(state);

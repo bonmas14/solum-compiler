@@ -24,6 +24,7 @@ enum ast_types_t {
     AST_EMPTY,
 
     AST_PRIMARY,
+    AST_UNNAMED_MODULE,
 
     // list
     AST_SEPARATION, 
@@ -35,6 +36,7 @@ enum ast_types_t {
     AST_UNARY_REF,
     AST_UNARY_NEGATE,
     AST_UNARY_NOT,
+    AST_NAMED_MODULE,
 
     // bin
     AST_BIN_ASSIGN,
