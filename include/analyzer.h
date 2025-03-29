@@ -8,7 +8,8 @@
 #include "scanner.h"
 
 struct scope_entry_t {
-    b32 not_resolved_type;
+    b32    not_resolved_type;
+    string_t source_filename;
 
     u32 type;
     ast_node_t *node;
@@ -74,6 +75,7 @@ struct analyzer_t {
     list_t<types_t> types;
 };
 
-b32 analyze_code(compiler_t *compiler);
+b32 analyze_all_files(compiler_t *state);
+b32 analyze_file(compiler_t *compiler, string_t filename);
 
 #endif // ANALYZER_H

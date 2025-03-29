@@ -38,10 +38,7 @@ void debug_tests(void) {
 void init(void) {
     debug_tests();
     default_allocator = preserve_allocator_from_stack(create_arena_allocator(PG(10)));
-}
 
-int main(int argc, char **argv) {
-    init();
     string_t str1 = {}, str2 = {};
 
     str1.data = STR("Concating some strings... ");
@@ -55,78 +52,67 @@ int main(int argc, char **argv) {
     log_info(str3.data);
 
     log_push_color(255, 255, 255);
+}
+
+b32 add_file(compiler_t *compiler, char *filename) {
+    if (filename == NULL) return false;
+
+    file_t file  = {};
+    file.scanner = (scanner_t*)mem_alloc(default_allocator, sizeof(scanner_t));
+
+    string_t source, name;
+
+    name.size = strlen(filename);
+    name.data = (u8*)filename;
+
+    if (!read_file_into_string(name.data, &source)) {
+        log_error(STR("Main: couldn't open file."));
+        log_update_color();
+        return false;
+    }
+
+    if (!scanner_open(&name, &source, file.scanner)) {
+        log_update_color();
+        return false;
+    }
+
+    if (!hashmap_add(&compiler->files, name, &file)) {
+        log_error(STR("Couldn't add file to work with."));
+        log_update_color();
+        return false;
+    }
+
+    return true;
+}
+
+int main(int argc, char **argv) {
+    UNUSED(argc);
+    init();
 
     compiler_t compiler = create_compiler_instance();
 
-    string_t file = {};
-    string_t filename;
-
-
-    if (argc <= 1) {
-        filename = STRING("test.slm");
-    } else {
-        filename.size = strlen(argv[1]);
-        filename.data = (u8*)argv[1];
+    u64 arg_index = 1;
+    while (add_file(&compiler, argv[arg_index])) {
+        arg_index++;
     }
 
-
-    if (!read_file_into_string(filename.data, &file)) {
-        log_error(STR("Main: couldn't open file."));
-        return -1;
-    }
-
-    if (!scanner_open(&filename, &file, compiler.scanner)) {
-        log_error(STR("Main: couldn't open file and load it into memory."));
-        return -1;
-    }
-
-    log_info(STR("Parsing..."));
-    if (!parse(&compiler)) { 
+    if (!parse_all_files(&compiler)) { 
         log_info(STR("Parsing error"));
         log_update_color();
-    }
-
-
-    string_t second;
-    second.size = strlen(argv[2]);
-    second.data = (u8*)argv[2];
-
-    if (!read_file_into_string(second.data, &file)) {
-        log_error(STR("Main: couldn't open file."));
         return -1;
     }
 
-    scanner_t  scanner = {};
-    compiler_t comp2   = compiler;
-
-    parser_t parser  = {};
-
-    comp2.scanner = &scanner;
-    comp2.parser  = &parser;
-
-    if (!scanner_open(&second, &file, &scanner)) {
-        log_error(STR("Main: couldn't open file and load it into memory."));
-        return -1;
-    }
-
-    log_info(STR("Parsing..."));
-    if (!parse(&comp2)) { 
-        log_info(STR("Parsing error"));
-        log_update_color();
-    }
-
-    log_info(STR("Analyzing..."));
-    if (!analyze_code(&comp2)) {
+    if (!analyze_all_files(&compiler)) {
         log_info(STR("Analyzing error"));
         log_update_color();
         return -1;
     }
 
     log_info(STR("IR..."));
-    generate_ir(&comp2);
+    generate_ir(&compiler);
 
     log_info(STR("Generating..."));
-    generate_code(&comp2);
+    generate_code(&compiler);
 
     log_update_color();
     return 0;

@@ -64,7 +64,6 @@ analyzer_t *analyzer_create(allocator_t *allocator) {
 
     u64 index = {};
     list_allocate(&analyzer->scopes, 1, &index);
-
     scope_t *global_scope = list_get(&analyzer->scopes, index);
     assert(index == 0);
 
@@ -77,14 +76,14 @@ analyzer_t *analyzer_create(allocator_t *allocator) {
 compiler_t create_compiler_instance(void) {
     compiler_t compiler = {};
 
-    compiler.scanner = (scanner_t*)mem_alloc(default_allocator, sizeof(scanner_t));
-    compiler.parser  =  (parser_t*)mem_alloc(default_allocator, sizeof(parser_t));
-
 	compiler.nodes   = preserve_allocator_from_stack(create_arena_allocator(sizeof(ast_node_t) * INIT_NODES_SIZE));
     compiler.strings = preserve_allocator_from_stack(create_arena_allocator(4096));
 
     compiler.analyzer = analyzer_create(default_allocator);
     compiler.codegen  = codegen_create(default_allocator);
+
+    compiler.files.hash_func    = get_string_hash;
+    compiler.files.compare_func = compare_string_keys;
 
     compiler.is_valid = true;
 

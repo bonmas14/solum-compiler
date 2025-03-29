@@ -647,21 +647,14 @@ b32 scanner_open(string_t *filename, string_t *string, scanner_t *state) {
     state->file = *string;
 
     u8* buff = (u8*)mem_alloc(default_allocator, filename->size);
+    if (buff == NULL) return false;
     memcpy(buff, filename->data, filename->size);
 
     state->filename = {};
     state->filename.size = filename->size;
     state->filename.data = buff;
 
-
-    u64 init_size = state->file.size / APPROX_CHAR_PER_LINE;
-
-    if (init_size == 0) {
-        init_size = MINIMAL_SIZE;
-    }
-
     scan_lines(state);
-
     return true;
 }
 
@@ -756,7 +749,7 @@ void print_info(scanner_t *state, token_t token) {
     log_push_color(255, 255, 255);
 
     log_update_color();
-    fprintf(stderr, "%*s (%zu;%zu)\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    fprintf(stderr, "%.*s (%zu;%zu)\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
     log_pop_color();
 }
 

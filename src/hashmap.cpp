@@ -75,20 +75,16 @@ COMPARE_KEYS(compare_string_keys) {
 
 void hashmap_tests(void) {
     {
-        hashmap_t<string_t, u32> map = { };
+        hashmap_t<string_t, u32> map = {};
         map.hash_func    = get_string_hash;
         map.compare_func = compare_string_keys;
 
         map.capacity = 3;
 
-        u8 name1[] = { "hashmap1" };
-        u8 name2[] = { "hashmap2" };
-
-        string_t key1 = (string_t){ .size = sizeof(name1), .data = name1 };
-        string_t key2 = (string_t){ .size = sizeof(name2), .data = name2 };
+        string_t key1 = STRING("hashmap1");
+        string_t key2 = STRING("hashmap2");
 
         u32 size = 8;
-
         void* ref;
 
         ref = hashmap_get(&map, key1);

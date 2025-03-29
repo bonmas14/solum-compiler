@@ -4,7 +4,6 @@
 #include "compiler.h"
 #include "list.h"
 
-#define APPROX_CHAR_PER_LINE (25)
 #define MINIMAL_SIZE (50)
 #define KEYWORDS_MAX_SIZE (11)
 

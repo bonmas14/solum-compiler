@@ -14,9 +14,14 @@
 #define MAX_COUNT_OF_RETS 1 
 
 struct scanner_t;
-struct parser_t;
 struct analyzer_t;
 struct codegen_t;
+struct ast_node_t;
+
+struct file_t {
+    scanner_t *scanner;
+    list_t<ast_node_t*> parsed_roots;
+};
 
 struct compiler_t {
     b32 is_valid;
@@ -24,10 +29,12 @@ struct compiler_t {
     allocator_t *strings;
     allocator_t *nodes;
 
-    scanner_t  *scanner;
-    parser_t   *parser;
+    scanner_t *current_scanner;
+
     analyzer_t *analyzer;
     codegen_t  *codegen;
+
+    hashmap_t<string_t, file_t> files;
 };
 
 compiler_t create_compiler_instance(void);

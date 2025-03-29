@@ -432,19 +432,26 @@ void generate_root(compiler_t *compiler, ast_node_t *root) {
 }
 
 void generate_code(compiler_t *compiler) {
-    log_update_color();
-    fprintf(stdout, "WE ARE IN CODEGEN\n");
+    for (u64 i = 0; i < compiler->files.capacity; i++) {
+        kv_pair_t<string_t, file_t> pair = compiler->files.entries[i];
+        if (!pair.occupied) continue;
+        if (pair.deleted)   continue;
+        log_update_color();
 
-    compiler->codegen->file = fopen("./output.cpp", "wb");
+        char buffer[256] = {};
+        sprintf(buffer, "./output-%zu.cpp", i);
+        fprintf(stderr, "compiling %.*s\n    file: %s\n", pair.key.size, pair.key.data, buffer);
 
-    fprintf(compiler->codegen->file, "#include <stdio.h>\n");
-    fprintf(compiler->codegen->file, "#include \"type_defines.h\"\n");
+        compiler->codegen->file = fopen(buffer, "wb");
+        fprintf(compiler->codegen->file, "#include <stdio.h>\n");
+        fprintf(compiler->codegen->file, "#include \"type_defines.h\"\n");
 
-    for (u64 i = 0; i < compiler->parser->parsed_roots.count; i++) {
-        ast_node_t * node = *list_get(&compiler->parser->parsed_roots, i);
+        for (u64 i = 0; i < pair.value.parsed_roots.count; i++) {
+            ast_node_t * node = *list_get(&pair.value.parsed_roots, i);
 
-        generate_root(compiler, node);
+            generate_root(compiler, node);
+        }
+
+        fclose(compiler->codegen->file);
     }
-
-    fclose(compiler->codegen->file);
 }

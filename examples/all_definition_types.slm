@@ -1,4 +1,3 @@
-/*
 unary_std : s32;
 // unary_func : () -> s32; // should fail
 
@@ -8,10 +7,9 @@ unary_ptr :    ^s32;
 
 unary_voidptr : ^void;
 unary_void : void; // should fail
-*/
+unary_undef : undef; // symbol is undefined
 
 a, b, c : s32, u64 = 2, 3;
 d, e : s32, b32, u8, u64 = 4;
 
-
-a : f32 = 0x0F.0F;
+a : f32 = 12.32;

@@ -6,3 +6,7 @@ main : () = {
     g, h, i : s32, s32, u64 = default;
     j, k, l : s32, s32, u64;
 }
+
+rand : (a : s32) -> s32 = {
+    return a - 19 * a;
+}

@@ -19,10 +19,6 @@ struct ast_node_t {
     u64 child_count;
 };
 
-struct parser_t {
-    list_t<ast_node_t*> parsed_roots;
-};
-
 enum ast_types_t {
     AST_ERROR,
     AST_EMPTY,
@@ -110,6 +106,7 @@ enum ast_types_t {
     AST_FUNC_RETURNS,
 };
 
-b32 parse(compiler_t *compiler);
+b32 parse_all_files(compiler_t *state);
+b32 parse_file(compiler_t *compiler, string_t filename);
 
 #endif // PARSER_H
