@@ -3,3 +3,6 @@
 
 - analyzer needs to make multiple global scopes for each imported file.
 every file can be different executable.
+
+- fix error when analyzer reports that variable doesn't have it's expression if there's only one.
+This should not happen because one expression is set to multiple variables at the same time
