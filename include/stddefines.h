@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -46,6 +47,6 @@ extern allocator_t * default_allocator;
 
 #define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 
-#define STRING(s) (string_t) { .size = sizeof(s) - 1, .data = STR(s) }
+#define STRING(s) (string_t) { .size = strlen(s), .data = STR(s) }
 
 #endif // USER_DEFINES

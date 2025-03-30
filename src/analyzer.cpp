@@ -409,10 +409,12 @@ b32 scan_node(compiler_t *state, ast_node_t *node) {
     switch (node->type) {
         case AST_UNNAMED_MODULE:
             // here we just load and parse the file from string
+
             break;
 
         case AST_NAMED_MODULE:
             // here we parse file into local state that will be accessed through that name
+            // add_and_parse_file_into_local_scope();
             break;
 
         case AST_STRUCT_DEF:

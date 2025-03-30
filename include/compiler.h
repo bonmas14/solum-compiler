@@ -19,6 +19,10 @@ struct codegen_t;
 struct ast_node_t;
 
 struct file_t {
+    b32 loaded;
+    b32 parsed;
+    b32 analyzed;
+    
     scanner_t *scanner;
     list_t<ast_node_t*> parsed_roots;
 };

@@ -2,6 +2,8 @@
 #define LOGGER_H
 
 #include "stddefines.h"
+#include "allocator.h"
+#include "talloc.h"
 
 #define INFO_COLOR     96, 224, 255
 #define WARNING_COLOR 226, 175,  63 
@@ -23,7 +25,9 @@ void log_info(u8 *text);
 void log_warning(u8 *text);
 void log_error(u8 *text);
 
-string_t string_temp_concat(string_t a, string_t b);
+#define str_concat(a, b) string_concat(a, b, default_allocator)
+#define string_temp_concat(a, b) string_concat(a, b, get_temporary_allocator())
+string_t string_concat(string_t a, string_t b, allocator_t *alloc);
 
 void debug_break(void);
 

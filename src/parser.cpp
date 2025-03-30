@@ -1396,5 +1396,6 @@ b32 parse_file(compiler_t *state, string_t filename) {
         curr = peek_token(state->current_scanner, state->strings);
     }
 
+    file->parsed = true;
     return valid_parse;
 }

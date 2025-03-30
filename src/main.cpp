@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-
 #include "stddefines.h"
 
 #include "allocator.h"
@@ -50,11 +47,10 @@ void init(void) {
     string_t str3 = string_temp_concat(str1, str2);
 
     log_info(str3.data);
-
     log_push_color(255, 255, 255);
 }
 
-b32 add_file(compiler_t *compiler, char *filename) {
+b32 add_file(compiler_t *state, char *filename) {
     if (filename == NULL) return false;
 
     file_t file  = {};
@@ -67,52 +63,90 @@ b32 add_file(compiler_t *compiler, char *filename) {
 
     if (!read_file_into_string(name.data, &source)) {
         log_error(STR("Main: couldn't open file."));
-        log_update_color();
         return false;
     }
 
     if (!scanner_open(&name, &source, file.scanner)) {
-        log_update_color();
         return false;
     }
 
-    if (!hashmap_add(&compiler->files, name, &file)) {
+    if (!hashmap_add(&state->files, name, &file)) {
         log_error(STR("Couldn't add file to work with."));
-        log_update_color();
         return false;
     }
 
     return true;
 }
 
-int main(int argc, char **argv) {
-    UNUSED(argc);
-    init();
+b32 compile(char *filename) {
+    if (filename == 0) return false;
 
-    compiler_t compiler = create_compiler_instance();
+    compiler_t state = create_compiler_instance();
 
-    u64 arg_index = 1;
-    while (add_file(&compiler, argv[arg_index])) {
-        arg_index++;
-    }
+    add_file(&state, filename);
 
-    if (!parse_all_files(&compiler)) { 
+    string_t file = STRING(filename);
+    assert(strlen(filename) == file.size);
+    if (!parse_file(&state, file)) { 
         log_info(STR("Parsing error"));
         log_update_color();
         return -1;
     }
 
-    if (!analyze_all_files(&compiler)) {
-        log_info(STR("Analyzing error"));
-        log_update_color();
-        return -1;
+    b32 result = true;
+    
+    for (u64 i = 0; i < state.files.capacity; i++) {
+        kv_pair_t<string_t, file_t> pair = state.files.entries[i];
+        if (!pair.occupied) continue;
+        if (pair.deleted)   continue;
+
+        /* loading files... when we do 'use: "filename"'
+        if (!pair.value.loaded) {
+            // find_file_by_key()
+            // <file>
+            // <file>.slm
+            // <dir>/module.slm
+            // <slm>/<dir>/module.slm
+            //
+            // delete key from hashmap
+            // add filename
+
+            // add_file();
+            // pair.value.loaded = true;
+        }
+        */
+
+        if (!pair.value.parsed) {
+            if (!parse_file(&state, pair.key)) {
+                result = false;
+            }
+        }
+
+        if (!analyze_file(&state, pair.key)) {
+            result = false;
+        }
+
+        pair.value.analyzed = true;
     }
 
     log_info(STR("IR..."));
-    generate_ir(&compiler);
+    generate_ir(&state);
 
     log_info(STR("Generating..."));
-    generate_code(&compiler);
+    generate_code(&state);
+
+    return result;
+}
+
+int main(int argc, char **argv) {
+    UNUSED(argc);
+    init();
+
+    assert(argc > 0);
+    // you can just pass that because C allows that,
+    // next index will be null so you dont need
+    // to use argc
+    compile(argv[1]); 
 
     log_update_color();
     return 0;

@@ -1,5 +1,4 @@
 #include "logger.h"
-#include "talloc.h"
 #include <memory.h>
 
 #define LOGGER_COLOR_STACK_SIZE 256
@@ -70,12 +69,10 @@ void log_error(u8 *text) {
     log_pop_color();
 }
 
-string_t string_temp_concat(string_t a, string_t b) {
+string_t string_concat(string_t a, string_t b, allocator_t *alloc) {
     assert(default_allocator != NULL);
     assert(a.data != NULL);
     assert(b.data != NULL);
-
-    allocator_t *alloc = get_temporary_allocator();
 
     u8* data = (u8*)mem_alloc(alloc, a.size + b.size);
 
