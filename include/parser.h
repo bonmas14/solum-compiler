@@ -4,6 +4,8 @@
 #include "compiler.h"
 #include "scanner.h"
 
+b32 parse_file(compiler_t *compiler, string_t filename);
+
 struct ast_node_t {
     s32 type;
 
@@ -62,7 +64,8 @@ enum ast_types_t {
     AST_BIN_BIT_XOR,
     AST_BIN_BIT_OR,
     AST_BIN_BIT_AND,
-    AST_BIN_BIT_SHIFT,
+    AST_BIN_BIT_LSHIFT,
+    AST_BIN_BIT_RSHIFT,
 
     AST_FUNC_CALL,
     AST_MEMBER_ACCESS,
@@ -107,8 +110,5 @@ enum ast_types_t {
     AST_FUNC_PARAMS,
     AST_FUNC_RETURNS,
 };
-
-b32 parse_all_files(compiler_t *state);
-b32 parse_file(compiler_t *compiler, string_t filename);
 
 #endif // PARSER_H

@@ -248,7 +248,8 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
         case AST_BIN_BIT_XOR:
         case AST_BIN_BIT_OR:
         case AST_BIN_BIT_AND:
-        case AST_BIN_BIT_SHIFT:
+        case AST_BIN_BIT_LSHIFT:
+        case AST_BIN_BIT_RSHIFT:
             // fprintf(compiler->codegen->file, "(");
             generate_expression(compiler, expression->left);
             generate_expression_token(compiler, expression->token);
@@ -268,7 +269,6 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             // fprintf(compiler->codegen->file, ")");
             break;
         default:
-
             log_error(STR("what is this token"));
             break;
     }
@@ -433,14 +433,14 @@ void generate_root(compiler_t *compiler, ast_node_t *root) {
 
 void generate_code(compiler_t *compiler) {
     for (u64 i = 0; i < compiler->files.capacity; i++) {
-        kv_pair_t<string_t, file_t> pair = compiler->files.entries[i];
+        kv_pair_t<string_t, source_file_t> pair = compiler->files.entries[i];
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
         log_update_color();
 
         char buffer[256] = {};
         sprintf(buffer, "./output-%zu.cpp", i);
-        fprintf(stderr, "compiling %.*s\n    file: %s\n", pair.key.size, pair.key.data, buffer);
+        fprintf(stderr, "compiling %.*s\n    file: %s\n", (int)pair.key.size, pair.key.data, buffer);
 
         compiler->codegen->file = fopen(buffer, "wb");
         fprintf(compiler->codegen->file, "#include <stdio.h>\n");

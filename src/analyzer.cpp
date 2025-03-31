@@ -1,50 +1,44 @@
-#include "compiler.h"
 #include "analyzer.h"
-#include "parser.h"
-#include "scanner.h"
+
 #include "logger.h"
-#include "list.h"
-#include "hashmap.h"
+#include "compiler.h"
+#include "scanner.h"
+#include "parser.h"
 
 // @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY). caching the tokens or just changing them all to use temp alloc
-// so in multiple definitions we getting multiple errors that are for one type
+// so in multiple definitions we getting multiple errors that are for one entry_type
 // but it happens like this:
 //    a, a : s32 = 123;
 //
 
-// helpers
-scope_t *get_global_scope(compiler_t *state) {
-    assert(state != NULL);
-    scope_t *scope = list_get(&state->analyzer->scopes, 0);
-    assert(scope->parent_scope == 0);
-    return scope;
-}
+struct analyzer_state_t {
+    scanner_t *scanner;
+    hashmap_t<string_t, scope_entry_t> *scope;
+};
 
-b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *entry) {
+b32 add_symbol_to_global_scope(analyzer_state_t *state, string_t key, scope_entry_t *entry) {
     assert(entry != NULL);
     assert(entry->node != NULL);
 
-    scope_t *scope = get_global_scope(state);
-
-    if (hashmap_contains(&scope->table, key)) {
-        scope_entry_t *exists = hashmap_get(&scope->table, key);
+    if (hashmap_contains(state->scope, key)) {
+        scope_entry_t *exists = hashmap_get(state->scope, key);
 
         log_push_color(INFO_COLOR);
         string_t decorated_name = string_temp_concat(string_temp_concat(STRING("The identifier '"), key), STRING("' "));
         string_t info = string_temp_concat(decorated_name, STRING("is already used before.\n\0"));
 
-        log_error_token(info.data, state->current_scanner, entry->node->token, 0);
+        log_error_token(info.data, state->scanner, entry->node->token, 0);
 
         log_info(STR("Was used here:"));
         log_pop_color();
         log_push_color(255, 255, 255);
-        print_lines_of_code(state->current_scanner, 1, 1, exists->node->token, 0);
+        print_lines_of_code(state->scanner, 1, 1, exists->node->token, 0);
         log_pop_color();
 
         return false;
     }
 
-    if (!hashmap_add(&scope->table, key, entry)) {
+    if (!hashmap_add(state->scope, key, entry)) {
         log_error(STR("Couldn't reserve symbol..."));
         assert(false);
     }
@@ -52,13 +46,11 @@ b32 add_symbol_to_global_scope(compiler_t *state, string_t key, scope_entry_t *e
     return true;
 }
 
-b32 get_entry_if_exists(compiler_t *state, string_t key, scope_entry_t **output) {
+b32 get_entry_if_exists(analyzer_state_t *state, string_t key, scope_entry_t **output) {
     UNUSED(output);
 
-    scope_t *scope = get_global_scope(state);
-
-    if (hashmap_contains(&scope->table, key)) {
-        *output = hashmap_get(&scope->table, key);
+    if (hashmap_contains(state->scope, key)) {
+        *output = hashmap_get(state->scope, key);
         return true;
     }
 
@@ -66,8 +58,8 @@ b32 get_entry_if_exists(compiler_t *state, string_t key, scope_entry_t **output)
 }
 
 // funcs
-b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
-    // why not add new scope and create all of the data anyways???
+b32 scan_struct_def(analyzer_state_t *state, ast_node_t *node) {
+    // why not add new state->current_scope and create all of the data anyways???
     // because we will do it later, we just need the SYMBOL
     //
     // WE WILL MAKE IT A COMPILE UNIT AFTER, IDIOT,
@@ -77,36 +69,25 @@ b32 scan_struct_def(compiler_t *state, ast_node_t *node) {
     scope_entry_t entry = {};
     string_t key = node->token.data.string;
 
-    entry.type = ENTRY_TYPE;
+    entry.entry_type = ENTRY_TYPE;
     entry.node = node;
     
-    b32 result = add_symbol_to_global_scope(state, key, &entry);
-
-    if (!result) return false;
-
-    types_t type = {};
-    type.type = TYPE_STRUCT;
-
-    list_add(&state->analyzer->types, &type);
-    scope_t *scope = get_global_scope(state);
-    hashmap_get(&scope->table, key)->type_index = state->analyzer->types.count - 1;
-
-    return true;
+    return add_symbol_to_global_scope(state, key, &entry);
 }
 
-b32 scan_prototype_def(compiler_t *state, ast_node_t *node) {
+b32 scan_prototype_def(analyzer_state_t *state, ast_node_t *node) {
     assert(node->type == AST_UNARY_PROTO_DEF);
 
     scope_entry_t entry = {};
     string_t key = node->token.data.string;
 
-    entry.type = ENTRY_PROTOTYPE;
+    entry.entry_type = ENTRY_PROTOTYPE;
     entry.node = node;
 
     return add_symbol_to_global_scope(state, key, &entry);
 }
 
-b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
+b32 scan_unary_var_def(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t entry = {};
 
@@ -116,7 +97,7 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
         scope_entry_t *type;
 
         if (get_entry_if_exists(state, type_key, &type)) {
-            switch (type->type) {
+            switch (type->entry_type) {
                 case ENTRY_UNKN:
                     entry.not_resolved_type = true;
                     break;
@@ -125,7 +106,7 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
                     break;
 
                 case ENTRY_PROTOTYPE: {
-                    log_error_token(STR("Couldn't create prototype realization without body."), state->current_scanner, node->token, 0);
+                    log_error_token(STR("Couldn't create prototype realization without body."), state->scanner, node->token, 0);
                     
                     log_push_color(INFO_COLOR);
                     string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), key), STRING("' "));
@@ -135,12 +116,12 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
                     log_pop_color();
 
                     log_push_color(255, 255, 255);
-                    print_lines_of_code(state->current_scanner, 2, 1, type->node->token, 0);
+                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
                     log_pop_color();
                 } return false;
 
                 case ENTRY_FUNC: {
-                    log_error_token(STR("Couldn't create variable with function type ."), state->current_scanner, node->token, 0);
+                    log_error_token(STR("Couldn't create variable with function type."), state->scanner, node->token, 0);
                     
                     log_push_color(INFO_COLOR);
                     string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), type_key), STRING("' "));
@@ -150,7 +131,7 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
                     log_pop_color();
 
                     log_push_color(255, 255, 255);
-                    print_lines_of_code(state->current_scanner, 2, 1, type->node->token, 0);
+                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
                     log_pop_color();
                 } return false;
 
@@ -163,13 +144,13 @@ b32 scan_unary_var_def(compiler_t *state, ast_node_t *node) {
         }
     }
 
-    entry.type = ENTRY_VAR;
+    entry.entry_type = ENTRY_VAR;
     entry.node = node;
 
     return add_symbol_to_global_scope(state, key, &entry);
 }
 
-b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
+b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node) {
     assert(state != NULL);
     assert(node  != NULL);
     assert(node->type == AST_BIN_MULT_DEF);
@@ -188,7 +169,7 @@ b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
             scope_entry_t entry = {};
             string_t key = next->token.data.string;
 
-            entry.type = ENTRY_VAR;
+            entry.entry_type = ENTRY_VAR;
             entry.node = node;
             entry.not_resolved_type = is_not_resolved;
 
@@ -208,7 +189,7 @@ b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
             next = next->list_next;
         }
 
-        log_error_token(STR("This variable didn't have it's own type:"), state->current_scanner, next->token, 0);
+        log_error_token(STR("This variable didn't have it's own type:"), state->scanner, next->token, 0);
         return false;
     }
 
@@ -219,7 +200,7 @@ b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
         scope_entry_t entry = {};
         string_t key = name->token.data.string;
 
-        entry.type = ENTRY_VAR;
+        entry.entry_type = ENTRY_VAR;
         entry.node = node;
 
         if (type->type == AST_UNKN_TYPE) {
@@ -234,7 +215,7 @@ b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
             log_pop_color();
 
             log_push_color(255, 255, 255);
-            print_lines_of_code(state->current_scanner, 0, 0, name->token, 0);
+            print_lines_of_code(state->scanner, 0, 0, name->token, 0);
             log_write(STR("\n"));
             log_pop_color();
             result = false;
@@ -250,7 +231,7 @@ b32 scan_bin_var_defs(compiler_t *state, ast_node_t *node) {
     return result;
 }
 
-b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
+b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
     assert(state != NULL);
     assert(node  != NULL);
     assert(node->type == AST_TERN_MULT_DEF);
@@ -269,7 +250,7 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
             scope_entry_t entry = {};
             string_t key = next->token.data.string;
 
-            entry.type = ENTRY_VAR;
+            entry.entry_type = ENTRY_VAR;
             entry.node = node;
             entry.not_resolved_type = is_not_resolved;
 
@@ -291,13 +272,13 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
             for (u64 i = 0; i < least_size; i++) {
                 next = next->list_next;
             }
-            log_error_token(STR("Too much types in definition. Starting from this one:"), state->current_scanner, next->token, 0);
+            log_error_token(STR("Too much types in definition. Starting from this one:"), state->scanner, next->token, 0);
         } else {
             next = node->left->list_start;
             for (u64 i = 0; i < least_size; i++) {
                 next = next->list_next;
             }
-            log_error_token(STR("Starting from this variable name, there's no enough types in definition:"), state->current_scanner, next->token, 0);
+            log_error_token(STR("Starting from this variable name, there's no enough types in definition:"), state->scanner, next->token, 0);
         }
 
         return false;
@@ -310,7 +291,7 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
         scope_entry_t entry = {};
         string_t key = name->token.data.string;
 
-        entry.type = ENTRY_VAR;
+        entry.entry_type = ENTRY_VAR;
         entry.node = node;
 
         if (type->type == AST_UNKN_TYPE) {
@@ -325,7 +306,7 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
             log_pop_color();
 
             log_push_color(255, 255, 255);
-            print_lines_of_code(state->current_scanner, 0, 0, name->token, 0);
+            print_lines_of_code(state->scanner, 0, 0, name->token, 0);
             log_write(STR("\n"));
             log_pop_color();
             result = false;
@@ -352,13 +333,13 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
                 next = next->list_next;
             }
 
-            log_error_token(STR("Trailing expression without its variable:"), state->current_scanner, next->token, 0);
+            log_error_token(STR("Trailing expression without its variable:"), state->scanner, next->token, 0);
         } else {
             next = node->left->list_start;
             for (u64 i = 0; i < least_size; i++) {
                 next = next->list_next;
             }
-            log_error_token(STR("This variable didn't have it's expression:"), state->current_scanner, next->token, 0);
+            log_error_token(STR("This variable didn't have it's expression:"), state->scanner, next->token, 0);
         }
 
 
@@ -368,11 +349,11 @@ b32 scan_tern_var_defs(compiler_t *state, ast_node_t *node) {
     return result;
 }
 
-b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
+b32 scan_unkn_def(analyzer_state_t *state, ast_node_t *node) {
     assert(node->type == AST_BIN_UNKN_DEF);
 
     scope_entry_t entry = {};
-    entry.type = ENTRY_ERROR;
+    entry.entry_type = ENTRY_ERROR;
     entry.node = node;
 
     if (node->left->type == AST_UNKN_TYPE) {
@@ -382,14 +363,14 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
 
     switch (node->left->type) {
         case AST_FUNC_TYPE:
-            entry.type = ENTRY_FUNC;
+            entry.entry_type = ENTRY_FUNC;
             break;
 
         case AST_AUTO_TYPE:
         case AST_STD_TYPE:
         case AST_ARR_TYPE:
         case AST_PTR_TYPE:
-            entry.type = ENTRY_VAR;
+            entry.entry_type = ENTRY_VAR;
             break;
 
         default:
@@ -397,15 +378,15 @@ b32 scan_unkn_def(compiler_t *state, ast_node_t *node) {
             return false;
     } 
 
-    if (entry.type == ENTRY_VAR && node->right->type == AST_BLOCK_IMPERATIVE) {
-        log_error_token(STR("Variable assignment should be expression"), state->current_scanner, node->right->token, 0);
+    if (entry.entry_type == ENTRY_VAR && node->right->type == AST_BLOCK_IMPERATIVE) {
+        log_error_token(STR("Variable assignment should be expression"), state->scanner, node->right->token, 0);
         return false;
     }
 
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
-b32 scan_node(compiler_t *state, ast_node_t *node) {
+b32 scan_node(analyzer_state_t *state, ast_node_t *node) {
     switch (node->type) {
         case AST_UNNAMED_MODULE:
             // here we just load and parse the file from string
@@ -442,7 +423,7 @@ b32 scan_node(compiler_t *state, ast_node_t *node) {
             return scan_unkn_def(state, node);
 
         default:
-            log_error_token(STR("Wrong type of construct in global scope."), state->current_scanner, node->token, 0);
+            log_error_token(STR("Wrong entry_type of construct in global state->current_scope."), state->scanner, node->token, 0);
             break;
     }
 
@@ -453,72 +434,31 @@ b32 scan_node(compiler_t *state, ast_node_t *node) {
 // then we can set 'ast_node_t.analyzed' to 'true'
 // and then we can already analyze the code
 
-void delete_scanned_defs(compiler_t *state, ast_node_t *node) {
+void delete_scanned_defs(analyzer_state_t *state, ast_node_t *node) {
     switch (node->type) {
         case AST_BIN_MULT_DEF:
         case AST_TERN_MULT_DEF:
             {
                 ast_node_t * next = node->left->list_start;
                 for (u64 i = 0; i < node->left->child_count; i++) {
-                    hashmap_remove(&state->analyzer->scopes.data[0].table, next->token.data.string);
+                    hashmap_remove(state->scope, next->token.data.string);
                     next = next->list_next;
                 }
             } break;
 
         default:
-            hashmap_remove(&state->analyzer->scopes.data[0].table, node->token.data.string);
+            hashmap_remove(state->scope, node->token.data.string);
             break;
     }
 }
 
-b32 analyze_all_files(compiler_t *state) {
-    b32 result = true;
-
-    for (u64 i = 0; i < state->files.capacity; i++) {
-        kv_pair_t<string_t, file_t> pair = state->files.entries[i];
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
-
-        if (!analyze_file(state, pair.key))
-            result = false;
-    }
-
-    scope_t *scope = get_global_scope(state);
-
-    log_write(STR("-------Definitions--------\n"));
-    for (u64 i = 0; i < scope->table.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = scope->table.entries[i];
-        if (!pair.occupied) continue;
-        if (pair.deleted) continue;
-
-        log_update_color();
-        fprintf(stderr, " %4llu -> %.*s\n", i, (int)pair.key.size, pair.key.data);
-    }
-    log_write(STR("--------------------------\n"));
-
-    for (u64 i = 0; i < scope->table.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = scope->table.entries[i];
-
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
-
-        scope_entry_t entry = pair.value;
-
-        if (!entry.not_resolved_type)
-            continue;
-
-        log_update_color();
-        fprintf(stderr, "Error: missing definition: %.*s\n", (int)pair.key.size, pair.key.data);
-    }
-
-    return result;
-}
-
-b32 analyze_file(compiler_t *state, string_t filename) {
-    file_t *file = hashmap_get(&state->files, filename);
+b32 analyze_file(compiler_t *compiler, string_t filename) {
+    source_file_t *file = hashmap_get(&compiler->files, filename);
     assert(file != NULL);
 
-    state->current_scanner = file->scanner;
+    analyzer_state_t state = {};
+    state.scanner = file->scanner;
+    state.scope   = &file->scope;
 
     b32 result = true;
 
@@ -526,14 +466,12 @@ b32 analyze_file(compiler_t *state, string_t filename) {
         ast_node_t *node = *list_get(&file->parsed_roots, i);
         assert(node->type != AST_ERROR);
 
-        if (!scan_node(state, node)) 
+        if (!scan_node(&state, node)) 
             result = false;
     }
 
-    scope_t *scope = get_global_scope(state);
-
-    for (u64 i = 0; i < scope->table.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = scope->table.entries[i];
+    for (u64 i = 0; i < state.scope->capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = state.scope->entries[i];
 
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
@@ -543,9 +481,9 @@ b32 analyze_file(compiler_t *state, string_t filename) {
         if (!entry.not_resolved_type)
             continue;
 
-        delete_scanned_defs(state, pair.value.node);
+        delete_scanned_defs(&state, pair.value.node);
 
-        if (!scan_node(state, entry.node)) 
+        if (!scan_node(&state, entry.node)) 
             result = false;
     }
 

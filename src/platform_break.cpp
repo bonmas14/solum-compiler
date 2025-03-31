@@ -6,12 +6,14 @@
 #include <windows.h>
 
 void debug_break(void) {
+    log_color_reset();
     DebugBreak();
 }
 
 #else
 
 void debug_break(void) {
+    log_color_reset();
     __builtin_trap();
 }
 

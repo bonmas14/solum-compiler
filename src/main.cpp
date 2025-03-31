@@ -14,12 +14,10 @@
 #include "ir_generator.h"
 #include "backend.h"
 
-#ifdef NDEBUG 
-#define log_info_token(a, b, c)
-#endif
-
 allocator_t * default_allocator;
 allocator_t __allocator;
+
+#if defined(DEBUG)
 
 void debug_tests(void) {
     hashmap_tests();
@@ -28,7 +26,7 @@ void debug_tests(void) {
     temp_tests();
 }
 
-#ifdef NDEBUG
+#elif defined(NDEBUG)
 #define debug_tests(...)
 #endif
 
@@ -50,27 +48,22 @@ void init(void) {
     log_push_color(255, 255, 255);
 }
 
-b32 add_file(compiler_t *state, char *filename) {
-    if (filename == NULL) return false;
-
-    file_t file  = {};
+b32 add_file(compiler_t *state, string_t filename) {
+    source_file_t file  = {};
     file.scanner = (scanner_t*)mem_alloc(default_allocator, sizeof(scanner_t));
 
-    string_t source, name;
+    string_t source;
 
-    name.size = strlen(filename);
-    name.data = (u8*)filename;
-
-    if (!read_file_into_string(name.data, &source)) {
+    if (!read_file_into_string(filename, default_allocator, &source)) {
         log_error(STR("Main: couldn't open file."));
         return false;
     }
 
-    if (!scanner_open(&name, &source, file.scanner)) {
+    if (!scanner_open(&filename, &source, file.scanner)) {
         return false;
     }
 
-    if (!hashmap_add(&state->files, name, &file)) {
+    if (!hashmap_add(&state->files, filename, &file)) {
         log_error(STR("Couldn't add file to work with."));
         return false;
     }
@@ -78,16 +71,11 @@ b32 add_file(compiler_t *state, char *filename) {
     return true;
 }
 
-b32 compile(char *filename) {
-    if (filename == 0) return false;
-
-    compiler_t state = create_compiler_instance();
-
+b32 compile(string_t filename) {
+    compiler_t state = create_compiler_instance(NULL);
     add_file(&state, filename);
 
-    string_t file = STRING(filename);
-    assert(strlen(filename) == file.size);
-    if (!parse_file(&state, file)) { 
+    if (!parse_file(&state, filename)) { 
         log_info(STR("Parsing error"));
         log_update_color();
         return -1;
@@ -96,7 +84,7 @@ b32 compile(char *filename) {
     b32 result = true;
     
     for (u64 i = 0; i < state.files.capacity; i++) {
-        kv_pair_t<string_t, file_t> pair = state.files.entries[i];
+        kv_pair_t<string_t, source_file_t> pair = state.files.entries[i];
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
 
@@ -145,9 +133,15 @@ int main(int argc, char **argv) {
     assert(argc > 0);
     // you can just pass that because C allows that,
     // next index will be null so you dont need
-    // to use argc
-    compile(argv[1]); 
+    // to use arg
+    
 
-    log_update_color();
+    if (argc > 1) {
+        compile(string_copy(STRING(argv[1]), default_allocator)); 
+    } else {
+        log_info(STR("usage: prog [FILE]"));
+    }
+
+    log_color_reset();
     return 0;
 }

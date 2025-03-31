@@ -31,7 +31,11 @@ ALLOCATOR_PROC(temporary_allocator_proc) {
             assert(false);
             break;
     }
-    
+}
+
+// @todo : for all allocators
+b32 is_inside_of_temp_memory(void *p) {
+    return (p >= __talloc_data.data) && (p < (__talloc_data.data + TEMP_MEM_SIZE));
 }
 
 allocator_t *get_temporary_allocator(void) {

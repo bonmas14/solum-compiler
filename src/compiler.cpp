@@ -7,6 +7,27 @@
 #include "analyzer.h"
 #include "backend.h"
 
+source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc) {
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc != NULL);
+    assert(compiler != NULL);
+
+    // here we will initialize source file
+
+    source_file_t file = {};
+
+    file.scanner = (scanner_t*)mem_alloc(alloc, sizeof(scanner_t));
+
+    if (file.scanner == NULL) { 
+        log_error(STR("Buy more ram, or provide normal alloc [create_source_file]."));
+    }
+
+    file.scope.hash_func    = get_string_hash;
+    file.scope.compare_func = compare_string_keys;
+
+    return file; 
+}
+
 void create_standart_types(analyzer_t *analyzer) {
     types_t type = {};
 
@@ -59,32 +80,25 @@ void create_standart_types(analyzer_t *analyzer) {
     list_add(&analyzer->types, &type);
 }
 
-analyzer_t *analyzer_create(allocator_t *allocator) {
-    analyzer_t *analyzer = (analyzer_t*)mem_alloc(allocator, sizeof(analyzer_t));
+compiler_t create_compiler_instance(allocator_t *alloc) {
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc != NULL);
 
-    u64 index = {};
-    list_allocate(&analyzer->scopes, 1, &index);
-    scope_t *global_scope = list_get(&analyzer->scopes, index);
-    assert(index == 0);
-
-    global_scope->table.hash_func    = get_string_hash;
-    global_scope->table.compare_func = compare_string_keys;
-
-    return analyzer;
-}
-
-compiler_t create_compiler_instance(void) {
     compiler_t compiler = {};
 
 	compiler.nodes   = preserve_allocator_from_stack(create_arena_allocator(sizeof(ast_node_t) * INIT_NODES_SIZE));
     compiler.strings = preserve_allocator_from_stack(create_arena_allocator(4096));
 
-    compiler.analyzer = analyzer_create(default_allocator);
-    compiler.codegen  = codegen_create(default_allocator);
+    compiler.analyzer = (analyzer_t*)mem_alloc(alloc, sizeof(analyzer_t));
 
-    compiler.files.hash_func    = get_string_hash;
-    compiler.files.compare_func = compare_string_keys;
+    if (compiler.analyzer == NULL) { 
+        log_error(STR("Buy more ram, or provide normal alloc [create_compiler_instance]."));
+    }
 
+    compiler.analyzer->global_scope.hash_func    = get_string_hash;
+    compiler.analyzer->global_scope.compare_func = compare_string_keys;
+
+    compiler.codegen  = codegen_create(alloc);
     compiler.is_valid = true;
 
     return compiler;

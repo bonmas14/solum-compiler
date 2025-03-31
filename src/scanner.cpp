@@ -593,12 +593,19 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t 
     return true;
 }
 
-b32 read_file_into_string(u8 *filename, string_t *output) {
-    FILE *file = fopen((char*)filename, "rb");
+b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *output) {
+    if (alloc == NULL) alloc = default_allocator;
+
+    assert(alloc != NULL);
+    assert(output != NULL);
+    assert(filename.data != NULL);
+    assert(filename.size > 0);
+
+    FILE *file = fopen(string_temp_to_c_string(filename), "rb");
 
     if (file == NULL) {
         log_error(STR("Scanner: Could not open file."));
-        log_error(filename); // @cleanup
+        log_error((u8*)string_temp_to_c_string(filename)); 
         return false;
     }
 
@@ -608,20 +615,19 @@ b32 read_file_into_string(u8 *filename, string_t *output) {
 
     if (file_size == 0) return false;
 
-    output->data = (u8*)mem_alloc(default_allocator, file_size + 1);
+    output->data = (u8*)mem_alloc(default_allocator, file_size);
 
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
     if (bytes_read < file_size) {
         log_error(STR("Scanner: Could not read file."));
-        log_error(filename); // @cleanup
+        log_error((u8*)string_temp_to_c_string(filename)); 
         return false;
     }
 
     output->size = file_size;
-    output->data[file_size] = 0;
-
     fclose(file);
+
     return true;
 }
 

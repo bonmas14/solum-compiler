@@ -1,24 +1,28 @@
 #ifndef ANALYZER_H
 #define ANALYZER_H
 
-#include "compiler.h"
-#include "parser.h"
 #include "list.h"
 #include "hashmap.h"
-#include "scanner.h"
+
+struct compiler_t;
+struct ast_node_t;
+
+#define MAX_COUNT_OF_PARAMS 16
+#define MAX_COUNT_OF_RETS 1 
+
 
 struct scope_entry_t {
-    b32    not_resolved_type;
+    b32      not_resolved_type;
     string_t source_filename;
 
-    u32 type;
+    u32 entry_type;
     ast_node_t *node;
 
     union {
         u32 type_index;
 
         struct {
-            u32 type;
+            u32 type_index;
             u32 pointer_depth;
             u32 array_dimensions;
         } variable_def;
@@ -47,11 +51,6 @@ enum type_t {
     TYPE_ENUM,
 };
 
-struct scope_t {
-    u64 parent_scope;
-    hashmap_t<string_t, scope_entry_t> table;
-};
-
 struct types_t {
     u32 type;
     u32 size;
@@ -71,11 +70,10 @@ struct types_t {
 };
 
 struct analyzer_t {
-    list_t<scope_t> scopes;
+    hashmap_t<string_t, scope_entry_t> global_scope;
     list_t<types_t> types;
 };
 
-b32 analyze_all_files(compiler_t *state);
 b32 analyze_file(compiler_t *compiler, string_t filename);
 
 #endif // ANALYZER_H

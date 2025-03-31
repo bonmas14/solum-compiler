@@ -1,7 +1,6 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
-#include "compiler.h"
 #include "list.h"
 
 #define MINIMAL_SIZE (50)
@@ -130,7 +129,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 };
 #endif
 
-b32 read_file_into_string(u8 *filename, string_t *output);
+b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *output);
 
 b32  scanner_open(string_t *filename, string_t *string, scanner_t *state);
 void scanner_close(scanner_t *state);

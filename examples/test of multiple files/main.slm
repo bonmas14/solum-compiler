@@ -1,0 +1,8 @@
+use smth: "something";
+
+main : () -> s32 = {
+    value := smth.some_function();
+
+    return 0;
+}
+

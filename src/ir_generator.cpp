@@ -67,7 +67,8 @@ void gen_expr_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t *ex
         case AST_BIN_BIT_XOR:
         case AST_BIN_BIT_OR:
         case AST_BIN_BIT_AND:
-        case AST_BIN_BIT_SHIFT:
+        case AST_BIN_BIT_LSHIFT:
+        case AST_BIN_BIT_RSHIFT:
             gen_expr_ir(state, opcodes, expr->left);
             gen_expr_ir(state, opcodes, expr->right);
             log_error(STR("Not supported..."));
@@ -145,8 +146,9 @@ void gen_bin_unkn_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t
 list_t<ir_opcode_t> generate_ir(compiler_t *state) {
     list_t<ir_opcode_t> ir_code = {};
 
+    UNUSED(state);
+
     /*
-    
     for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
         ast_node_t * node = *list_get(&state->parser->parsed_roots, i);
 
