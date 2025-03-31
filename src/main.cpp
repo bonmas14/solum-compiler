@@ -50,7 +50,8 @@ void init(void) {
 
 b32 add_file(compiler_t *state, string_t filename) {
     source_file_t file  = {};
-    file.scanner = (scanner_t*)mem_alloc(default_allocator, sizeof(scanner_t));
+
+    file = create_source_file(state, NULL);
 
     string_t source;
 
@@ -134,7 +135,6 @@ int main(int argc, char **argv) {
     // you can just pass that because C allows that,
     // next index will be null so you dont need
     // to use arg
-    
 
     if (argc > 1) {
         compile(string_copy(STRING(argv[1]), default_allocator)); 

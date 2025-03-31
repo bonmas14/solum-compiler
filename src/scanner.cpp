@@ -1,6 +1,6 @@
 #define SCANNER_DEFINITION
 #include "scanner.h"
-#include "allocator.h"
+#include "talloc.h"
 
 
 // @todo for scanner:
@@ -108,13 +108,10 @@ static inline b32 char_is_number_or_letter(u8 in) {
     return char_is_digit(in) | char_is_letter(in);
 }
 
-static inline b32 char_is_special(u8 in) {
-    // null is not a special symbol of ascii, it is OUR null terminator
-    return (in > 0 && in <= 31) || in == 127;
-}
-
 // @todo we need to support escape codes
-static b32 process_string(scanner_t *state, token_t *token, allocator_t * allocator) {
+static b32 process_string(scanner_t *state, token_t *token, allocator_t * alloc) {
+    assert(alloc != NULL);
+
     token->type = TOKEN_CONST_STRING;
     token->c0 = state->current_char;
     token->l0 = state->current_line;
@@ -159,7 +156,7 @@ static b32 process_string(scanner_t *state, token_t *token, allocator_t * alloca
     identifier.data = (u8*)state->file.data + string_start;
 
     if (identifier.size != 0) {
-        u8 *data = (u8*)mem_alloc(allocator, identifier.size);
+        u8 *data = (u8*)mem_alloc(alloc, identifier.size);
 
         memcpy(data, identifier.data, identifier.size);
 
@@ -356,7 +353,9 @@ static b32 process_number(scanner_t *state, token_t *token) {
     return true;
 }
 
-static b32 process_word(scanner_t *state, token_t *token, allocator_t * allocator) {
+static b32 process_word(scanner_t *state, token_t *token, allocator_t * alloc) {
+    assert(alloc != NULL);
+
     token->c0 = state->current_char;
     token->l0 = state->current_line;
 
@@ -392,7 +391,7 @@ static b32 process_word(scanner_t *state, token_t *token, allocator_t * allocato
         return true;
     }
 
-    u8 *data = (u8*)mem_alloc(allocator, identifier.size);
+    u8 *data = (u8*)mem_alloc(alloc, identifier.size);
 
     memcpy(data, identifier.data, identifier.size);
 
@@ -411,7 +410,10 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state, allocator_t * allocator) {
+token_t advance_token(scanner_t *state, allocator_t * alloc) {
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc != NULL);
+
     eat_all_spaces(state);
 
     token_t token = {};
@@ -432,7 +434,7 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
                 advance_char(state);
             }
 
-            token = advance_token(state, allocator);
+            token = advance_token(state, alloc);
             return token;
         }
     }
@@ -456,7 +458,7 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
             advance_char(state);
             advance_char(state);
 
-            return advance_token(state, allocator);
+            return advance_token(state, alloc);
         case '.': 
         case ',':
         case ':':
@@ -529,7 +531,7 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
         } break;
 
         case '"': {
-            process_string(state, &token, allocator); // @todo. do we need to check the value? 
+            process_string(state, &token, alloc); // @todo. do we need to check the value? 
                                            // right now we just ignore the result
                                            // because in failure it returns only TOKEN_EOF
             return token;
@@ -538,7 +540,7 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
         default: {
             if (char_is_letter(ch)) {
                 stepback_char(state);
-                process_word(state, &token, allocator); // @todo add handlers for false case
+                process_word(state, &token, alloc); // @todo add handlers for false case
             } else if (char_is_digit(ch)) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
@@ -556,24 +558,24 @@ token_t advance_token(scanner_t *state, allocator_t * allocator) {
 }
 
 // @todo: add caching instead of just cleaning this up 
-token_t peek_token(scanner_t *state, allocator_t * allocator) {
+token_t peek_token(scanner_t *state, allocator_t * alloc) {
     scanner_t peek_state = *state;
 
-    token_t token  = advance_token(&peek_state, allocator);
+    token_t token  = advance_token(&peek_state, alloc);
 
     return token;
 }
 
-token_t peek_next_token(scanner_t *state, allocator_t * allocator) {
+token_t peek_next_token(scanner_t *state, allocator_t * alloc) {
     scanner_t peek_state = *state;
 
-    advance_token(&peek_state, allocator);
-    token_t token = advance_token(&peek_state, allocator);
+    advance_token(&peek_state, alloc);
+    token_t token = advance_token(&peek_state, alloc);
 
     return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * allocator) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * alloc) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
@@ -581,14 +583,25 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t 
         token  = &local_token;
     }
 
-    *token = peek_token(&peek_state, allocator);
+    *token = peek_token(&peek_state, alloc);
+
+    allocator_t *talloc = get_temporary_allocator();
 
     if (token->type != token_type) {
-        return false;
-    }
 
-    *token = advance_token(&peek_state, allocator);
-    *state = peek_state;
+        string_t name = {};
+        name.size = 1;
+        name.data = (u8*)&token_type;
+
+        char *str = string_to_c_string(string_concat(STRING("Expected token '"), 
+                    string_concat(name, STRING("' here:"), talloc), talloc), talloc);
+
+        log_error_token(STR(str), state, *token, 0);
+        return false;
+    } else {
+        advance_token(&peek_state, talloc);
+        *state = peek_state;
+    }
 
     return true;
 }
@@ -755,7 +768,7 @@ void print_info(scanner_t *state, token_t token) {
     log_push_color(255, 255, 255);
 
     log_update_color();
-    fprintf(stderr, "%.*s (%zu;%zu)\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    fprintf(stderr, "%.*s:%zu:%zu:\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
     log_pop_color();
 }
 

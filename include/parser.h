@@ -40,6 +40,8 @@ enum ast_types_t {
     AST_UNARY_NOT,
     AST_NAMED_MODULE,
 
+    AST_ENUM_DELC, 
+
     // bin
     AST_BIN_ASSIGN,
     AST_BIN_SWAP,

@@ -76,11 +76,10 @@ void log_error(u8 *text) {
 }
 
 char *string_to_c_string(string_t a, allocator_t *alloc) {
-    assert(default_allocator != NULL);
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc  != NULL);
     assert(a.data != NULL);
 
-    if (alloc == NULL)
-        alloc = default_allocator;
 
     u8* data = (u8*)mem_alloc(alloc, a.size + 1);
 
@@ -94,7 +93,8 @@ char *string_to_c_string(string_t a, allocator_t *alloc) {
 }
 
 string_t string_copy(string_t a, allocator_t *alloc) {
-    assert(default_allocator != NULL);
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc  != NULL);
     assert(a.data != NULL);
 
     if (alloc == NULL)
@@ -112,7 +112,8 @@ string_t string_copy(string_t a, allocator_t *alloc) {
 }
 
 string_t string_concat(string_t a, string_t b, allocator_t *alloc) {
-    assert(default_allocator != NULL);
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc  != NULL);
     assert(a.data != NULL);
     assert(b.data != NULL);
 

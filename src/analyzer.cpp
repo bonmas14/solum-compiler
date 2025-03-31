@@ -9,7 +9,6 @@
 // so in multiple definitions we getting multiple errors that are for one entry_type
 // but it happens like this:
 //    a, a : s32 = 123;
-//
 
 struct analyzer_state_t {
     scanner_t *scanner;

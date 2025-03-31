@@ -9,10 +9,8 @@
 
 source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
-    assert(alloc != NULL);
+    assert(alloc    != NULL);
     assert(compiler != NULL);
-
-    // here we will initialize source file
 
     source_file_t file = {};
 
@@ -93,7 +91,12 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
 
     if (compiler.analyzer == NULL) { 
         log_error(STR("Buy more ram, or provide normal alloc [create_compiler_instance]."));
+        compiler.is_valid = false;
+        return compiler;
     }
+
+    compiler.files.hash_func    = get_string_hash;
+    compiler.files.compare_func = compare_string_keys;
 
     compiler.analyzer->global_scope.hash_func    = get_string_hash;
     compiler.analyzer->global_scope.compare_func = compare_string_keys;

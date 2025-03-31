@@ -38,22 +38,18 @@ void debug_break(void);
 
 #define check_value(value) {\
     if ((b32)(value) == false) {\
-        u8 fname[256] = { __FILE__ };\
-        u64 line = __LINE__;\
-        u8 buffer[512];\
-        sprintf((char*)buffer, "check failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
+        u8 buffer[1024];\
+        sprintf((char*)buffer, "failed check in file: '%.256s', in function '%.128s', line: %zu", __FILE__, __func__, (size_t)__LINE__);\
         log_error(buffer);\
     }\
 }
 
 
 #ifdef DEBUG
-#define assert(result) { \
-    if ((b32)(result) == false) { \
-        u8 fname[256] = { __FILE__ };\
-        u64 line = __LINE__;\
-        u8 buffer[512];\
-        sprintf((char*)buffer, "assertion failed: %.256s, line: %zu", (char*)fname, (size_t)line);\
+#define assert(result) {\
+    if ((b32)(result) == false) {\
+        u8 buffer[1024];\
+        sprintf((char*)buffer, "assertion failed in file: '%.256s', in function '%.128s', line: %zu", __FILE__, __func__, (size_t)__LINE__);\
         log_error(buffer);\
         debug_break();\
     } \
