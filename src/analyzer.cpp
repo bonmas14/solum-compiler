@@ -18,7 +18,7 @@ struct analyzer_state_t {
     hashmap_t<string_t, scope_entry_t> *scope;
 };
 
-b32 add_symbol_to_global_scope(analyzer_state_t *state, string_t key, scope_entry_t *entry) {
+b32 add_symbol_to_scope(analyzer_state_t *state, string_t key, scope_entry_t *entry) {
     assert(entry != NULL);
     assert(entry->node != NULL);
 
@@ -74,7 +74,7 @@ b32 scan_struct_def(analyzer_state_t *state, ast_node_t *node) {
     entry.entry_type = ENTRY_TYPE;
     entry.node = node;
     
-    return add_symbol_to_global_scope(state, key, &entry);
+    return add_symbol_to_scope(state, key, &entry);
 }
 
 b32 scan_union_def(analyzer_state_t *state, ast_node_t *node) {
@@ -86,7 +86,7 @@ b32 scan_union_def(analyzer_state_t *state, ast_node_t *node) {
     entry.entry_type = ENTRY_TYPE;
     entry.node = node;
     
-    return add_symbol_to_global_scope(state, key, &entry);
+    return add_symbol_to_scope(state, key, &entry);
 }
 
 b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
@@ -98,7 +98,7 @@ b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
     entry.entry_type = ENTRY_TYPE;
     entry.node = node;
     
-    return add_symbol_to_global_scope(state, key, &entry);
+    return add_symbol_to_scope(state, key, &entry);
 }
 
 b32 scan_prototype_def(analyzer_state_t *state, ast_node_t *node) {
@@ -110,7 +110,7 @@ b32 scan_prototype_def(analyzer_state_t *state, ast_node_t *node) {
     entry.entry_type = ENTRY_PROTOTYPE;
     entry.node = node;
 
-    return add_symbol_to_global_scope(state, key, &entry);
+    return add_symbol_to_scope(state, key, &entry);
 }
 
 b32 scan_unary_var_def(analyzer_state_t *state, ast_node_t *node) {
@@ -159,14 +159,14 @@ b32 scan_unary_var_def(analyzer_state_t *state, ast_node_t *node) {
                     return false;
             }
         } else {
-            entry.not_resolved_type = true;
+            entry.unknown_type = true;
         }
     }
 
     entry.entry_type = ENTRY_VAR;
     entry.node = node;
 
-    return add_symbol_to_global_scope(state, key, &entry);
+    return add_symbol_to_scope(state, key, &entry);
 }
 
 b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node) {
@@ -190,9 +190,9 @@ b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node) {
 
             entry.entry_type = ENTRY_VAR;
             entry.node = node;
-            entry.not_resolved_type = is_not_resolved;
+            entry.unknown_type = is_not_resolved;
 
-            if (!add_symbol_to_global_scope(state, key, &entry)) 
+            if (!add_symbol_to_scope(state, key, &entry)) 
                 result = false;
 
             next = next->list_next;
@@ -223,7 +223,7 @@ b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node) {
         entry.node = node;
 
         if (type->type == AST_UNKN_TYPE) {
-            entry.not_resolved_type = true;
+            entry.unknown_type = true;
         }
 
         if (type->type == AST_VOID_TYPE) {
@@ -240,7 +240,7 @@ b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node) {
             result = false;
         }
 
-        if (!add_symbol_to_global_scope(state, key, &entry)) 
+        if (!add_symbol_to_scope(state, key, &entry)) 
             result = false;
 
         name = name->list_next;
@@ -271,9 +271,9 @@ b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
 
             entry.entry_type = ENTRY_VAR;
             entry.node = node;
-            entry.not_resolved_type = is_not_resolved;
+            entry.unknown_type = is_not_resolved;
 
-            if (!add_symbol_to_global_scope(state, key, &entry)) 
+            if (!add_symbol_to_scope(state, key, &entry)) 
                 result = false;
 
             next = next->list_next;
@@ -314,7 +314,7 @@ b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
         entry.node = node;
 
         if (type->type == AST_UNKN_TYPE) {
-            entry.not_resolved_type = true;
+            entry.unknown_type = true;
         }
 
         if (type->type == AST_VOID_TYPE) {
@@ -331,7 +331,7 @@ b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
             result = false;
         }
 
-        if (!add_symbol_to_global_scope(state, key, &entry)) 
+        if (!add_symbol_to_scope(state, key, &entry)) 
             result = false;
 
         name = name->list_next;
@@ -376,8 +376,8 @@ b32 scan_unkn_def(analyzer_state_t *state, ast_node_t *node) {
     entry.node = node;
 
     if (node->left->type == AST_UNKN_TYPE) {
-        entry.not_resolved_type = true;
-        return add_symbol_to_global_scope(state, node->token.data.string, &entry);
+        entry.unknown_type = true;
+        return add_symbol_to_scope(state, node->token.data.string, &entry);
     } 
 
     switch (node->left->type) {
@@ -402,7 +402,7 @@ b32 scan_unkn_def(analyzer_state_t *state, ast_node_t *node) {
         return false;
     }
 
-    return add_symbol_to_global_scope(state, node->token.data.string, &entry);
+    return add_symbol_to_scope(state, node->token.data.string, &entry);
 }
 
 string_t construct_source_name(string_t path, string_t name, allocator_t *alloc) {
@@ -430,7 +430,7 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
     // /<compiler>/<file>.slm
     // /<compiler>/<file>/module.slm
 
-    string_t file, directory, name = node->token.data.string;
+    string_t result, file, directory, name = node->token.data.string;
 
     s64 slash = index_of_last_file_slash(state->scanner->filename);
     if (slash == -1) {
@@ -443,7 +443,6 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
     log_write(STR("TRY: "));
     log_print(file);
 
-
 #define GREEN_COLOR 63, 255, 63
 
     if (is_file_exist(file)) { 
@@ -451,7 +450,8 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         log_write(STR(" OK\n"));
         log_pop_color();
         source_file_t source = create_source_file(compiler, NULL);
-        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+        result = string_copy(file, compiler->strings);
+        return hashmap_add(&compiler->files, result, &source);
     } else {
         log_push_color(ERROR_COLOR);
         log_write(STR(" FAIL\n"));
@@ -467,7 +467,8 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         log_write(STR(" OK\n"));
         log_pop_color();
         source_file_t source = create_source_file(compiler, NULL);
-        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+        result = string_copy(file, compiler->strings);
+        return hashmap_add(&compiler->files, result, &source);
     } else {
         log_push_color(ERROR_COLOR);
         log_write(STR(" FAIL\n"));
@@ -483,7 +484,8 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         log_write(STR(" OK\n"));
         log_pop_color();
         source_file_t source = create_source_file(compiler, NULL);
-        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+        result = string_copy(file, compiler->strings);
+        return hashmap_add(&compiler->files, result, &source);
     } else {
         log_push_color(ERROR_COLOR);
         log_write(STR(" FAIL\n"));
@@ -499,7 +501,8 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         log_write(STR(" OK\n"));
         log_pop_color();
         source_file_t source = create_source_file(compiler, NULL);
-        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+        result = string_copy(file, compiler->strings);
+        return hashmap_add(&compiler->files, result, &source);
     } else {
         log_push_color(ERROR_COLOR);
         log_write(STR(" FAIL\n"));
@@ -514,11 +517,12 @@ b32 scan_node(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
     temp_reset();
 
     switch (node->type) {
-        case AST_UNNAMED_MODULE: return find_and_add_file(compiler, state, node);
+        case AST_UNNAMED_MODULE: {
+            return find_and_add_file(compiler, state, node);
+        } break;
 
         case AST_NAMED_MODULE:
             // ENTRY_NAMESPACE
-
             log_error_token(STR("Named modules dont work right now."), state->scanner, node->token, 0);
             break;
 
@@ -588,7 +592,7 @@ b32 pre_analyze_file(compiler_t *compiler, string_t filename) {
 
         scope_entry_t entry = pair.value;
 
-        if (!entry.not_resolved_type)
+        if (!entry.unknown_type)
             continue;
 
         delete_scanned_defs(&state, pair.value.node);
@@ -600,10 +604,29 @@ b32 pre_analyze_file(compiler_t *compiler, string_t filename) {
     return result;
 }
 
-b32 analyze_all_files(compiler_t *compiler) {
-    b32 result = true;
+b32 resolve_everything_and_generate_ir(compiler_t *compiler) {
+    // first thing is to add all types into one place and resolve them all
+    //
+    // then we will do same to prototypes and variables
+    //
+    // after that main part. functions and variables
+    //
+    // first thing - we resolve all of type info, before starting going deep
+    //
+    // and then we run resolving for every func body.
+    //
+    //
+    // use: "core";
+    //
+    // release_build : b32 = false;
+    //
+    // entry : (args : []string) -> s32 = {
+    // }
+    //
+    // #run entry();
+    //
 
-    // we check all not resolved types
+    
 
-    return result;
+
 }

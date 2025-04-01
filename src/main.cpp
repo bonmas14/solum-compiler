@@ -119,9 +119,6 @@ b32 compile(string_t filename) {
         }
     }
 
-    log_info(STR("IR..."));
-    generate_ir(&state);
-
     log_info(STR("Generating..."));
     generate_code(&state);
 

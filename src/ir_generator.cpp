@@ -143,31 +143,20 @@ void gen_bin_unkn_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t
     gen_block_ir(state, opcodes, node->right);
 }
 
-list_t<ir_opcode_t> generate_ir(compiler_t *state) {
+list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement) {
     list_t<ir_opcode_t> ir_code = {};
 
-    UNUSED(state);
+    // so here we will generate code for statements
+    //
+    // supported things:
+    //
+    //
 
-    /*
-    for (u64 i = 0; i < state->parser->parsed_roots.count; i++) {
-        ast_node_t * node = *list_get(&state->parser->parsed_roots, i);
-
-        switch (node->type) {
-            case AST_BIN_UNKN_DEF: 
-                gen_bin_unkn_ir(state, &ir_code, node);
-                break;
-
-            default:
-                break;
-        }
-    }
 
 
     for (u64 i = 0; i < ir_code.count; i++) {
         print_ir_opcode(list_get(&ir_code, i));
     }
-
-    */
 
     return ir_code;
 }

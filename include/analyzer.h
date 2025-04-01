@@ -11,10 +11,7 @@ struct ast_node_t;
 #define MAX_COUNT_OF_RETS 1 
 
 struct scope_entry_t {
-    b32      not_resolved_type;
-    string_t source_filename;
-    string_t link_filename;
-
+    b32 unknown_type;
     u32 entry_type;
     ast_node_t *node;
 
@@ -31,6 +28,8 @@ struct scope_entry_t {
             list_t<u32> params;
             list_t<u32> returns;
         } func;
+
+        string_t use_filename;
     };
 };
 
@@ -75,7 +74,6 @@ struct analyzer_t {
 };
 
 b32 pre_analyze_file(compiler_t *compiler, string_t filename);
-
-b32 analyze_all_files(compiler_t *compiler);
+b32 resolve_everything(compiler_t *compiler);
 
 #endif // ANALYZER_H

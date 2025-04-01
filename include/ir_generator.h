@@ -80,11 +80,10 @@ enum ir_opcodes_t {
     IR_IMM,
     IR_MOVE,
 
-
     IR_JUMP,
 };
 
-list_t<ir_opcode_t> generate_ir(compiler_t *state);
+list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement);
 void print_ir_opcode(ir_opcode_t *code);
 
 #endif // IR_GEN_H
