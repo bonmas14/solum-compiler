@@ -1,6 +1,6 @@
 #include "talloc.h"
 
-#include <strings.h> 
+#include "strings.h"
 #include <memory.h> 
 
 struct {
