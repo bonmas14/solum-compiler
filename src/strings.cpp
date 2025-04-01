@@ -1,5 +1,6 @@
 #include "strings.h"
 #include "logger.h"
+#include <memory.h>
 
 char *string_to_c_string(string_t a, allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
@@ -15,6 +16,16 @@ char *string_to_c_string(string_t a, allocator_t *alloc) {
 
     memcpy((void*)data, a.data, a.size);
     return (char*)data;
+}
+
+u64 c_string_length(const char *c_str) {
+    char* s = const_cast<char*>(c_str);
+
+    while (*s != '\0') {
+        s++;
+    }
+
+    return s - const_cast<char*>(c_str);
 }
 
 b32 string_compare(string_t a, string_t b) {
@@ -203,6 +214,11 @@ s64 string_last_index_of(string_t input, u8 value) {
 
 void string_tests(void) {
     temp_reset();
+
+    assert(c_string_length("Hello") == 5);
+    assert(c_string_length("")      == 0);
+    assert(c_string_length("What")  == 4);
+
     allocator_t *alloc = get_temporary_allocator();
 
     string_t result = {};
