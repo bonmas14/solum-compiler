@@ -21,6 +21,10 @@ arr = create_array_type(sizeof(s32));
 func : (x : f32) -> f32 = sin(x);
 
 
+we can use enum as an standart type because we create it like that:
+type : enum(u64) = { ERROR = 0; }
+
+
 how to cast?
 
 // implicit conversions of extending types?

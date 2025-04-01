@@ -18,6 +18,7 @@ struct codegen_t;
 struct ast_node_t;
 
 struct source_file_t {
+    b32 had_error;
     b32 loaded;
     b32 parsed;
     b32 analyzed;
@@ -36,6 +37,7 @@ struct compiler_t {
     analyzer_t *analyzer;
     codegen_t  *codegen;
 
+    string_t modules_path;
     hashmap_t<string_t, source_file_t> files;
 };
 

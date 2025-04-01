@@ -10,10 +10,10 @@ struct ast_node_t;
 #define MAX_COUNT_OF_PARAMS 16
 #define MAX_COUNT_OF_RETS 1 
 
-
 struct scope_entry_t {
     b32      not_resolved_type;
     string_t source_filename;
+    string_t link_filename;
 
     u32 entry_type;
     ast_node_t *node;
@@ -40,7 +40,7 @@ enum entry_type_t {
     ENTRY_TYPE,
     ENTRY_PROTOTYPE,
     ENTRY_FUNC,
-    ENTRY_UNKN,
+    ENTRY_NAMESPACE,
 };
 
 enum type_t {
@@ -74,6 +74,8 @@ struct analyzer_t {
     list_t<types_t> types;
 };
 
-b32 analyze_file(compiler_t *compiler, string_t filename);
+b32 pre_analyze_file(compiler_t *compiler, string_t filename);
+
+b32 analyze_all_files(compiler_t *compiler);
 
 #endif // ANALYZER_H

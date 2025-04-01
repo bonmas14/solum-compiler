@@ -73,6 +73,19 @@ u64 c_string_length(const char *c_str) {
     return s - const_cast<char*>(c_str);
 }
 
+string_t string_swap(string_t input, u8 from, u8 to, allocator_t *alloc) {
+    string_t output = string_copy(input, alloc);
+
+    for (u64 i = 0; i < input.size; i++) {
+        if (output.data[i] != from)
+            continue;
+
+        output.data[i] = to;
+    }
+
+    return output;
+}
+
 b32 string_compare(string_t a, string_t b) {
     assert(a.data != NULL);
     assert(b.data != NULL);
@@ -347,9 +360,10 @@ void string_tests(void) {
     assert(string_compare(string_substring(STRING("HelloWorld!"), 0, 11, alloc), STRING("HelloWorld!")));
     assert(string_compare(string_substring(STRING("HelloWorld!"), 10, 1, alloc), STRING("!")));
 
-
     assert(string_index_of(STRING("CP/M"), (u8)'/') == 2);
     assert(string_last_index_of(STRING("https://github.com/bonmas14"), (u8)'/') == 18);
+
+    assert(string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
     log_info(STR("STRINGS: OK"));
 

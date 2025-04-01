@@ -1,4 +1,5 @@
 use: "something";
+use: "inside/path";
 
 main : () -> s32 = {
     value := some_function();

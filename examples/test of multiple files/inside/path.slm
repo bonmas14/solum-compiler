@@ -1,0 +1,6 @@
+
+use: "test";
+
+get_path : () -> String = {
+    return ".";
+}

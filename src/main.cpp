@@ -66,6 +66,9 @@ b32 add_file(compiler_t *state, string_t filename) {
 
 b32 compile(string_t filename) {
     compiler_t state = create_compiler_instance(NULL);
+    
+    if (!state.is_valid) return false;
+
     add_file(&state, filename);
 
     b32 result = true;
@@ -84,31 +87,31 @@ b32 compile(string_t filename) {
                 string_t source = {};
 
                 if (!read_file_into_string(pair->key, default_allocator, &source)) {
-                    log_error(STR("Pickle?!"));
                     return false;
                 }
 
                 if (!scanner_open(&pair->key, &source, pair->value.scanner)) {
-                    log_error(STR("Pickle no good maan"));
                     return false;
                 }
 
                 pair->value.loaded = true;
             }
 
-            if (!pair->value.parsed) {
+            if (!pair->value.had_error && !pair->value.parsed) {
                 finished = false;
                 if (!parse_file(&state, pair->key)) {
                     result = false;
+                    pair->value.had_error = true;
                 }
 
                 pair->value.parsed = true;
             }
 
-            if (!pair->value.analyzed) {
+            if (!pair->value.had_error && !pair->value.analyzed) {
                 finished = false;
-                if (!analyze_file(&state, pair->key)) {
+                if (!pre_analyze_file(&state, pair->key)) {
                     result = false;
+                    pair->value.had_error = true;
                 }
 
                 pair->value.analyzed = true;
@@ -129,8 +132,10 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     init();
 
-    // thats because in some systems argv[0] is not a filename of executable
-    assert(argc > 0);
+    if (argc < 1) { 
+        assert(argc > 0); 
+        return -1; 
+    }
 
     if (argc > 1) {
         compile(string_copy(STRING(argv[1]), default_allocator)); 

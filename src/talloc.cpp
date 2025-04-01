@@ -97,5 +97,5 @@ void temp_tests(void) {
     assert(data1 == data2);
     temp_reset();
 
-    log_info(STR("Temp_Allocator: OK"));
+    log_info(STR("TALLOC: OK"));
 }

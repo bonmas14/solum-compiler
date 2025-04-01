@@ -124,13 +124,6 @@ b32 scan_unary_var_def(analyzer_state_t *state, ast_node_t *node) {
 
         if (get_entry_if_exists(state, type_key, &type)) {
             switch (type->entry_type) {
-                case ENTRY_UNKN:
-                    entry.not_resolved_type = true;
-                    break;
-
-                case ENTRY_TYPE:
-                    break;
-
                 case ENTRY_PROTOTYPE: {
                     log_error_token(STR("Couldn't create prototype realization without body."), state->scanner, node->token, 0);
                     
@@ -412,31 +405,120 @@ b32 scan_unkn_def(analyzer_state_t *state, ast_node_t *node) {
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
+string_t construct_source_name(string_t path, string_t name, allocator_t *alloc) {
+    return string_swap(string_concat(path, string_concat(name, STRING(".slm"), alloc), alloc), SWAP_SLASH, (u8)HOST_SYSTEM_SLASH, alloc);
+}
+
+string_t construct_module_name(string_t path, string_t name, allocator_t *alloc) {
+    return string_swap(string_concat(path, string_concat(name, STRING("/module.slm"), alloc), alloc), SWAP_SLASH, (u8)HOST_SYSTEM_SLASH, alloc);
+}
+
+b32 is_file_exist(string_t name) {
+    FILE *file = fopen(string_to_c_string(name, get_temporary_allocator()), "rb");
+
+    if (file == NULL) return false;
+
+    fclose(file);
+    return true;
+}
+
+b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
+    allocator_t *talloc = get_temporary_allocator();
+
+    // ./<file>.slm
+    // ./<file>/module.slm
+    // /<compiler>/<file>.slm
+    // /<compiler>/<file>/module.slm
+
+    string_t file, directory, name = node->token.data.string;
+
+    s64 slash = index_of_last_file_slash(state->scanner->filename);
+    if (slash == -1) {
+        directory = string_copy(STRING("./"), talloc);
+    } else {
+        directory = string_substring(state->scanner->filename, 0, slash + 1, talloc);
+    }
+
+    file = construct_source_name(directory, name, talloc);
+    log_write(STR("TRY: "));
+    log_print(file);
+
+
+#define GREEN_COLOR 63, 255, 63
+
+    if (is_file_exist(file)) { 
+        log_push_color(GREEN_COLOR);
+        log_write(STR(" OK\n"));
+        log_pop_color();
+        source_file_t source = create_source_file(compiler, NULL);
+        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+    } else {
+        log_push_color(ERROR_COLOR);
+        log_write(STR(" FAIL\n"));
+        log_pop_color();
+    }
+
+    file = construct_module_name(directory, name, talloc);
+    log_write(STR("TRY: "));
+    log_print(file);
+
+    if (is_file_exist(file)) { 
+        log_push_color(GREEN_COLOR);
+        log_write(STR(" OK\n"));
+        log_pop_color();
+        source_file_t source = create_source_file(compiler, NULL);
+        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+    } else {
+        log_push_color(ERROR_COLOR);
+        log_write(STR(" FAIL\n"));
+        log_pop_color();
+    }
+
+    file = construct_source_name(compiler->modules_path, name, talloc);
+    log_write(STR("TRY: "));
+    log_print(file);
+
+    if (is_file_exist(file)) { 
+        log_push_color(GREEN_COLOR);
+        log_write(STR(" OK\n"));
+        log_pop_color();
+        source_file_t source = create_source_file(compiler, NULL);
+        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+    } else {
+        log_push_color(ERROR_COLOR);
+        log_write(STR(" FAIL\n"));
+        log_pop_color();
+    }
+
+    file = construct_module_name(compiler->modules_path, name, talloc);
+    log_write(STR("TRY: "));
+    log_print(file);
+
+    if (is_file_exist(file)) { 
+        log_push_color(GREEN_COLOR);
+        log_write(STR(" OK\n"));
+        log_pop_color();
+        source_file_t source = create_source_file(compiler, NULL);
+        return hashmap_add(&compiler->files, string_copy(file, compiler->strings), &source);
+    } else {
+        log_push_color(ERROR_COLOR);
+        log_write(STR(" FAIL\n"));
+        log_pop_color();
+    }
+
+    log_error_token(STR("Couldn't find corresponding file to this declaration."), state->scanner, node->token, 0);
+    return false;
+}
+
 b32 scan_node(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
     temp_reset();
 
     switch (node->type) {
-        case AST_UNNAMED_MODULE:
-        {
-            allocator_t *talloc = get_temporary_allocator();
-
-            s64 slash = index_of_last_file_slash(state->scanner->filename);
-
-            string_t file_dir = {};
-            string_t filename = string_copy(node->token.data.string, talloc);
-
-            if (slash > 0) {
-                file_dir = string_substring(state->scanner->filename, 0, slash + 1, talloc);
-                filename = string_concat(file_dir, filename, talloc);
-            }
-
-            filename = string_concat(filename, STRING(".slm"), compiler->strings);
-
-            source_file_t file = create_source_file(compiler, NULL);
-            hashmap_add(&compiler->files, filename, &file);
-        } break;
+        case AST_UNNAMED_MODULE: return find_and_add_file(compiler, state, node);
 
         case AST_NAMED_MODULE:
+            // ENTRY_NAMESPACE
+
             log_error_token(STR("Named modules dont work right now."), state->scanner, node->token, 0);
             break;
 
@@ -480,7 +562,7 @@ void delete_scanned_defs(analyzer_state_t *state, ast_node_t *node) {
     }
 }
 
-b32 analyze_file(compiler_t *compiler, string_t filename) {
+b32 pre_analyze_file(compiler_t *compiler, string_t filename) {
     source_file_t *file = hashmap_get(&compiler->files, filename);
     assert(file != NULL);
 
@@ -514,6 +596,14 @@ b32 analyze_file(compiler_t *compiler, string_t filename) {
         if (!scan_node(compiler, &state, entry.node)) 
             result = false;
     }
+
+    return result;
+}
+
+b32 analyze_all_files(compiler_t *compiler) {
+    b32 result = true;
+
+    // we check all not resolved types
 
     return result;
 }

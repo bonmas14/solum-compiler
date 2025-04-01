@@ -44,7 +44,7 @@ struct string_t {
 struct allocator_t;
 extern allocator_t * default_allocator;
 
-extern "C++" u64 c_string_length(const char *c_str);
+u64 c_string_length(const char *c_str);
 #define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))
 #define STRING(s) (string_t) { .size = c_string_length(s), .data = STR(s) }
 

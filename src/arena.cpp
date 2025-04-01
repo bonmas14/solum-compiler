@@ -118,5 +118,5 @@ void arena_tests(void) {
 
     arena_delete(arena);
     
-    log_info(STR("arena: OK"));
+    log_info(STR("ARENA: OK"));
 }

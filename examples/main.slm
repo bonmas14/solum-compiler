@@ -1,4 +1,5 @@
-
+use: "core";
+use: "test of multiple files";
 // we will do a standart example of convay's game of life
 
 

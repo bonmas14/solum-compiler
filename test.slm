@@ -1,3 +1,5 @@
+use: "examples/main";
+
 test : struct = {
     something1 : s32;
     something2 : s32;
