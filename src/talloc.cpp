@@ -1,6 +1,6 @@
 #include "talloc.h"
 
-#include <string.h> 
+#include <strings.h> 
 #include <memory.h> 
 
 struct {
@@ -88,7 +88,7 @@ void temp_tests(void) {
     temp_reset();
     const char* text = "eating burger wit no honey mustard";
     u8* str = STR(text);
-    u64 len = strlen((char*)str);
+    u64 len = c_string_length((char*)str);
 
     u8* data1 = (u8*)temp_allocate(len);
     memcpy(data1, "eating burger wit no honey mustard", len);
