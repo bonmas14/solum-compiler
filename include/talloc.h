@@ -16,4 +16,6 @@ void   temp_tests(void);
 
 allocator_t *get_temporary_allocator(void);
 
+b32 is_inside_of_temp_memory(void *p);
+
 #endif // TEMP_ALLOC_H

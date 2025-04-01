@@ -5,6 +5,8 @@
 #include "scanner.h"
 #include "parser.h"
 
+#include "strings.h"
+
 // @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY). caching the tokens or just changing them all to use temp alloc
 // so in multiple definitions we getting multiple errors that are for one entry_type
 // but it happens like this:
@@ -64,6 +66,30 @@ b32 scan_struct_def(analyzer_state_t *state, ast_node_t *node) {
     // WE WILL MAKE IT A COMPILE UNIT AFTER, IDIOT,
     // THEN WE WILL TYPE CHECK AND FINALIZE ALL TYPES
     assert(node->type == AST_STRUCT_DEF);
+
+    scope_entry_t entry = {};
+    string_t key = node->token.data.string;
+
+    entry.entry_type = ENTRY_TYPE;
+    entry.node = node;
+    
+    return add_symbol_to_global_scope(state, key, &entry);
+}
+
+b32 scan_union_def(analyzer_state_t *state, ast_node_t *node) {
+    assert(node->type == AST_UNION_DEF);
+
+    scope_entry_t entry = {};
+    string_t key = node->token.data.string;
+
+    entry.entry_type = ENTRY_TYPE;
+    entry.node = node;
+    
+    return add_symbol_to_global_scope(state, key, &entry);
+}
+
+b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
+    assert(node->type == AST_ENUM_DEF);
 
     scope_entry_t entry = {};
     string_t key = node->token.data.string;
@@ -385,41 +411,44 @@ b32 scan_unkn_def(analyzer_state_t *state, ast_node_t *node) {
     return add_symbol_to_global_scope(state, node->token.data.string, &entry);
 }
 
-b32 scan_node(analyzer_state_t *state, ast_node_t *node) {
+b32 scan_node(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
+    temp_reset();
+
     switch (node->type) {
         case AST_UNNAMED_MODULE:
-            // here we just load and parse the file from string
+        {
+            allocator_t *talloc = get_temporary_allocator();
 
-            break;
+            s64 slash = index_of_last_file_slash(state->scanner->filename);
+
+            string_t file_dir = {};
+            string_t filename = string_copy(node->token.data.string, talloc);
+
+            if (slash > 0) {
+                file_dir = string_substring(state->scanner->filename, 0, slash + 1, talloc);
+                filename = string_concat(file_dir, filename, talloc);
+            }
+
+            filename = string_concat(filename, STRING(".slm"), compiler->strings);
+
+            source_file_t file = create_source_file(compiler, NULL);
+            hashmap_add(&compiler->files, filename, &file);
+        } break;
 
         case AST_NAMED_MODULE:
-            // here we parse file into local state that will be accessed through that name
-            // add_and_parse_file_into_local_scope();
+            log_error_token(STR("Named modules dont work right now."), state->scanner, node->token, 0);
             break;
 
-        case AST_STRUCT_DEF:
-            return scan_struct_def(state, node);
+        case AST_STRUCT_DEF: return scan_struct_def(state, node);
+        case AST_UNION_DEF:  return scan_union_def(state, node);
+        case AST_ENUM_DEF:   return scan_enum_def(state, node);
 
-        case AST_UNION_DEF:
-            break;
+        case AST_UNARY_PROTO_DEF: return scan_prototype_def(state, node);
 
-        case AST_ENUM_DEF:
-            break;
-
-        case AST_UNARY_PROTO_DEF: 
-            return scan_prototype_def(state, node);
-
-        case AST_UNARY_VAR_DEF:
-            return scan_unary_var_def(state, node);
-
-        case AST_BIN_MULT_DEF:
-            return scan_bin_var_defs(state, node);
-
-        case AST_TERN_MULT_DEF:
-            return scan_tern_var_defs(state, node);
-
-        case AST_BIN_UNKN_DEF:
-            return scan_unkn_def(state, node);
+        case AST_UNARY_VAR_DEF: return scan_unary_var_def(state, node);
+        case AST_BIN_MULT_DEF:  return scan_bin_var_defs(state, node);
+        case AST_TERN_MULT_DEF: return scan_tern_var_defs(state, node);
+        case AST_BIN_UNKN_DEF:  return scan_unkn_def(state, node);
 
         default:
             log_error_token(STR("Wrong entry_type of construct in global state->current_scope."), state->scanner, node->token, 0);
@@ -436,14 +465,13 @@ b32 scan_node(analyzer_state_t *state, ast_node_t *node) {
 void delete_scanned_defs(analyzer_state_t *state, ast_node_t *node) {
     switch (node->type) {
         case AST_BIN_MULT_DEF:
-        case AST_TERN_MULT_DEF:
-            {
-                ast_node_t * next = node->left->list_start;
-                for (u64 i = 0; i < node->left->child_count; i++) {
-                    hashmap_remove(state->scope, next->token.data.string);
-                    next = next->list_next;
-                }
-            } break;
+        case AST_TERN_MULT_DEF: {
+            ast_node_t * next = node->left->list_start;
+            for (u64 i = 0; i < node->left->child_count; i++) {
+                hashmap_remove(state->scope, next->token.data.string);
+                next = next->list_next;
+            }
+        } break;
 
         default:
             hashmap_remove(state->scope, node->token.data.string);
@@ -465,7 +493,7 @@ b32 analyze_file(compiler_t *compiler, string_t filename) {
         ast_node_t *node = *list_get(&file->parsed_roots, i);
         assert(node->type != AST_ERROR);
 
-        if (!scan_node(&state, node)) 
+        if (!scan_node(compiler, &state, node)) 
             result = false;
     }
 
@@ -482,7 +510,7 @@ b32 analyze_file(compiler_t *compiler, string_t filename) {
 
         delete_scanned_defs(&state, pair.value.node);
 
-        if (!scan_node(&state, entry.node)) 
+        if (!scan_node(compiler, &state, entry.node)) 
             result = false;
     }
 

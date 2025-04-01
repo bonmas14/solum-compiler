@@ -151,10 +151,8 @@ ast_node_t parse_primary(parser_state_t *state) {
             result = parse_cast_expression(state); 
             
             token_t error_token = {};
-            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token, talloc)) {
+            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token, false, talloc)) {
                 result.type = AST_ERROR;
-
-                log_error_token(STR("Parser: expected closing brace after expression"), state->scanner, error_token, 0);
             }
         } break;
 
@@ -187,7 +185,7 @@ ast_node_t parse_function_call(parser_state_t *state) {
         check_value(node.type != AST_ERROR); // @todo: better messages
         add_right_node(state, &result, &node);
             
-        consume_token(')', state->scanner, NULL, talloc);
+        consume_token(')', state->scanner, NULL, true, talloc);
     } else if (next.type == '.') {
         result.type  = AST_MEMBER_ACCESS;
         result.token = advance_token(state->scanner, state->strings);
@@ -219,7 +217,7 @@ ast_node_t parse_function_call(parser_state_t *state) {
 
         node = parse_separated_expressions(state);
             
-        consume_token(']', state->scanner, NULL, talloc);
+        consume_token(']', state->scanner, NULL, false, talloc);
         check_value(node.type != AST_EMPTY);
         check_value(node.type != AST_ERROR);
 
@@ -583,10 +581,10 @@ ast_node_t parse_cast_expression(parser_state_t *state) {
     token_t    cast_token = {};
     ast_node_t result     = {};
 
-    if (consume_token(TOK_CAST, state->scanner, &cast_token, state->strings)) {
-        consume_token('(', state->scanner, NULL, get_temporary_allocator());
+    if (consume_token(TOK_CAST, state->scanner, &cast_token, true, state->strings)) {
+        consume_token('(', state->scanner, NULL, false, get_temporary_allocator());
         ast_node_t type = parse_type(state);
-        consume_token(')', state->scanner, NULL, get_temporary_allocator());
+        consume_token(')', state->scanner, NULL, false, get_temporary_allocator());
 
         ast_node_t expr = parse_logic_or_expression(state);
 
@@ -763,10 +761,7 @@ ast_node_t parse_type(parser_state_t *state) {
             ast_node_t size = parse_separated_expressions(state); 
             check_value(size.type != AST_EMPTY);
 
-            token_t array_end = advance_token(state->scanner, state->strings); 
-
-            if (!consume_token(']', state->scanner, &token, get_temporary_allocator())) {
-                log_error_token(STR("Array initializer expression should end with ']'."), state->scanner, array_end, 0);
+            if (!consume_token(']', state->scanner, &token, false, get_temporary_allocator())) {
                 result.type = AST_ERROR;
                 break;
             }
@@ -808,17 +803,15 @@ ast_node_t parse_param_declaration(parser_state_t *state) {
 
     token_t name, next;
 
-    if (!consume_token(TOKEN_IDENT, state->scanner, &name, state->strings)) {
+    if (!consume_token(TOKEN_IDENT, state->scanner, &name, false, state->strings)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
-        log_error_token(STR("parameter name should be identifier."), state->scanner, name, 0);
         return node;
     }
 
-    if (!consume_token(':', state->scanner, &next, state->strings)) {
+    if (!consume_token(':', state->scanner, &next, false, state->strings)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
-        log_error_token(STR("':' separator before parameter type is required."), state->scanner, name, 0);
         return node;
     }
 
@@ -872,7 +865,7 @@ ast_node_t parse_return_list(parser_state_t *state) {
 
     result.type = AST_FUNC_RETURNS;
 
-    if (!consume_token(TOKEN_RET, state->scanner, &result.token, state->strings)) {
+    if (!consume_token(TOKEN_RET, state->scanner, &result.token, true, state->strings)) {
         result.type = AST_EMPTY;
         return result;
     }
@@ -902,7 +895,7 @@ ast_node_t parse_return_list(parser_state_t *state) {
 ast_node_t parse_function_type(parser_state_t *state) {
     token_t token = {};
 
-    if (!consume_token('(', state->scanner, &token, state->strings)) {
+    if (!consume_token('(', state->scanner, &token, false, state->strings)) {
         assert(false);
     }
 
@@ -914,9 +907,9 @@ ast_node_t parse_function_type(parser_state_t *state) {
     // @todo check_value for errors
     add_left_node(state, &result, &parameters);
 
-    if (!consume_token(')', state->scanner, NULL, state->strings)) {
+    if (!consume_token(')', state->scanner, NULL, false, state->strings)) {
         result.type = AST_ERROR;
-        log_warning_token(STR("waiting for ')'."), state->scanner, result.token, 0);
+        return result;
     }
 
     ast_node_t returns = parse_return_list(state);
@@ -1065,9 +1058,8 @@ ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
         return node;
     }
 
-    if (!consume_token('=', state->scanner, NULL, state->strings)) {
+    if (!consume_token('=', state->scanner, NULL, false, state->strings)) {
         node.type = AST_ERROR;
-        log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
         panic_skip(state);
         return node;
     }
@@ -1099,8 +1091,8 @@ ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
 
 ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
     // @todo better checking_value 
-    consume_token(TOK_UNION, state->scanner, NULL, get_temporary_allocator());
-    consume_token('=', state->scanner, NULL, get_temporary_allocator());
+    consume_token(TOK_UNION, state->scanner, NULL, false, get_temporary_allocator());
+    consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
 
     ast_node_t result = {};
 
@@ -1115,8 +1107,8 @@ ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
 
 ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name) {
     // @todo better checking_value 
-    consume_token(TOK_STRUCT, state->scanner, NULL, get_temporary_allocator());
-    consume_token('=', state->scanner, NULL, get_temporary_allocator());
+    consume_token(TOK_STRUCT, state->scanner, NULL, false, get_temporary_allocator());
+    consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
 
     ast_node_t result = {};
 
@@ -1135,10 +1127,10 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
 
     allocator_t *talloc = get_temporary_allocator();
 
-    consume_token(TOK_ENUM, state->scanner, NULL, talloc);
-    consume_token('(', state->scanner, NULL, talloc);
+    consume_token(TOK_ENUM, state->scanner, NULL, false, talloc);
+    consume_token('(', state->scanner, NULL, false, talloc);
     ast_node_t type = parse_type(state);
-    consume_token(')', state->scanner, NULL, talloc);
+    consume_token(')', state->scanner, NULL, false, talloc);
     
     if (type.type == AST_STD_TYPE) {
         switch (type.token.type) {
@@ -1162,7 +1154,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     result.type = AST_ENUM_DEF;
     result.token = *name;
 
-    consume_token('=', state->scanner, NULL, talloc);
+    consume_token('=', state->scanner, NULL, false, talloc);
 
     ast_node_t left = parse_block(state, AST_BLOCK_ENUM);
     add_left_node(state, &result, &left);
@@ -1180,8 +1172,8 @@ ast_node_t parse_statement(parser_state_t *state) {
     b32 ignore_semicolon = false;
 
     if (name.type == TOKEN_IDENT && next.type == ':') {
-        consume_token(TOKEN_IDENT, state->scanner, &name, state->strings);
-        consume_token(':', state->scanner, &next, get_temporary_allocator());
+        consume_token(TOKEN_IDENT, state->scanner, &name, false, state->strings);
+        consume_token(':', state->scanner, &next, false, get_temporary_allocator());
 
         next = peek_token(state->scanner, get_temporary_allocator());
 
@@ -1241,15 +1233,15 @@ ast_node_t parse_statement(parser_state_t *state) {
             if (token.type == ':') {
                 node.type = AST_UNNAMED_MODULE;
                 advance_token(state->scanner, state->strings);
-                consume_token(TOKEN_CONST_STRING, state->scanner, &node.token, state->strings);
+                consume_token(TOKEN_CONST_STRING, state->scanner, &node.token, false, state->strings);
             } else if (token.type == TOKEN_IDENT) {
                 node.type  = AST_NAMED_MODULE;
                 node.token = advance_token(state->scanner, state->strings);
-                consume_token(':', state->scanner, NULL, state->strings);
+                consume_token(':', state->scanner, NULL, false, state->strings);
                 ast_node_t import = {};
 
                 import.type = AST_PRIMARY;
-                consume_token(TOKEN_CONST_STRING, state->scanner, &import.token, state->strings);
+                consume_token(TOKEN_CONST_STRING, state->scanner, &import.token, false, state->strings);
                 add_left_node(state, &node, &import);
             } else {
                 check_value(false);
@@ -1317,10 +1309,8 @@ ast_node_t parse_statement(parser_state_t *state) {
 
     token_t semicolon = {};
 
-    if (!consume_token(';', state->scanner, &semicolon, get_temporary_allocator())) {
+    if (!consume_token(';', state->scanner, &semicolon, false, get_temporary_allocator())) {
         node.type = AST_ERROR;
-
-        log_error_token(STR("We expected semicolon after this token."), state->scanner, node.token, 0);
         panic_skip(state);
     }
 
@@ -1363,14 +1353,14 @@ ast_node_t parse_enum_decl(parser_state_t *state) {
 
     token_t name = {};
 
-    if (!consume_token(TOKEN_IDENT,state->scanner, &name, state->strings)) {
+    if (!consume_token(TOKEN_IDENT,state->scanner, &name, false, state->strings)) {
         result.type = AST_ERROR;
         return result;
     }
 
     result.token = name;
 
-    if (!consume_token(TOKEN_IDENT, state->scanner, NULL, get_temporary_allocator())) {
+    if (!consume_token(TOKEN_IDENT, state->scanner, NULL, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
         return result;
     }
@@ -1408,7 +1398,7 @@ ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
     ast_node_t result = {};
     token_t start, stop;
 
-    if (!consume_token('{', state->scanner, &start, get_temporary_allocator())) {
+    if (!consume_token('{', state->scanner, &start, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
         log_error_token(STR("Expected opening of a block."), state->scanner, start, 0);
         return result;
@@ -1422,7 +1412,7 @@ ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
         assert(false);
     }
 
-    if (!consume_token('}', state->scanner, &stop, get_temporary_allocator())) {
+    if (!consume_token('}', state->scanner, &stop, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
         log_error_token(STR("Expected closing of a block."), state->scanner, stop, 0);
         return result;

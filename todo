@@ -5,3 +5,5 @@ This should not happen because one expression is set to multiple variables at th
 
 - create allocator functions that will check if pointer inside of theirs function
 for debug purposes
+
+- we dont know how to merge scopes and resolve named includes

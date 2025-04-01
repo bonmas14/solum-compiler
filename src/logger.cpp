@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "list.h"
 #include <memory.h>
 
 #define LOGGER_COLOR_STACK_SIZE 256
@@ -73,59 +74,6 @@ void log_error(u8 *text) {
     log_update_color();
     fprintf(stderr, "ERROR: %s\n", text);
     log_pop_color();
-}
-
-char *string_to_c_string(string_t a, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc  != NULL);
-    assert(a.data != NULL);
-
-
-    u8* data = (u8*)mem_alloc(alloc, a.size + 1);
-
-    if (data == NULL) {
-        log_error(STR("string conversion failed, buy more ram, or provide normal allocator..."));
-        return NULL;
-    }
-
-    memcpy((void*)data, a.data, a.size);
-    return (char*)data;
-}
-
-string_t string_copy(string_t a, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc  != NULL);
-    assert(a.data != NULL);
-
-    if (alloc == NULL)
-        alloc = default_allocator;
-
-    u8* data = (u8*)mem_alloc(alloc, a.size);
-
-    if (data == NULL) {
-        log_error(STR("string copy failed, buy more ram, or provide normal allocator..."));
-        return (string_t) {.size = 0, .data = NULL };
-    }
-
-    memcpy((void*)data, a.data, a.size);
-    return (string_t) {.size = a.size, .data = (u8*) data };
-}
-
-string_t string_concat(string_t a, string_t b, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc  != NULL);
-    assert(a.data != NULL);
-    assert(b.data != NULL);
-
-    if (alloc == NULL)
-        alloc = default_allocator;
-
-    u8* data = (u8*)mem_alloc(alloc, a.size + b.size);
-
-    memcpy((void*)data,            a.data, a.size);
-    memcpy((void*)(data + a.size), b.data, b.size);
-
-    return (string_t) {.size = a.size + b.size, .data = (u8*) data };
 }
 
 /*

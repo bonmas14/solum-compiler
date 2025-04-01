@@ -1,7 +1,7 @@
 #define SCANNER_DEFINITION
 #include "scanner.h"
 #include "talloc.h"
-
+#include "strings.h"
 
 // @todo for scanner:
 // create string builder and replace all of defines
@@ -575,7 +575,7 @@ token_t peek_next_token(scanner_t *state, allocator_t * alloc) {
     return token;
 }
 
-b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * alloc) {
+b32 consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_report, allocator_t *alloc) {
     scanner_t peek_state = *state;
     token_t local_token = {};
 
@@ -588,12 +588,13 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t 
     allocator_t *talloc = get_temporary_allocator();
 
     if (token->type != token_type) {
+        if (dont_report) return false;
 
         string_t name = {};
         name.size = 1;
         name.data = (u8*)&token_type;
 
-        char *str = string_to_c_string(string_concat(STRING("Expected token '"), 
+        char *str = string_to_c_string(string_concat(STRING("Expected token (@todo introspection...)'"), 
                     string_concat(name, STRING("' here:"), talloc), talloc), talloc);
 
         log_error_token(STR(str), state, *token, 0);

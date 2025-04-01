@@ -1,7 +1,7 @@
-use smth: "something";
+use: "something";
 
 main : () -> s32 = {
-    value := smth.some_function();
+    value := some_function();
 
     return 0;
 }

@@ -135,7 +135,7 @@ b32  scanner_open(string_t *filename, string_t *string, scanner_t *state);
 void scanner_close(scanner_t *state);
 
 token_t advance_token(scanner_t *state, allocator_t * allocator);
-b32     consume_token(u32 token_type, scanner_t *state, token_t *token, allocator_t * allocator);
+b32     consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_report, allocator_t * allocator);
 
 token_t peek_token(scanner_t *state, allocator_t * allocator);
 token_t peek_next_token(scanner_t *state, allocator_t * allocator);
