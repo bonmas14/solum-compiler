@@ -5,6 +5,7 @@
 #include "scanner.h"
 #include "parser.h"
 
+#include "talloc.h"
 #include "strings.h"
 
 // @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY). caching the tokens or just changing them all to use temp alloc

@@ -158,7 +158,7 @@ static b32 process_string(scanner_t *state, token_t *token, allocator_t * alloc)
     if (identifier.size != 0) {
         u8 *data = (u8*)mem_alloc(alloc, identifier.size);
 
-        memcpy(data, identifier.data, identifier.size);
+        mem_copy(data, identifier.data, identifier.size);
 
         token->data.string.size = identifier.size;
         token->data.string.data = data;
@@ -393,7 +393,7 @@ static b32 process_word(scanner_t *state, token_t *token, allocator_t * alloc) {
 
     u8 *data = (u8*)mem_alloc(alloc, identifier.size);
 
-    memcpy(data, identifier.data, identifier.size);
+    mem_copy(data, identifier.data, identifier.size);
 
     token->data.string.size = identifier.size;
     token->data.string.data = data;
@@ -668,7 +668,7 @@ b32 scanner_open(string_t *filename, string_t *string, scanner_t *state) {
 
     u8* buff = (u8*)mem_alloc(default_allocator, filename->size);
     if (buff == NULL) return false;
-    memcpy(buff, filename->data, filename->size);
+    mem_copy(buff, filename->data, filename->size);
 
     state->filename = {};
     state->filename.size = filename->size;

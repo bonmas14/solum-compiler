@@ -7,12 +7,8 @@
 #include "allocator.h"
 
 #ifndef CUSTIOM_MEM_CTRL
-
-#include <memory.h> 
-
 #define ALLOC(x) calloc(1, x) 
 #define FREE(x)  free(x) 
-
 #endif
 
 #ifdef DEBUG

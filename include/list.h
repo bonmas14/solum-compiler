@@ -3,7 +3,7 @@
 
 #include "stddefines.h"
 #include "logger.h"
-#include <memory.h> 
+#include "memctl.h"
 
 #ifndef CUSTIOM_MEM_CTRL
 #define ALLOC(x)      calloc(1, x) 
@@ -125,7 +125,7 @@ void list_fill(list_t<DataType> *list, DataType *data, u64 elements_amount, u64 
         assert(false);
     }
 
-    memcpy(start_address, data, elements_amount * sizeof(DataType));
+    mem_copy((u8*)start_address, (u8*)data, elements_amount * sizeof(DataType));
 }
 
 // add element to an list, and advance
@@ -137,7 +137,7 @@ void list_add(list_t<DataType> *list, DataType *data) {
     u64 index = 0;
     list_allocate(list, 1, &index);
 
-    memcpy(list->data + index, data, sizeof(DataType));
+    mem_copy((u8*)(list->data + index), (u8*)data, sizeof(DataType));
 }
 
 // get element by index
@@ -172,9 +172,9 @@ b32 list_grow(list_t<DataType> *list) {
         return false;
     }
 
-    (void)memset(data, 0, list->grow_size * sizeof(DataType));
+    (void)mem_set((u8*)data, 0, list->grow_size * sizeof(DataType));
 
-    (void)memcpy(data, list->data, list->current_size * sizeof(DataType));
+    (void)mem_copy((u8*)data, (u8*)list->data, list->current_size * sizeof(DataType));
 
     FREE(list->data);
     list->data = data;

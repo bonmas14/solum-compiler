@@ -3,7 +3,6 @@
 
 #include "stddefines.h"
 #include "allocator.h"
-#include "talloc.h"
 #include "list.h"
 
 #define string_temp_concat(a, b) string_concat(a, b, get_temporary_allocator())

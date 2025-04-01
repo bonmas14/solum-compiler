@@ -3,8 +3,7 @@
 
 #include "stddefines.h"
 #include "logger.h"
-
-#include <memory.h> 
+#include "memctl.h"
 
 #ifndef CUSTOM_MEM_CTRL
 #define ALLOC(x)      calloc(1, x) 
@@ -168,7 +167,7 @@ b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value)
         u32 lookup = (index + offset) % map->capacity;
 
         if (!map->entries[lookup].occupied || map->entries[lookup].deleted) { 
-            memcpy(&map->entries[lookup].value, value, sizeof(DataType));
+            mem_copy((u8*)&map->entries[lookup].value, (u8*)value, sizeof(DataType));
 
             map->entries[lookup].key      = key;
             map->entries[lookup].deleted  = false;

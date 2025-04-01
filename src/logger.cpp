@@ -1,6 +1,6 @@
 #include "logger.h"
 #include "list.h"
-#include <memory.h>
+#include "strings.h"
 
 #define LOGGER_COLOR_STACK_SIZE 256
 

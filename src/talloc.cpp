@@ -1,7 +1,5 @@
 #include "talloc.h"
-
 #include "strings.h"
-#include <memory.h> 
 
 struct {
     u64 position;
@@ -57,10 +55,10 @@ void *temp_allocate(u64 size) {
     }
     
     u64 new_position = __talloc_data.position  + size;
-    void *address    = __talloc_data.data + __talloc_data.position;
+    u8 *address      = __talloc_data.data + __talloc_data.position;
 
     if (new_position < TEMP_MEM_SIZE) {
-        memset(address, 0, size);
+        mem_set(address, 0, size);
         __talloc_data.position = new_position;
         return address;
     }
@@ -91,8 +89,8 @@ void temp_tests(void) {
     u64 len = c_string_length((char*)str);
 
     u8* data1 = (u8*)temp_allocate(len);
-    memcpy(data1, "eating burger wit no honey mustard", len);
-    assert(memcmp(data1, str, len) == 0);
+    mem_copy(data1, STR("eating burger wit no honey mustard"), len);
+    assert(mem_compare(data1, str, len) == 0);
     temp_reset();
 
     u8* data2 = (u8*)temp_allocate(len);

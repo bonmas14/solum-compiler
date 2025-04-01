@@ -1,6 +1,51 @@
 #include "strings.h"
+#include "memctl.h"
 #include "logger.h"
-#include <memory.h>
+#include "talloc.h"
+
+void mem_set(u8 *buffer, u8 value, u64 size) {
+    if (size == 0) return;
+    assert(buffer != NULL);
+
+    while (size-- > 0) {
+        *buffer++ = value;
+    }
+}
+
+void mem_copy(u8 *dest, u8 *source, u64 size) {
+    if (size == 0) return;
+
+    assert(dest   != NULL);
+    assert(source != NULL);
+
+    while (size-- > 0) {
+        *dest++ = *source++;
+    }
+}
+
+void mem_move(u8 *dest, u8 *source, u64 size) {
+    if (size == 0) return;
+
+    assert(dest   != NULL);
+    assert(source != NULL);
+
+    allocator_t *talloc = get_temporary_allocator();
+    u8* buff = (u8*)mem_alloc(talloc, size);
+
+    mem_copy(buff, source, size);
+    mem_copy(dest, buff, size);
+}
+
+u32 mem_compare(u8 *left, u8 *right, u64 size) {
+    while (size-- > 0) {
+        if (*left++ == *right++)
+            continue;
+
+        return left[-1] > right[-1] ? 1 : -1;
+    }
+
+    return 0;
+}
 
 char *string_to_c_string(string_t a, allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
@@ -14,7 +59,7 @@ char *string_to_c_string(string_t a, allocator_t *alloc) {
         return NULL;
     }
 
-    memcpy((void*)data, a.data, a.size);
+    mem_move(data, a.data, a.size);
     return (char*)data;
 }
 
@@ -34,7 +79,7 @@ b32 string_compare(string_t a, string_t b) {
 
     if (a.size != b.size) return false;
 
-    return memcmp(a.data, b.data, a.size) == 0;
+    return mem_compare(a.data, b.data, a.size) == 0;
 }
 
 string_t string_join(list_t<string_t> input, string_t separator, allocator_t *alloc) {
@@ -87,7 +132,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
     u64 start = 0;
 
     for (u64 i = 0; i < (input.size - (pattern.size - 1)); i++) {
-        if (memcmp(input.data + i, pattern.data, pattern.size) != 0) {
+        if (mem_compare(input.data + i, pattern.data, pattern.size) != 0) {
             continue;
         }
 
@@ -105,14 +150,14 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
             return splits;
         }
 
-        memcpy(buffer, input.data + start, size);
+        mem_move(buffer, input.data + start, size);
         string_t output = { .size = size, .data = buffer };
         list_add(&splits, &output);
         start = i + pattern.size;
     }
 
     if (start != input.size - pattern.size) {
-        if (memcmp(input.data + start, pattern.data, pattern.size) == 0) {
+        if (mem_compare(input.data + start, pattern.data, pattern.size) == 0) {
             return splits;
         }
 
@@ -129,7 +174,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
             return splits;
         }
 
-        memcpy(buffer, input.data + start, size);
+        mem_move(buffer, input.data + start, size);
         string_t output = { .size = size, .data = buffer };
         list_add(&splits, &output);
     }
@@ -152,7 +197,7 @@ string_t string_copy(string_t a, allocator_t *alloc) {
         return (string_t) {.size = 0, .data = NULL };
     }
 
-    memcpy((void*)data, a.data, a.size);
+    mem_move(data, a.data, a.size);
     return (string_t) {.size = a.size, .data = (u8*) data };
 }
 
@@ -168,12 +213,12 @@ string_t string_concat(string_t a, string_t b, allocator_t *alloc) {
 
     if (a.size > 0) {
         assert(a.data != NULL);
-        memcpy((void*)data, a.data, a.size);
+        mem_move(data, a.data, a.size);
     }
 
     if (b.size > 0) {
         assert(b.data != NULL);
-        memcpy((void*)(data + a.size), b.data, b.size);
+        mem_move((data + a.size), b.data, b.size);
     }
 
     return {.size = a.size + b.size, .data = (u8*) data };
@@ -189,7 +234,7 @@ string_t string_substring(string_t input, u64 start, u64 size, allocator_t *allo
         return {};
     }
     u8* data = (u8*)mem_alloc(alloc, size);
-    memcpy((void*)data, input.data + start, size);
+    mem_move(data, input.data + start, size);
 
     return {.size = size, .data = (u8*) data };
 }
