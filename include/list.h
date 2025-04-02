@@ -1,5 +1,5 @@
-#ifndef AREA_ALLOC_H
-#define AREA_ALLOC_H
+#ifndef LIST_H
+#define LIST_H
 
 #include "stddefines.h"
 #include "logger.h"
@@ -201,4 +201,4 @@ b32 list_grow_fit(list_t<DataType> *list, u64 fit_elements) {
     return true;
 }
 
-#endif // AREA_ALLOC_H
+#endif // LIST_H

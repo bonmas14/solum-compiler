@@ -3,11 +3,13 @@
 
 #include "allocator.h"
 
-#include "list.h"
 #include "talloc.h"
 #include "arena.h"
 
+#include "list.h"
 #include "hashmap.h"
+#include "stack.h"
+
 
 #include "scanner.h"
 #include "parser.h"
@@ -23,6 +25,7 @@ allocator_t __allocator;
 void debug_tests(void) {
     hashmap_tests();
     list_tests();
+    stack_tests();
     arena_tests();
     temp_tests();
     string_tests();
@@ -38,93 +41,6 @@ void init(void) {
     log_push_color(255, 255, 255);
 }
 
-b32 add_file(compiler_t *state, string_t filename) {
-    source_file_t file = {};
-
-    file = create_source_file(state, NULL);
-
-    string_t source;
-
-    if (!read_file_into_string(filename, default_allocator, &source)) {
-        log_error(STR("Main: couldn't open file."));
-        return false;
-    }
-
-    if (!scanner_open(&filename, &source, file.scanner)) {
-        return false;
-    }
-
-    file.loaded = true;
-
-    if (!hashmap_add(&state->files, filename, &file)) {
-        log_error(STR("Couldn't add file to work with."));
-        return false;
-    }
-
-    return true;
-}
-
-b32 compile(string_t filename) {
-    compiler_t state = create_compiler_instance(NULL);
-    
-    if (!state.is_valid) return false;
-
-    add_file(&state, filename);
-
-    b32 result = true;
-    b32 finished = false;
-
-    while (!finished) {
-        finished = true;
-
-        for (u64 i = 0; i < state.files.capacity; i++) {
-            kv_pair_t<string_t, source_file_t> *pair = &state.files.entries[i];
-            if (!pair->occupied) continue;
-            if (pair->deleted)   continue;
-
-            if (!pair->value.loaded) {
-                finished = false;
-                string_t source = {};
-
-                if (!read_file_into_string(pair->key, default_allocator, &source)) {
-                    return false;
-                }
-
-                if (!scanner_open(&pair->key, &source, pair->value.scanner)) {
-                    return false;
-                }
-
-                pair->value.loaded = true;
-            }
-
-            if (!pair->value.had_error && !pair->value.parsed) {
-                finished = false;
-                if (!parse_file(&state, pair->key)) {
-                    result = false;
-                    pair->value.had_error = true;
-                }
-
-                pair->value.parsed = true;
-            }
-
-            if (!pair->value.had_error && !pair->value.analyzed) {
-                finished = false;
-                if (!pre_analyze_file(&state, pair->key)) {
-                    result = false;
-                    pair->value.had_error = true;
-                }
-
-                pair->value.analyzed = true;
-            }
-        }
-    }
-
-    log_info(STR("Generating..."));
-    generate_code(&state);
-
-    return result;
-}
-
 int main(int argc, char **argv) {
     UNUSED(argc);
     init();
@@ -134,11 +50,22 @@ int main(int argc, char **argv) {
         return -1; 
     }
 
-    if (argc > 1) {
-        compile(string_copy(STRING(argv[1]), default_allocator)); 
-    } else {
+    if (argc <= 1) {
         log_info(STR("usage: prog [FILE]"));
+        log_color_reset();
+        return 0;
     }
+
+    compiler_t state = create_compiler_instance(NULL);
+
+    if (!state.valid) {
+        return 100;
+    }
+
+    string_t filename = string_copy(STRING(argv[1]), default_allocator);
+
+    load_and_process_file(&state, filename);
+    analyze_and_compile(&state);
 
     log_color_reset();
     return 0;

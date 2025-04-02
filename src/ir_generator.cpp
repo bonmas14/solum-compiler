@@ -152,8 +152,6 @@ list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement) {
     //
     //
 
-
-
     for (u64 i = 0; i < ir_code.count; i++) {
         print_ir_opcode(list_get(&ir_code, i));
     }

@@ -7,6 +7,7 @@
 b32 parse_file(compiler_t *compiler, string_t filename);
 
 struct ast_node_t {
+    b32 analyzed;
     s32 type;
 
     token_t token;

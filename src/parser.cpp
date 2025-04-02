@@ -1463,6 +1463,5 @@ b32 parse_file(compiler_t *compiler, string_t filename) {
         curr = peek_token(state.scanner, get_temporary_allocator());
     }
 
-    file->parsed = true;
     return valid_parse;
 }

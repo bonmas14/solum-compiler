@@ -18,6 +18,14 @@ void mem_copy(u8 *dest, u8 *source, u64 size) {
     assert(dest   != NULL);
     assert(source != NULL);
 
+#ifdef DEBUG
+    if (dest < source) {
+        assert((source - dest) >= size);
+    } else {
+        assert((dest - source) >= size);
+    }
+#endif DEBUG
+
     while (size-- > 0) {
         *dest++ = *source++;
     }
@@ -369,4 +377,3 @@ void string_tests(void) {
 
     temp_reset();
 }
-

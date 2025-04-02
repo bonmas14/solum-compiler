@@ -769,7 +769,7 @@ void print_info(scanner_t *state, token_t token) {
     log_push_color(255, 255, 255);
 
     log_update_color();
-    fprintf(stderr, "%.*s:%zu:%zu:\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    fprintf(stderr, "%.*s:%zu,%zu:\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
     log_pop_color();
 }
 
