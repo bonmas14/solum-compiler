@@ -9,7 +9,8 @@
 #include "talloc.h"
 #include "strings.h"
 
-// @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY). caching the tokens or just changing them all to use temp alloc
+// @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY).
+// caching the tokens or just changing them all to use temp alloc
 // so in multiple definitions we getting multiple errors that are for one entry_type
 // but it happens like this:
 //    a, a : s32 = 123;
@@ -287,43 +288,48 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                 case ENTRY_FUNC: 
                     log_error(STR("Cant use FUNC as a type of variable [@better_message]"));
                     entry->type = ENTRY_ERROR;
-                    break;
+                    node->analyzed = true;
+                    return false;
 
                 default:
                     log_error(STR("Unexpected type..."));
+                    node->analyzed = true;
                     return false;
             }
+            node->analyzed = true;
         } else {
             *should_wait = true;
         }
-    }
-
+        return true;
+    } 
 
     switch (node->left->type) {
         case AST_FUNC_TYPE:
             entry->type = ENTRY_FUNC;
+            node->analyzed = true;
             // analyze func
+            // what are types in args return
             break;
 
             // ast_type == primary
         case AST_AUTO_TYPE:
         case AST_STD_TYPE:
             entry->type = ENTRY_VAR;
-
-            if (node->left) {
-            }
-
+            node->analyzed = true;
             break;
+
             // ast_type == unary
         case AST_ARR_TYPE:
         case AST_PTR_TYPE:
             log_error(STR("we dont support pointers and arrays right now"));
             entry->type = ENTRY_ERROR;
+            node->analyzed = true;
             return false;
             break;
 
         default:
             log_error(STR("unexpected type of ast node. in scan unkn def"));
+            node->analyzed = true;
             return false;
     } 
 

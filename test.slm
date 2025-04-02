@@ -9,9 +9,11 @@ rand_func : (a : s32) -> s32 = {
     return a * a;
 }
 
+/*
 main : () -> s32 = {
     t : test;
     t.something1 = 32 * rand_func(210);
 
     return 0;
 }
+*/

@@ -1,3 +1,11 @@
+
+
+super_cool_struct : struct = {
+    first : a;
+    second : b;
+}
+
+
 a : struct = {
     a : s32;
     f : b;
