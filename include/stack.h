@@ -91,7 +91,6 @@ b32 stack_delete(stack_t<DataType> *stack) {
 template<typename DataType>
 void stack_push(stack_t<DataType> *stack, DataType data) {
     stack_create_if_needed(stack);
-    assert(data != 0);
 
     if (stack->index >= stack->current_size) {
         if (!stack_grow(stack)) return;
@@ -107,7 +106,7 @@ DataType stack_pop(stack_t<DataType> *stack) {
 
     if (stack->index == 0) {
         log_error(STR("Stack doesn't have elements in it to pop."));
-        return NULL;
+        return {};
     }
 
     return stack->data[--stack->index]; 
@@ -119,7 +118,7 @@ DataType stack_peek(stack_t<DataType> *stack) {
     
     if (stack->index == 0) {
         log_error(STR("Stack doesn't have elements in it to peek at."));
-        return NULL;
+        return {};
     }
 
     return stack->data[stack->index - 1]; 

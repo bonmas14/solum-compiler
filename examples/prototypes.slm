@@ -1,0 +1,13 @@
+Function_Pointer : () -> s32 = prototype;
+
+pointer: Function_Pointer;
+
+realization: Function_Pointer = {
+    return 1000;
+}
+
+main : () -> s32 = {
+    pointer = realization;
+
+    pointer();
+}

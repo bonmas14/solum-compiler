@@ -1,17 +1,22 @@
 
+A : struct = {
+    b : A;
+};
 
-super_cool_struct : struct = {
-    first : a;
-    second : b;
+
+/*
+Super_Cool_Struct : struct = {
+    first  : A;
+    second : B;
 }
 
-
-a : struct = {
+A : struct = {
     a : s32;
-    f : b;
+    used_type_a : A; // actually cant... because this will be recursive
+    used_type_b : B;
 }
 
-b : struct = {
+B : struct = {
     a : s32;
 }
-
+*/

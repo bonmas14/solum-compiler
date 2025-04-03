@@ -64,8 +64,9 @@ int main(int argc, char **argv) {
 
     string_t filename = string_copy(STRING(argv[1]), default_allocator);
 
-    load_and_process_file(&state, filename);
-    analyze_and_compile(&state);
+    if (load_and_process_file(&state, filename)) {
+        analyze_and_compile(&state);
+    }
 
     log_color_reset();
     return 0;

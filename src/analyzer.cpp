@@ -19,6 +19,7 @@ struct analyzer_state_t {
     scanner_t  *scanner;
     compiler_t *compiler;
     stack_t<hashmap_t<string_t, scope_entry_t>*> *scopes;
+    stack_t<string_t> *dependencies;
 };
 
 // ------------ helpers
@@ -76,15 +77,31 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
     return true;
 }
 
-b32 get_if_exists(analyzer_state_t *state, string_t key, scope_entry_t **output) {
+b32 get_if_exists(analyzer_state_t *state, string_t key, b32 *failed, scope_entry_t **output) {
     UNUSED(output);
+
     // scan up to global scope
 
     for (u64 i = 0; i < state->scopes->index; i++) {
         if (!hashmap_contains(state->scopes->data[i], key))
             continue;
 
-        *output = hashmap_get(state->scopes->data[i], key);
+        scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
+
+        // @cleanup @speed @todo: doesnt work for pointers...
+        for (u64 i = 0; i < state->dependencies->index; i++) {
+            if (string_compare(key, state->dependencies->data[i])) {
+                log_error_token(STR("Identifier can not be resoled because it's definition is recursive."), state->scanner, entry->node->token, 0);
+                *failed = true;
+                return false;
+            }
+        }
+        
+        if (!entry->node->analyzed) {
+            return false;
+        }
+
+        *output = entry;
         return true;
     }
 
@@ -117,25 +134,18 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
 
         scope_entry_t *type;
 
-        if (get_if_exists(state, type_key, &type)) {
+        b32 failed = false;
+        if (get_if_exists(state, type_key, &failed, &type)) {
             switch (type->type) {
                 case ENTRY_TYPE:
                     break;
 
-                case ENTRY_PROTOTYPE: {
-                    log_error_token(STR("Couldn't create prototype realization without body."), state->scanner, node->token, 0);
-                    
-                    log_push_color(INFO_COLOR);
-                    string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), key), STRING("' "));
-                    string_t info = string_temp_concat(decorated_name, STRING("is defined as a prototype of:\n\0"));
-
-                    log_print(info);
-                    log_pop_color();
-
-                    log_push_color(255, 255, 255);
-                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
-                    log_pop_color();
-                } return false;
+                case ENTRY_PROTOTYPE:
+                    // THIS IS NOT AN ERROR,
+                    //
+                    // AST_PROTOTYPE_VARIABLE
+                    // it holds pointer to function
+                    break;
 
                 case ENTRY_FUNC: {
                     log_error_token(STR("Couldn't create variable with function type."), state->scanner, node->token, 0);
@@ -156,9 +166,14 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
                     log_error(STR("Unexpected type..."));
                     return false;
             }
+        } else if (failed) {
+            return false;
         } else {
             *should_wait = true;
         }
+    } else {
+        // @todo: here will be pointers...
+        // and types
     }
 
     if (!*should_wait) {
@@ -276,8 +291,9 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
         scope_entry_t *type = {};
 
+        b32 failed = false;
         // this could be: prototype, or var def
-        if (get_if_exists(state, type_key, &type)) {
+        if (get_if_exists(state, type_key, &failed, &type)) {
             switch (type->type) {
                 case ENTRY_TYPE:
                     break;
@@ -297,9 +313,12 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                     return false;
             }
             node->analyzed = true;
+        } else if (failed) {
+            return false;
         } else {
             *should_wait = true;
         }
+
         return true;
     } 
 
@@ -336,23 +355,40 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     return true;
 }
 
-b32 analyze_and_add_struct_members(analyzer_state_t *state, scope_entry_t *entry) {
+b32 analyze_and_add_type_members(analyzer_state_t *state, scope_entry_t *entry) {
     ast_node_t *block = entry->node->left;
 
     ast_node_t * next = block->list_start;
 
     b32 should_wait = false;
+    b32 result      = true;
 
     for (u64 i = 0; i < block->child_count; i++) {
-        analyze_unary_var_def(state, next, &should_wait);
+        switch (next->type) {
+            case AST_BIN_UNKN_DEF:
+                if (!analyze_unkn_def(state, next, &should_wait)) {
+                    result = false;
+                } break;
+            case AST_UNARY_VAR_DEF:
+                if (!analyze_unary_var_def(state, next, &should_wait)) {
+                    result = false;
+                } break;
+            default:
+                log_error_token(STR("Cant use this as member of type."), state->scanner, entry->node->token, 0);
+                result = false;
+                break;
 
-        if (should_wait) return true;
+        }
+
+        if (should_wait) {
+            return result;
+        }
 
         next = next->list_next;
     }
 
     entry->node->analyzed = true;
-    return true;
+    return result;
 }
 
 b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
@@ -360,7 +396,6 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     if (node->analyzed) return true; 
 
     string_t key = node->token.data.string;
-
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
@@ -374,32 +409,89 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
         entry->scope = create_scope();
     }
 
-
     b32 result = false;
+
     stack_push(state->scopes, &entry->scope);
-    result = analyze_and_add_struct_members(state, entry); 
+    stack_push(state->dependencies, key);
+
+    result = analyze_and_add_type_members(state, entry); 
+
+    stack_pop(state->dependencies);
     stack_pop(state->scopes);
 
+    node->analyzed = true;
+
     return result;
 }
 
+b32 analyze_prototype_def(analyzer_state_t *state, ast_node_t *node) {
+    assert(node->type == AST_UNARY_PROTO_DEF);
+    if (node->analyzed) return true; 
+
+    string_t key = node->token.data.string;
+    scope_entry_t *entry = NULL;
+
+    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+        report_already_used(state, key, node);
+        return false;
+    }
+
+    if (!entry->configured) {
+        entry->node = node;
+        entry->type = ENTRY_PROTOTYPE;
+    }
+
+    b32 result = false;
+
+    stack_push(state->scopes, &entry->scope);
+    stack_push(state->dependencies, key);
+
+    // @todo: function type processing...
+    result = true;
+    //    result = analyze_and_add_type_members(state, entry); 
+
+    stack_pop(state->dependencies);
+    stack_pop(state->scopes);
+
+    node->analyzed = true;
+
+    return result;
+}
+
+b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
+    assert(node->type == AST_UNION_DEF);
+    if (node->analyzed) return true; 
+
+    string_t key = node->token.data.string;
+    scope_entry_t *entry = NULL;
+
+    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+        report_already_used(state, key, node);
+        return false;
+    }
+
+    if (!entry->configured) {
+        entry->node  = node;
+        entry->type  = ENTRY_TYPE;
+        entry->scope = create_scope();
+    }
+
+    b32 result = false;
+
+    stack_push(state->scopes, &entry->scope);
+    stack_push(state->dependencies, key);
+
+    result = analyze_and_add_type_members(state, entry); 
+
+    stack_pop(state->dependencies);
+    stack_pop(state->scopes);
+
+    node->analyzed = true;
+
+    return result;
+}
 
 /*
-b32 scan_union_def(analyzer_state_t *state, ast_node_t *node) {
-    assert(node->type == AST_UNION_DEF);
-    if (node.analyzed) return true; 
-
-    scope_entry_t entry = {};
-    string_t key = node->token.data.string;
-
-    entry.entry_type = ENTRY_TYPE;
-    entry.node = node;
-    
-    b32 result = add_symbol_to_scope(state, key, &entry);
-    node.analyzed = true;
-    return result;
-}
-
 b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
     assert(node->type == AST_ENUM_DEF);
     if (node.analyzed) return true; 
@@ -414,22 +506,6 @@ b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
     node.analyzed = true;
     return result;
 }
-
-b32 scan_prototype_def(analyzer_state_t *state, ast_node_t *node) {
-    assert(node->type == AST_UNARY_PROTO_DEF);
-    if (node.analyzed) return true; 
-
-    scope_entry_t entry = {};
-    string_t key = node->token.data.string;
-
-    entry.entry_type = ENTRY_PROTOTYPE;
-    entry.node = node;
-
-    b32 result = add_symbol_to_scope(state, key, &entry);
-    node.analyzed = true;
-    return result;
-}
-
 
 b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
     assert(state != NULL);
@@ -548,8 +624,6 @@ b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
 
     return result;
 }
-
-
 */
 
 #define GREEN_COLOR 63, 255, 63
@@ -565,6 +639,7 @@ string_t construct_module_name(string_t path, string_t name, allocator_t *alloc)
     return string_swap(string_concat(path, string_concat(name, STRING("/module.slm"), alloc), alloc), SWAP_SLASH, (u8)HOST_SYSTEM_SLASH, alloc);
 }
 
+// @cleanup fopen is not seems good
 b32 is_file_exists(string_t name) {
     FILE *file = fopen(string_to_c_string(name, get_temporary_allocator()), "rb");
 
@@ -599,7 +674,7 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
     return true;
 }
 
-b32 add_file_if_exists(compiler_t *compiler, string_t file) {
+b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
     log_write(STR("TRY: "));
     log_print(file);
 
@@ -608,14 +683,12 @@ b32 add_file_if_exists(compiler_t *compiler, string_t file) {
         log_write(STR(" FAIL\n"));
         log_pop_color();
         return false;
-    }
-
-    if (is_file_exists(file)) { 
+    } else { 
         log_push_color(GREEN_COLOR);
         log_write(STR(" OK\n"));
         log_pop_color();
 
-        load_and_process_file(compiler, string_copy(file, compiler->strings));
+        *valid_file = load_and_process_file(compiler, string_copy(file, compiler->strings));
     }
 
     return true;
@@ -638,24 +711,26 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         directory = string_substring(state->scanner->filename, 0, slash + 1, talloc);
     }
 
-    if (add_file_if_exists(compiler, construct_source_name(directory, name, talloc))) {
+    b32 valid_file;
+
+    if (add_file_if_exists(compiler, &valid_file, construct_source_name(directory, name, talloc))) {
         node->analyzed = true;
-        return true;
+        return valid_file;
     }
 
-    if (add_file_if_exists(compiler, construct_module_name(directory, name, talloc))) {
+    if (add_file_if_exists(compiler, &valid_file, construct_module_name(directory, name, talloc))) {
         node->analyzed = true;
-        return true;
+        return valid_file;
     }
 
-    if (add_file_if_exists(compiler, construct_source_name(compiler->modules_path, name, talloc))) {
+    if (add_file_if_exists(compiler, &valid_file, construct_source_name(compiler->modules_path, name, talloc))) {
         node->analyzed = true;
-        return true;
+        return valid_file;
     }
 
-    if (add_file_if_exists(compiler, construct_module_name(compiler->modules_path, name, talloc))) {
+    if (add_file_if_exists(compiler, &valid_file, construct_module_name(compiler->modules_path, name, talloc))) {
         node->analyzed = true;
-        return true;
+        return valid_file;
     }
 
     log_error_token(STR("Couldn't find corresponding file to this declaration."), state->scanner, node->token, 0);
@@ -678,11 +753,17 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         case AST_STRUCT_DEF: 
                 return analyze_struct(state, node);
 
+        case AST_UNION_DEF:
+                return analyze_union(state, node);
+
         case AST_UNARY_VAR_DEF:
                 return analyze_unary_var_def(state, node, &should_wait);
                 
         case AST_BIN_UNKN_DEF: 
                 return analyze_unkn_def(state, node, &should_wait);
+
+        case AST_UNARY_PROTO_DEF: 
+                return analyze_prototype_def(state, node);
 
                              /*
         case AST_NAMED_MODULE:
@@ -692,10 +773,8 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
             break;
 
 
-        case AST_UNION_DEF:  return scan_union_def(state, node);
         case AST_ENUM_DEF:   return scan_enum_def(state, node);
 
-        case AST_UNARY_PROTO_DEF: return scan_prototype_def(state, node);
 
         case AST_BIN_MULT_DEF:  return scan_bin_var_defs(state, node);
         case AST_TERN_MULT_DEF: return scan_tern_var_defs(state, node);
@@ -723,6 +802,9 @@ b32 analyze_and_compile(compiler_t *compiler) {
     b32 not_finished = true;
 
     stack_t<hashmap_t<string_t, scope_entry_t>*> scopes = {};
+    stack_t<string_t> dependencies = {};
+
+    stack_create(&dependencies, 16);
 
     stack_push(&scopes, &compiler->scope);
 
@@ -748,6 +830,8 @@ b32 analyze_and_compile(compiler_t *compiler) {
             state.compiler = compiler;
             state.scopes   = &scopes;
 
+            state.dependencies = &dependencies;
+
             // we just need to try to compile, if we cant resolve something we add it, but just
             for (u64 j = 0; j < pair.value.parsed_roots.count; j++) {
                 ast_node_t *node = *list_get(&pair.value.parsed_roots, j);
@@ -763,6 +847,8 @@ b32 analyze_and_compile(compiler_t *compiler) {
                 }
             }
 
+            assert(dependencies.index == 0);
+
             if (!result) {
                 not_finished = false;
                 break;
@@ -770,16 +856,17 @@ b32 analyze_and_compile(compiler_t *compiler) {
         }
     }
 
+    assert(dependencies.index == 0);
+
     if (!result) {
         log_error(STR("Had an analyze error, wont go further."));
         return false;
+    } else { 
+        log_info(STR("Everything is okay, compiling."));
     }
 
-    log_info(STR("Everything is okay, compiling."));
-
-    // compiling to IR aka bytecode
-
-    stack_pop(&scopes);
+    stack_delete(&dependencies);
+    stack_delete(&scopes);
 
     log_update_color();
 

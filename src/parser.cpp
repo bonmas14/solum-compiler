@@ -69,6 +69,10 @@ void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     root->left = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->left != NULL);
     *root->left = *node;
+
+    if (node->type == AST_ERROR) {
+        root->type = AST_ERROR;
+    }
 }
 
 void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
@@ -80,6 +84,10 @@ void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     root->right = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->right != NULL);
     *root->right = *node;
+
+    if (node->type == AST_ERROR) {
+        root->type = AST_ERROR;
+    }
 }
 
 void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
@@ -91,6 +99,10 @@ void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) 
     root->center = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->center != NULL);
     *root->center = *node;
+
+    if (node->type == AST_ERROR) {
+        root->type = AST_ERROR;
+    }
 }
 
 void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
@@ -116,6 +128,10 @@ void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     *list_node->list_next = *node;
 
     root->child_count++;
+
+    if (node->type == AST_ERROR) {
+        root->type = AST_ERROR;
+    }
 }
 
 /* parsing */
@@ -875,7 +891,13 @@ ast_node_t parse_return_list(parser_state_t *state) {
     while (current.type != '=' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_type(state);
 
-        // @todo check_value for errors
+        if (node.type == AST_ERROR) {
+            panic_skip_until_token('=', state);
+
+            result.type = AST_ERROR;
+            break;
+        }
+
         add_list_node(state, &result, &node);
 
         current = peek_token(state->scanner, talloc);
@@ -946,6 +968,7 @@ ast_node_t parse_multiple_types(parser_state_t *state) {
         ast_node_t node = parse_type(state);
 
         if (node.type == AST_ERROR) {
+            panic_skip_until_token(',', state);
             result.type = AST_ERROR;
             break;
         }
@@ -1045,7 +1068,7 @@ ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
 
     if (type.type == AST_ERROR) {
         node.type = AST_ERROR;
-        panic_skip(state);
+        panic_skip_until_token(';', state);
         return node;
     }
 
@@ -1102,6 +1125,7 @@ ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
     ast_node_t left = parse_block(state, AST_BLOCK_IMPERATIVE);
     // @todo add checks_value
     add_left_node(state, &result, &left);
+
     return result;
 }
 
@@ -1158,6 +1182,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
 
     ast_node_t left = parse_block(state, AST_BLOCK_ENUM);
     add_left_node(state, &result, &left);
+
     return result;
 }
 
