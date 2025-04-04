@@ -39,6 +39,12 @@ struct scope_entry_t {
 
     ast_node_t *node;
     hashmap_t<string_t, scope_entry_t> scope;
+
+    // ENTRY_VAR
+    
+    // b32 array_type;
+    // u32 array_count;
+    u32 pointer_depth;
 };
 
 enum types_t {

@@ -1,6 +1,27 @@
 
-same_name : () = {
+/*
+
+// unary defs
+
+
+Type: struct = {
+    a: s32;
 }
 
-same_name : () = {
+
+std_type:            s32;
+std_ptr_type:       ^s32;
+std_mult_ptr_type: ^^s32;
+
+unkn_type:            Type; 
+unkn_ptr_type:       ^Type; 
+unkn_mult_ptr_type: ^^Type; 
+
+*/
+
+use: "recursive_error";
+
+D : struct = {
+    f: B;
 }
+

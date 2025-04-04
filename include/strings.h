@@ -17,7 +17,7 @@
 #define SWAP_SLASH (u8)'\\'
 #endif
 
-#define index_of_last_file_slash(input) string_last_index_of(input, HOST_SYSTEM_SLASH)
+#define index_of_last_file_slash(input) string_last_index_of(string_swap(input, SWAP_SLASH, HOST_SYSTEM_SLASH, get_temporary_allocator()), HOST_SYSTEM_SLASH)
 
 list_t<string_t> string_split(string_t input, string_t pattern,   allocator_t *alloc);
 string_t string_join(list_t<string_t> input,  string_t separator, allocator_t *alloc);

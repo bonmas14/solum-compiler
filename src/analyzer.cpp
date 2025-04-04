@@ -19,7 +19,9 @@ struct analyzer_state_t {
     scanner_t  *scanner;
     compiler_t *compiler;
     stack_t<hashmap_t<string_t, scope_entry_t>*> *scopes;
-    stack_t<string_t> *dependencies;
+
+    stack_t<string_t>                      *local_deps;
+    hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
 // ------------ helpers
@@ -77,7 +79,29 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
     return true;
 }
 
-b32 get_if_exists(analyzer_state_t *state, string_t key, b32 *failed, scope_entry_t **output) {
+
+b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t key) {
+    stack_t<string_t> *deps = hashmap_get(state->type_deps, key);
+
+        // @cleanup @speed @todo: doesnt work for pointers...
+    for (u64 i = 0; i < state->local_deps->index; i++) {
+        if (string_compare(key, state->local_deps->data[i])) {
+            log_error_token(STR("Identifier can not be resolved because it's definition is recursive."), state->scanner, entry->node->token, 0);
+            return false;
+        }
+
+        for (u64 j = 0; j < deps->index; j++) {
+            if (string_compare(state->local_deps->data[i], deps->data[j])) {
+                log_error_token(STR("Identifier can not be resolved because type definition is recursive."), state->scanner, entry->node->token, 0);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *failed, scope_entry_t **output) {
     UNUSED(output);
 
     // scan up to global scope
@@ -88,13 +112,9 @@ b32 get_if_exists(analyzer_state_t *state, string_t key, b32 *failed, scope_entr
 
         scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
 
-        // @cleanup @speed @todo: doesnt work for pointers...
-        for (u64 i = 0; i < state->dependencies->index; i++) {
-            if (string_compare(key, state->dependencies->data[i])) {
-                log_error_token(STR("Identifier can not be resoled because it's definition is recursive."), state->scanner, entry->node->token, 0);
-                *failed = true;
-                return false;
-            }
+        if (!is_pointer && !check_dependencies(state, entry, key)) {
+            *failed = true;
+            return false;
         }
         
         if (!entry->node->analyzed) {
@@ -127,28 +147,44 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     if (!entry->configured) {
         entry->node = node;
         entry->type = ENTRY_VAR;
+        entry->configured = true;
     }
 
-    if (node->left->type == AST_UNKN_TYPE) {
-        string_t type_key = node->left->token.data.string;
+    ast_node_t *type_node = node->left;
+
+    if (type_node->type == AST_ARR_TYPE) {
+        log_error_token(STR("Type can not be a array right now."), state->scanner, type_node->token, 0);
+        return false;
+    }
+
+    b32 is_pointer = false;
+
+    while (type_node->type == AST_PTR_TYPE) {
+        entry->pointer_depth++;
+        type_node = type_node->left;
+        is_pointer = true;
+    }
+    
+    if (type_node->type == AST_UNKN_TYPE) {
+        string_t type_key = type_node->token.data.string;
+
+        if (!is_pointer) {
+            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+        }
 
         scope_entry_t *type;
 
         b32 failed = false;
-        if (get_if_exists(state, type_key, &failed, &type)) {
+        if (get_if_exists(state, is_pointer, type_key, &failed, &type)) {
             switch (type->type) {
                 case ENTRY_TYPE:
                     break;
 
                 case ENTRY_PROTOTYPE:
-                    // THIS IS NOT AN ERROR,
-                    //
-                    // AST_PROTOTYPE_VARIABLE
-                    // it holds pointer to function
                     break;
 
                 case ENTRY_FUNC: {
-                    log_error_token(STR("Couldn't create variable with function type."), state->scanner, node->token, 0);
+                    log_error_token(STR("Couldn't create variable with function type."), state->scanner, type_node->token, 0);
                     
                     log_push_color(INFO_COLOR);
                     string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), type_key), STRING("' "));
@@ -168,12 +204,11 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
             }
         } else if (failed) {
             return false;
-        } else {
+        } else if (!is_pointer) {
             *should_wait = true;
         }
     } else {
-        // @todo: here will be pointers...
-        // and types
+        // standart types
     }
 
     if (!*should_wait) {
@@ -284,16 +319,31 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
     if (!entry->configured) {
         entry->node = node;
+        entry->configured = true;
     }
 
-    if (node->left->type == AST_UNKN_TYPE) {
-        string_t type_key = node->left->token.data.string;
+    ast_node_t *type_node = node->left;
+
+    b32 is_pointer = false;
+
+    while (type_node->type == AST_PTR_TYPE) {
+        entry->pointer_depth++;
+        type_node = type_node->left;
+        is_pointer = true;
+    }
+
+    if (type_node->type == AST_UNKN_TYPE) {
+        string_t type_key = type_node->token.data.string;
+
+        if (!is_pointer) {
+            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+        }
 
         scope_entry_t *type = {};
 
         b32 failed = false;
         // this could be: prototype, or var def
-        if (get_if_exists(state, type_key, &failed, &type)) {
+        if (get_if_exists(state, is_pointer, type_key, &failed, &type)) {
             switch (type->type) {
                 case ENTRY_TYPE:
                     break;
@@ -315,14 +365,14 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
             node->analyzed = true;
         } else if (failed) {
             return false;
-        } else {
+        } else if (!is_pointer) {
             *should_wait = true;
         }
 
         return true;
     } 
 
-    switch (node->left->type) {
+    switch (type_node->type) {
         case AST_FUNC_TYPE:
             entry->type = ENTRY_FUNC;
             node->analyzed = true;
@@ -355,22 +405,20 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     return true;
 }
 
-b32 analyze_and_add_type_members(analyzer_state_t *state, scope_entry_t *entry) {
-    ast_node_t *block = entry->node->left;
+b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scope_entry_t *entry) {
+    ast_node_t * block = entry->node->left;
+    ast_node_t * next  = block->list_start;
 
-    ast_node_t * next = block->list_start;
-
-    b32 should_wait = false;
     b32 result      = true;
 
     for (u64 i = 0; i < block->child_count; i++) {
         switch (next->type) {
             case AST_BIN_UNKN_DEF:
-                if (!analyze_unkn_def(state, next, &should_wait)) {
+                if (!analyze_unkn_def(state, next, should_wait)) {
                     result = false;
                 } break;
             case AST_UNARY_VAR_DEF:
-                if (!analyze_unary_var_def(state, next, &should_wait)) {
+                if (!analyze_unary_var_def(state, next, should_wait)) {
                     result = false;
                 } break;
             default:
@@ -380,7 +428,7 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, scope_entry_t *entry) 
 
         }
 
-        if (should_wait) {
+        if (*should_wait) {
             return result;
         }
 
@@ -407,19 +455,28 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
         entry->node = node;
         entry->type = ENTRY_TYPE;
         entry->scope = create_scope();
+        entry->configured = true;
     }
 
     b32 result = false;
+    b32 should_wait = false;
 
     stack_push(state->scopes, &entry->scope);
-    stack_push(state->dependencies, key);
+    stack_push(state->local_deps, key);
+    
+    {
+        stack_t<string_t> type_deps = {};
+        hashmap_add(state->type_deps, key, &type_deps);
+    }
 
-    result = analyze_and_add_type_members(state, entry); 
+    result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->dependencies);
+    stack_pop(state->local_deps);
     stack_pop(state->scopes);
 
-    node->analyzed = true;
+    if (!should_wait) {
+        node->analyzed = true;
+    }
 
     return result;
 }
@@ -439,21 +496,30 @@ b32 analyze_prototype_def(analyzer_state_t *state, ast_node_t *node) {
     if (!entry->configured) {
         entry->node = node;
         entry->type = ENTRY_PROTOTYPE;
+        entry->configured = true;
     }
 
     b32 result = false;
+    b32 should_wait = false;
 
     stack_push(state->scopes, &entry->scope);
-    stack_push(state->dependencies, key);
+    stack_push(state->local_deps, key);
+
+    {
+        stack_t<string_t> type_deps = {};
+        hashmap_add(state->type_deps, key, &type_deps);
+    }
 
     // @todo: function type processing...
     result = true;
-    //    result = analyze_and_add_type_members(state, entry); 
+    //    result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->dependencies);
+    stack_pop(state->local_deps);
     stack_pop(state->scopes);
 
-    node->analyzed = true;
+    if (!should_wait) {
+        node->analyzed = true;
+    }
 
     return result;
 }
@@ -474,19 +540,28 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
         entry->node  = node;
         entry->type  = ENTRY_TYPE;
         entry->scope = create_scope();
+        entry->configured = true;
     }
 
     b32 result = false;
+    b32 should_wait = false;
 
     stack_push(state->scopes, &entry->scope);
-    stack_push(state->dependencies, key);
+    stack_push(state->local_deps, key);
 
-    result = analyze_and_add_type_members(state, entry); 
+    {
+        stack_t<string_t> type_deps = {};
+        hashmap_add(state->type_deps, key, &type_deps);
+    }
 
-    stack_pop(state->dependencies);
+    result = analyze_and_add_type_members(state, &should_wait, entry); 
+
+    stack_pop(state->local_deps);
     stack_pop(state->scopes);
 
-    node->analyzed = true;
+    if (!should_wait) {
+        node->analyzed = true;
+    }
 
     return result;
 }
@@ -802,9 +877,12 @@ b32 analyze_and_compile(compiler_t *compiler) {
     b32 not_finished = true;
 
     stack_t<hashmap_t<string_t, scope_entry_t>*> scopes = {};
-    stack_t<string_t> dependencies = {};
 
-    stack_create(&dependencies, 16);
+    stack_t<string_t> local_deps = {};
+    stack_create(&local_deps, 16);
+
+    hashmap_t<string_t, stack_t<string_t>> type_deps = {};
+    hashmap_create(&type_deps, 128, get_string_hash, compare_string_keys);
 
     stack_push(&scopes, &compiler->scope);
 
@@ -829,8 +907,9 @@ b32 analyze_and_compile(compiler_t *compiler) {
             state.scanner  = pair.value.scanner;
             state.compiler = compiler;
             state.scopes   = &scopes;
-
-            state.dependencies = &dependencies;
+            
+            state.local_deps = &local_deps;
+            state.type_deps = &type_deps;
 
             // we just need to try to compile, if we cant resolve something we add it, but just
             for (u64 j = 0; j < pair.value.parsed_roots.count; j++) {
@@ -847,16 +926,12 @@ b32 analyze_and_compile(compiler_t *compiler) {
                 }
             }
 
-            assert(dependencies.index == 0);
-
             if (!result) {
                 not_finished = false;
                 break;
             }
         }
     }
-
-    assert(dependencies.index == 0);
 
     if (!result) {
         log_error(STR("Had an analyze error, wont go further."));
@@ -865,7 +940,7 @@ b32 analyze_and_compile(compiler_t *compiler) {
         log_info(STR("Everything is okay, compiling."));
     }
 
-    stack_delete(&dependencies);
+    hashmap_delete(&type_deps);
     stack_delete(&scopes);
 
     log_update_color();
