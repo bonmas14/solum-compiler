@@ -168,7 +168,7 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     if (type_node->type == AST_UNKN_TYPE) {
         string_t type_key = type_node->token.data.string;
 
-        if (!is_pointer) {
+        if (!is_pointer && state->local_deps->index > 0) {
             stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
         }
 
@@ -335,7 +335,7 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     if (type_node->type == AST_UNKN_TYPE) {
         string_t type_key = type_node->token.data.string;
 
-        if (!is_pointer) {
+        if (!is_pointer && state->local_deps->index > 0) {
             stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
         }
 
@@ -886,9 +886,13 @@ b32 analyze_and_compile(compiler_t *compiler) {
 
     stack_push(&scopes, &compiler->scope);
 
+
+    // @todo @fix, change so we wont have infinite loop on undefined declarations
+    u64 max_iterations = 10;
+
     // we analyze and typecheck and prepare to compile this
     u64 curr_index = 0;
-    while (not_finished) {
+    while (max_iterations-- > 0 && not_finished) {
         not_finished = false;
 
         log_push_color(GREEN_COLOR);
@@ -936,7 +940,10 @@ b32 analyze_and_compile(compiler_t *compiler) {
     if (!result) {
         log_error(STR("Had an analyze error, wont go further."));
         return false;
-    } else { 
+    } else if (not_finished) { 
+        log_error(STR("There is undefined types..."));
+        return false;
+    } else {
         log_info(STR("Everything is okay, compiling."));
     }
 

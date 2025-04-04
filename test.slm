@@ -1,5 +1,13 @@
-use: "examples/main";
 
+use: "core";
+
+use: "examples";
+
+
+// undef : u;
+
+
+/*
 test : struct = {
     something1 : s32;
     something2 : s32;
@@ -9,7 +17,6 @@ rand_func : (a : s32) -> s32 = {
     return a * a;
 }
 
-/*
 main : () -> s32 = {
     t : test;
     t.something1 = 32 * rand_func(210);

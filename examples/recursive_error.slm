@@ -1,5 +1,3 @@
-
-B : struct = {
+D : struct = {
     a: D;
 }
-

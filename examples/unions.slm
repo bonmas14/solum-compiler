@@ -1,5 +1,5 @@
 Union : union = {
     unsigned: u64;
     signed:   s64;
-    pointer: *void;
+    pointer: ^void;
 }

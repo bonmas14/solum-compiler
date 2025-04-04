@@ -1,3 +1,7 @@
 // This is core module for our compiler
 
 
+
+add_source_file : (file : ^u8) -> b32 = {
+
+}

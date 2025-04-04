@@ -6,7 +6,6 @@ tern_c, tern_d : proto = 1, 2;
 // ------ binary multiple
 bin_a, bin_b : s32; 
 
-
 main : () -> s32 = {
     return 0;
 }
@@ -20,9 +19,6 @@ signed, unsigned : s32, u64 = -1;
 a := 123;
 
 proto : () -> s32 = prototype;
-
-
-
 
 Ast_Type : struct = {
     a : s32;

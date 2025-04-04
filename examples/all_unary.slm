@@ -15,8 +15,4 @@ Func : () -> s32 = prototype;
 func_ptr2: Func;
 
 
-// wrong_type_here: main;
-
-main : () = { }
-
 valid_proto: Func = { }
