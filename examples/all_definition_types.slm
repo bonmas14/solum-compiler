@@ -6,7 +6,7 @@ unary_arr:  s32;
 unary_ptr: ^s32;
 
 unary_voidptr : ^void;
-unary_void : void; // should fail
+// unary_void : void; // should fail
 // unary_undef : undef; // symbol is undefined
 
 // a, b, c : s32, u64 = 2, 3;

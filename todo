@@ -12,4 +12,8 @@ for debug purposes
 
 - constants
 
-- dependencies!
+
+ideas:
+
+- soft inlining - is when compiler generates output source code but inlines all of functions on source level. 
+could be great for debug purposes?

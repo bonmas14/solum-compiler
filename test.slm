@@ -1,26 +1,21 @@
-
 use: "core";
-
 use: "examples";
+// unary def
 
 
-// undef : u;
-
-
-/*
-test : struct = {
-    something1 : s32;
-    something2 : s32;
-};
-
-rand_func : (a : s32) -> s32 = {
-    return a * a;
+A : struct = {
+    s: s32;
+    u: u32;
 }
 
-main : () -> s32 = {
-    t : test;
-    t.something1 = 32 * rand_func(210);
-
-    return 0;
+B : struct = {
+    s: s64;
+    u: u64;
 }
-*/
+
+// __unary1 : s32;
+// __unary2 : void;
+
+__bin_one_type1, __bin_one_type2 : s32;
+__bin_two_types1, __bin_two_types2 : s32, u64;
+__bin_two_unkn_types1, __bin_two_unkn_types2 : A, B;

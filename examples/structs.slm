@@ -1,23 +1,8 @@
-
 Node : struct = {
     left:  ^Node;
     right: ^Node;
 };
 
-
-/*
-Super_Cool_Struct : struct = {
-    first  : A;
-    second : B;
+Mult : struct = {
+    a, b, c, d : s32;
 }
-
-A : struct = {
-    a : s32;
-    used_type_a : A; // actually cant... because this will be recursive
-    used_type_b : B;
-}
-
-B : struct = {
-    a : s32;
-}
-*/

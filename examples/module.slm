@@ -4,5 +4,4 @@ use: "all_unary";
 use: "prototypes";
 use: "structs";
 use: "unions";
-// use: "enum";
 use: "expr";

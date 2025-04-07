@@ -24,6 +24,11 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
+
+#define ENTRY_TYPE_CONSTRAINS(name) b32 name(analyzer_state_t *state, scope_entry_t *entry)
+
+typedef ENTRY_TYPE_CONSTRAINS(type_constrains_func);
+
 // ------------ helpers
 
 hashmap_t<string_t, scope_entry_t> create_scope(void) {
@@ -130,127 +135,165 @@ b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *fa
 
 // -----------------
 
+b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *name, ast_node_t *type,  b32 *should_wait) {
+    string_t key = name->token.data.string;
+
+    scope_entry_t *entry = NULL;
+
+    if (!aquire_entry(stack_peek(state->scopes), key, name, &entry)) {
+        report_already_used(state, key, name);
+        return false;
+    }
+
+    if (!entry->configured) {
+        entry->node = name;
+        entry->configured = true;
+    }
+
+    if (type->type == AST_ARR_TYPE) {
+        log_error_token(STR("Type can not be a array right now."), state->scanner, type->token, 0);
+        return false;
+    }
+
+    b32 is_pointer = false;
+    b32 failed     = false;
+
+    while (type->type == AST_PTR_TYPE) {
+        entry->pointer_depth++;
+        type = type->left;
+        is_pointer = true;
+    }
+
+    if (type->type == AST_UNKN_TYPE) {
+        string_t type_key = type->token.data.string;
+
+        if (!is_pointer && state->local_deps->index > 0) {
+            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+        }
+
+        scope_entry_t *output_type = NULL; 
+
+        if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
+            switch (output_type->type) {
+                case ENTRY_PROTOTYPE:
+                case ENTRY_TYPE:
+                    break;
+
+                case ENTRY_FUNC: 
+                    log_error(STR("Cant use FUNC as a type of variable [@better_message]"));
+                    entry->type = ENTRY_ERROR;
+                    entry->node->analyzed = true;
+                    return false;
+
+                default:
+                    log_error(STR("Unexpected type..."));
+                    entry->type = ENTRY_ERROR;
+                    entry->node->analyzed = true;
+                    return false;
+            }
+
+            entry->node->analyzed = true;
+        } else if (failed) {
+            return false;
+        } else if (!is_pointer) {
+            *should_wait = true;
+        }
+    } else switch (type->type) {
+        case AST_FUNC_TYPE: 
+        {
+            if (!can_do_func) {
+                log_error(STR("Cant do functions for multiple var decl..."));
+                entry->type = ENTRY_ERROR;
+                entry->node->analyzed = true;
+                return false;
+            }
+
+            // do func
+            entry->type = ENTRY_FUNC;
+            entry->node->analyzed = true;
+        }
+        break;
+
+        case AST_VOID_TYPE:
+            if (!is_pointer) {
+                log_error_token(STR("Cant make variable with void type..."), state->scanner, type->token, 0);
+                entry->type = ENTRY_ERROR;
+                entry->node->analyzed = true;
+                return false;
+            }
+
+            entry->type = ENTRY_VAR;
+            entry->node->analyzed = true;
+            break;
+
+
+        case AST_AUTO_TYPE:
+        case AST_STD_TYPE:
+            entry->type = ENTRY_VAR;
+            entry->node->analyzed = true;
+            break;
+
+        case AST_ARR_TYPE:
+        case AST_PTR_TYPE:
+            log_error(STR("we dont support pointers and arrays right now"));
+            entry->type = ENTRY_ERROR;
+            entry->node->analyzed = true;
+            return false;
+            break;
+
+        default:
+            log_error(STR("unexpected type of ast node..."));
+            entry->node->analyzed = true;
+            return false;
+    } 
+
+    return true;
+}
+
 b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
     assert(node->type == AST_UNARY_VAR_DEF);
     assert(state       != NULL);
     assert(node        != NULL);
     assert(should_wait != NULL);
 
-    string_t key = node->token.data.string;
-    scope_entry_t *entry = {};
-
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
+    if (!analyze_definition(state, false, node, node->left, should_wait)) {
         return false;
     }
 
-    if (!entry->configured) {
-        entry->node = node;
-        entry->type = ENTRY_VAR;
-        entry->configured = true;
+    if (*should_wait) {
+        return true;
     }
 
-    ast_node_t *type_node = node->left;
-
-    if (type_node->type == AST_ARR_TYPE) {
-        log_error_token(STR("Type can not be a array right now."), state->scanner, type_node->token, 0);
-        return false;
-    }
-
-    b32 is_pointer = false;
-
-    while (type_node->type == AST_PTR_TYPE) {
-        entry->pointer_depth++;
-        type_node = type_node->left;
-        is_pointer = true;
-    }
-    
-    if (type_node->type == AST_UNKN_TYPE) {
-        string_t type_key = type_node->token.data.string;
-
-        if (!is_pointer && state->local_deps->index > 0) {
-            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
-        }
-
-        scope_entry_t *type;
-
-        b32 failed = false;
-        if (get_if_exists(state, is_pointer, type_key, &failed, &type)) {
-            switch (type->type) {
-                case ENTRY_TYPE:
-                    break;
-
-                case ENTRY_PROTOTYPE:
-                    break;
-
-                case ENTRY_FUNC: {
-                    log_error_token(STR("Couldn't create variable with function type."), state->scanner, type_node->token, 0);
-                    
-                    log_push_color(INFO_COLOR);
-                    string_t decorated_name = string_temp_concat(string_temp_concat(STRING("---- '"), type_key), STRING("' "));
-                    string_t info = string_temp_concat(decorated_name, STRING("is defined as a function here:\n\0"));
-
-                    log_print(info);
-                    log_pop_color();
-
-                    log_push_color(255, 255, 255);
-                    print_lines_of_code(state->scanner, 2, 1, type->node->token, 0);
-                    log_pop_color();
-                } return false;
-
-                default:
-                    log_error(STR("Unexpected type..."));
-                    return false;
-            }
-        } else if (failed) {
-            return false;
-        } else if (!is_pointer) {
-            *should_wait = true;
-        }
-    } else {
-        // standart types
-    }
-
-    if (!*should_wait) {
-        node->analyzed = true;
-    }
-
+    // it was set as analyzed here already
     return true;
 }
 
 
-/*
-b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
     assert(node->type == AST_BIN_MULT_DEF);
     assert(state != NULL);
     assert(node  != NULL);
     assert(should_wait != NULL);
 
-    b32 result = true;
-    b32 is_not_resolved = false;
+    ast_node_t *type_node = node->right;
 
-    if ((node->right->type == AST_UNKN_TYPE) || (node->right->type == AST_AUTO_TYPE)) {
-        is_not_resolved = true;
-    }
-
-    if (node->right->type != AST_MUL_TYPES) {
+    if (type_node->type != AST_MUL_TYPES) {
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            scope_entry_t entry = {};
-            string_t key = next->token.data.string;
+            if (!analyze_definition(state, false, next, node->right, should_wait)) {
+                return false;
+            }
 
-            entry.entry_type = ENTRY_VAR;
-            entry.node = node;
-            entry.unknown_type = is_not_resolved;
-
-            if (!add_symbol_to_scope(state, key, &entry)) 
-                result = false;
+            if (*should_wait) {
+                return true;
+            }
 
             next = next->list_next;
         }
 
-        return result;
+        node->analyzed = true;
+        return true;
     }
 
     if (node->left->child_count != node->right->child_count) {
@@ -268,40 +311,23 @@ b32 scan_bin_var_defs(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     ast_node_t * type = node->right->list_start;
 
     for (u64 i = 0; i < node->left->child_count; i++) {
-        scope_entry_t entry = {};
-        string_t key = name->token.data.string;
-
-        entry.entry_type = ENTRY_VAR;
-        entry.node = node;
-
-        if (type->type == AST_UNKN_TYPE) {
-            entry.unknown_type = true;
+        if (!analyze_definition(state, false, name, type, should_wait)) {
+            return false;
         }
 
-        if (type->type == AST_VOID_TYPE) {
-            log_push_color(ERROR_COLOR);
-            string_t decorated_name = string_temp_concat(string_temp_concat(STRING("The variable '"), key), STRING("' "));
-            string_t info = string_temp_concat(decorated_name, STRING("is defined with void type:\n\0"));
-            log_print(info);
-            log_pop_color();
-
-            log_push_color(255, 255, 255);
-            print_lines_of_code(state->scanner, 0, 0, name->token, 0);
-            log_write(STR("\n"));
-            log_pop_color();
-            result = false;
+        if (*should_wait) {
+            return true;
         }
 
-        if (!add_symbol_to_scope(state, key, &entry)) 
-            result = false;
 
         name = name->list_next;
         type = type->list_next;
     }
 
-    return result;
+    node->analyzed = true;
+
+    return true;
 } 
-*/
 
 b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
     assert(node->type == AST_BIN_UNKN_DEF);
@@ -309,99 +335,16 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(node  != NULL);
     assert(should_wait != NULL);
 
-    string_t key = node->token.data.string;
-    scope_entry_t *entry = {};
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
+    if (!analyze_definition(state, true, node, node->left, should_wait)) {
         return false;
     }
 
-    if (!entry->configured) {
-        entry->node = node;
-        entry->configured = true;
-    }
-
-    ast_node_t *type_node = node->left;
-
-    b32 is_pointer = false;
-
-    while (type_node->type == AST_PTR_TYPE) {
-        entry->pointer_depth++;
-        type_node = type_node->left;
-        is_pointer = true;
-    }
-
-    if (type_node->type == AST_UNKN_TYPE) {
-        string_t type_key = type_node->token.data.string;
-
-        if (!is_pointer && state->local_deps->index > 0) {
-            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
-        }
-
-        scope_entry_t *type = {};
-
-        b32 failed = false;
-        // this could be: prototype, or var def
-        if (get_if_exists(state, is_pointer, type_key, &failed, &type)) {
-            switch (type->type) {
-                case ENTRY_TYPE:
-                    break;
-
-                case ENTRY_PROTOTYPE:
-                    break;
-
-                case ENTRY_FUNC: 
-                    log_error(STR("Cant use FUNC as a type of variable [@better_message]"));
-                    entry->type = ENTRY_ERROR;
-                    node->analyzed = true;
-                    return false;
-
-                default:
-                    log_error(STR("Unexpected type..."));
-                    node->analyzed = true;
-                    return false;
-            }
-            node->analyzed = true;
-        } else if (failed) {
-            return false;
-        } else if (!is_pointer) {
-            *should_wait = true;
-        }
-
+    if (*should_wait) {
         return true;
-    } 
+    }
 
-    switch (type_node->type) {
-        case AST_FUNC_TYPE:
-            entry->type = ENTRY_FUNC;
-            node->analyzed = true;
-            // analyze func
-            // what are types in args return
-            break;
-
-            // ast_type == primary
-        case AST_AUTO_TYPE:
-        case AST_STD_TYPE:
-            entry->type = ENTRY_VAR;
-            node->analyzed = true;
-            break;
-
-            // ast_type == unary
-        case AST_ARR_TYPE:
-        case AST_PTR_TYPE:
-            log_error(STR("we dont support pointers and arrays right now"));
-            entry->type = ENTRY_ERROR;
-            node->analyzed = true;
-            return false;
-            break;
-
-        default:
-            log_error(STR("unexpected type of ast node. in scan unkn def"));
-            node->analyzed = true;
-            return false;
-    } 
-
+    // it was set as analyzed here already
     return true;
 }
 
@@ -419,6 +362,10 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 } break;
             case AST_UNARY_VAR_DEF:
                 if (!analyze_unary_var_def(state, next, should_wait)) {
+                    result = false;
+                } break;
+            case AST_BIN_MULT_DEF:  
+                if (!analyze_bin_var_def(state, next, should_wait)) {
                     result = false;
                 } break;
             default:
@@ -837,6 +784,9 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         case AST_BIN_UNKN_DEF: 
                 return analyze_unkn_def(state, node, &should_wait);
 
+        case AST_BIN_MULT_DEF: 
+                return analyze_bin_var_def(state, node, &should_wait);
+
         case AST_UNARY_PROTO_DEF: 
                 return analyze_prototype_def(state, node);
 
@@ -851,7 +801,6 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         case AST_ENUM_DEF:   return scan_enum_def(state, node);
 
 
-        case AST_BIN_MULT_DEF:  return scan_bin_var_defs(state, node);
         case AST_TERN_MULT_DEF: return scan_tern_var_defs(state, node);
                              */
 
@@ -951,7 +900,6 @@ b32 analyze_and_compile(compiler_t *compiler) {
     stack_delete(&scopes);
 
     log_update_color();
-
     fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
 
     for (u64 i = 0; i < compiler->scope.capacity; i++) {
@@ -960,8 +908,32 @@ b32 analyze_and_compile(compiler_t *compiler) {
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
 
-        log_update_color();
-        fprintf(stderr, "%zu -> %s\n", i, string_to_c_string(pair.key, talloc));
+        fprintf(stderr, " -> %s", string_to_c_string(pair.key, talloc));
+
+        if (pair.value.scope.capacity == 0) {
+            fprintf(stderr, "\n");
+            continue;
+        }
+
+        fprintf(stderr, " { ");
+        b32 first = true;
+
+        for (u64 j = 0; j < pair.value.scope.capacity; j++) {
+            kv_pair_t<string_t, scope_entry_t> member = pair.value.scope.entries[j];
+
+            if (!member.occupied) continue;
+            if (member.deleted)   continue;
+
+            if (first) {
+                first = false;
+            } else {
+                fprintf(stderr, ", ");
+            }
+
+            fprintf(stderr, "%s", string_to_c_string(member.key, talloc));
+
+        }
+        fprintf(stderr, " }\n");
     }
 
     fprintf(stderr, "-----------------------------\n");
