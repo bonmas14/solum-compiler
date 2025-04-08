@@ -45,8 +45,10 @@ void panic_skip(parser_state_t *state) {
         if (token.type == '{') depth++;
         if (token.type == '}') depth--;
 
-        advance_token(state->scanner, talloc);
-        token = peek_token(state->scanner, talloc);
+        if (depth > 0) {
+            advance_token(state->scanner, talloc);
+            token = peek_token(state->scanner, talloc);
+        }
     }
 }
 
@@ -1005,7 +1007,8 @@ ast_node_t parse_declaration_type(parser_state_t *state) {
 ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *names) {
     ast_node_t node = {}, type = {};
 
-    node.type = AST_TERN_MULT_DEF;
+    node.type  = AST_TERN_MULT_DEF;
+    node.token = names->token;
 
     if (peek_token(state->scanner, get_temporary_allocator()).type == '=') {
         token_t token = peek_token(state->scanner, state->strings);
@@ -1181,6 +1184,10 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     consume_token('=', state->scanner, NULL, false, talloc);
 
     ast_node_t left = parse_block(state, AST_BLOCK_ENUM);
+    if (left.type == AST_ERROR) {
+        result.type = AST_ERROR;
+        return result;
+    }
     add_left_node(state, &result, &left);
 
     return result;
@@ -1323,6 +1330,16 @@ ast_node_t parse_statement(parser_state_t *state) {
             add_left_node(state, &node, &expr);
         } break;
 
+        case TOK_BREAK: {
+            node.type  = AST_BREAK_STMT;
+            node.token = advance_token(state->scanner, state->strings);
+        } break;
+
+        case TOK_CONTINUE: {
+            node.type  = AST_CONTINUE_STMT;
+            node.token = advance_token(state->scanner, state->strings);
+        } break;
+
         default: {
             node = parse_swap_expression(state);
         } break;
@@ -1374,18 +1391,24 @@ ast_node_t parse_const_decl(parser_state_t *state) {
 ast_node_t parse_enum_decl(parser_state_t *state) {
     ast_node_t result = {};
 
-    result.type = AST_ENUM_DELC;
+    result.type = AST_ENUM_DECL;
 
     token_t name = {};
 
-    if (!consume_token(TOKEN_IDENT,state->scanner, &name, false, state->strings)) {
+    allocator_t *talloc = get_temporary_allocator();
+
+    if (!consume_token(TOKEN_IDENT, state->scanner, &name, true, state->strings)) {
+        log_error_token(STR("Declaration should start from identifier"), state->scanner, peek_token(state->scanner, talloc), 0);
+
         result.type = AST_ERROR;
         return result;
     }
 
     result.token = name;
 
-    if (!consume_token(TOKEN_IDENT, state->scanner, NULL, false, get_temporary_allocator())) {
+    if (!consume_token('=', state->scanner, NULL, true, get_temporary_allocator())) {
+        log_error_token(STR("Declaration should have expression"), state->scanner, peek_token(state->scanner, talloc), 0);
+
         result.type = AST_ERROR;
         return result;
     }
@@ -1400,12 +1423,18 @@ ast_node_t parse_enum_block(parser_state_t *state) {
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
-    result.type = AST_BLOCK_IMPERATIVE;
+    result.type = AST_BLOCK_ENUM;
 
     token_t current = peek_token(state->scanner, talloc);
 
     while (current.type != '}' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
         ast_node_t node = parse_enum_decl(state);
+
+        if (node.type == AST_ERROR) {
+            result.type = AST_ERROR;
+            panic_skip(state);
+            break;
+        }
 
         if (node.type == AST_EMPTY) {
             current = peek_token(state->scanner, talloc);
@@ -1414,6 +1443,11 @@ ast_node_t parse_enum_block(parser_state_t *state) {
 
         add_list_node(state, &result, &node);
         current = peek_token(state->scanner, talloc);
+
+        if (current.type == ',') {
+            advance_token(state->scanner, talloc);
+            current = peek_token(state->scanner, talloc);
+        }
     }
 
     return result;

@@ -226,7 +226,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             entry->node->analyzed = true;
             break;
 
-
+        case AST_MUL_AUTO:
         case AST_AUTO_TYPE:
         case AST_STD_TYPE:
             entry->type = ENTRY_VAR;
@@ -265,6 +265,34 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     }
 
     // it was set as analyzed here already
+    return true;
+}
+
+b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+    assert(node->type == AST_ENUM_DECL);
+    assert(state       != NULL);
+    assert(node        != NULL);
+    assert(should_wait != NULL);
+
+    *should_wait = false;
+
+    string_t       key   = node->token.data.string;
+    scope_entry_t *entry = NULL;
+
+    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+        report_already_used(state, key, node);
+        return false;
+    }
+
+    if (!entry->configured) {
+        entry->node = node;
+        entry->type = ENTRY_TYPE;
+        entry->configured = true;
+    }
+
+    // node->left // expression
+    
+    node->analyzed = true;
     return true;
 }
 
@@ -348,6 +376,91 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     return true;
 }
 
+b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+    assert(node->type == AST_TERN_MULT_DEF);
+    assert(state != NULL);
+    assert(node  != NULL);
+    assert(should_wait != NULL);
+
+    ast_node_t *type_node = node->center;
+
+    if (type_node->type != AST_MUL_TYPES) {
+        ast_node_t * next = node->left->list_start;
+
+        for (u64 i = 0; i < node->left->child_count; i++) {
+            if (!analyze_definition(state, false, next, node->center, should_wait)) {
+                return false;
+            }
+
+            if (*should_wait) {
+                return true;
+            }
+
+            next = next->list_next;
+        }
+
+        node->analyzed = true;
+        return true;
+    }
+
+    if (node->left->child_count != node->center->child_count) {
+        ast_node_t * next = node->left->list_start;
+
+        while (next->list_next != NULL) {
+            next = next->list_next;
+        }
+
+        log_error_token(STR("This variable didn't have it's own type:"), state->scanner, next->token, 0);
+        return false;
+    }
+
+    ast_node_t * name = node->left->list_start;
+    ast_node_t * type = node->center->list_start;
+
+    for (u64 i = 0; i < node->left->child_count; i++) {
+        if (!analyze_definition(state, false, name, type, should_wait)) {
+            return false;
+        }
+
+        if (*should_wait) {
+            return true;
+        }
+
+
+        name = name->list_next;
+        type = type->list_next;
+    }
+
+    if (node->right->type != AST_SEPARATION) {
+        return true;
+    }
+
+    if (node->left->child_count != node->right->child_count) {
+        ast_node_t * next;
+        u64 least_size = MIN(node->left->child_count, node->right->child_count);
+
+        if (least_size >= node->left->child_count) {
+            next = node->right->list_start;
+            for (u64 i = 0; i < least_size; i++) {
+                next = next->list_next;
+            }
+
+            log_error_token(STR("Trailing expression without its variable:"), state->scanner, next->token, 0);
+        } else {
+            next = node->left->list_start;
+            for (u64 i = 0; i < least_size; i++) {
+                next = next->list_next;
+            }
+            log_error_token(STR("This variable didn't have it's expression:"), state->scanner, next->token, 0);
+        }
+
+        return false;
+    }
+
+    node->analyzed = true;
+    return true;
+}
+
 b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scope_entry_t *entry) {
     ast_node_t * block = entry->node->left;
     ast_node_t * next  = block->list_start;
@@ -366,6 +479,13 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 } break;
             case AST_BIN_MULT_DEF:  
                 if (!analyze_bin_var_def(state, next, should_wait)) {
+                    result = false;
+                } break;
+
+                // We can find them only in enum_block
+            case AST_ENUM_DECL: 
+                assert(block->type == AST_BLOCK_ENUM);
+                if (!analyze_enum_decl(state, next, should_wait)) {
                     result = false;
                 } break;
             default:
@@ -513,140 +633,48 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     return result;
 }
 
-/*
-b32 scan_enum_def(analyzer_state_t *state, ast_node_t *node) {
+b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     assert(node->type == AST_ENUM_DEF);
-    if (node.analyzed) return true; 
+    if (node->analyzed) return true; 
 
     string_t key = node->token.data.string;
+    scope_entry_t *entry = NULL;
 
-    scope_entry_t entry = {};
-    entry.entry_type = ENTRY_TYPE;
-    entry.node       = node;
-    
-    b32 result    = add_symbol_to_scope(state, key, &entry);
-    node.analyzed = true;
-    return result;
-}
-
-b32 scan_tern_var_defs(analyzer_state_t *state, ast_node_t *node) {
-    assert(state != NULL);
-    assert(node  != NULL);
-    assert(node->type == AST_TERN_MULT_DEF);
-
-    b32 result = true;
-    b32 is_not_resolved = false;
-
-    if ((node->center->type == AST_UNKN_TYPE) || (node->center->type == AST_AUTO_TYPE)) {
-        is_not_resolved = true;
-    }
-
-    if (node->center->type != AST_MUL_TYPES) {
-        ast_node_t * next = node->left->list_start;
-
-        for (u64 i = 0; i < node->left->child_count; i++) {
-            scope_entry_t entry = {};
-            string_t key = next->token.data.string;
-
-            entry.entry_type = ENTRY_VAR;
-            entry.node = node;
-            entry.unknown_type = is_not_resolved;
-
-            if (!add_symbol_to_scope(state, key, &entry)) 
-                result = false;
-
-            next = next->list_next;
-        }
-
-        return result;
-    }
-
-    if (node->left->child_count != node->center->child_count) {
-        ast_node_t * next;
-        u64 least_size = MIN(node->left->child_count, node->center->child_count);
-
-        if (least_size >= node->left->child_count) {
-            next = node->center->list_start;
-            for (u64 i = 0; i < least_size; i++) {
-                next = next->list_next;
-            }
-            log_error_token(STR("Too much types in definition. Starting from this one:"), state->scanner, next->token, 0);
-        } else {
-            next = node->left->list_start;
-            for (u64 i = 0; i < least_size; i++) {
-                next = next->list_next;
-            }
-            log_error_token(STR("Starting from this variable name, there's no enough types in definition:"), state->scanner, next->token, 0);
-        }
-
+    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+        report_already_used(state, key, node);
         return false;
     }
 
-    ast_node_t * name = node->left->list_start;
-    ast_node_t * type = node->center->list_start;
-
-    for (u64 i = 0; i < node->left->child_count; i++) {
-        scope_entry_t entry = {};
-        string_t key = name->token.data.string;
-
-        entry.entry_type = ENTRY_VAR;
-        entry.node = node;
-
-        if (type->type == AST_UNKN_TYPE) {
-            entry.unknown_type = true;
-        }
-
-        if (type->type == AST_VOID_TYPE) {
-            log_push_color(ERROR_COLOR);
-            string_t decorated_name = string_temp_concat(string_temp_concat(STRING("The variable '"), key), STRING("' "));
-            string_t info = string_temp_concat(decorated_name, STRING("is defined with void type:\n\0"));
-            log_print(info);
-            log_pop_color();
-
-            log_push_color(255, 255, 255);
-            print_lines_of_code(state->scanner, 0, 0, name->token, 0);
-            log_write(STR("\n"));
-            log_pop_color();
-            result = false;
-        }
-
-        if (!add_symbol_to_scope(state, key, &entry)) 
-            result = false;
-
-        name = name->list_next;
-        type = type->list_next;
+    if (!entry->configured) {
+        entry->node  = node;
+        entry->type  = ENTRY_TYPE;
+        entry->scope = create_scope();
+        entry->configured = true;
     }
 
-    if (node->right->type != AST_SEPARATION) {
-        return true;
+    b32 result = false;
+    b32 should_wait = false;
+
+    stack_push(state->scopes, &entry->scope);
+    stack_push(state->local_deps, key);
+
+    {
+        stack_t<string_t> type_deps = {};
+        hashmap_add(state->type_deps, key, &type_deps);
     }
 
-    if (node->left->child_count != node->right->child_count) {
-        ast_node_t * next;
-        u64 least_size = MIN(node->left->child_count, node->right->child_count);
+    result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-        if (least_size >= node->left->child_count) {
-            next = node->right->list_start;
-            for (u64 i = 0; i < least_size; i++) {
-                next = next->list_next;
-            }
+    stack_pop(state->local_deps);
+    stack_pop(state->scopes);
 
-            log_error_token(STR("Trailing expression without its variable:"), state->scanner, next->token, 0);
-        } else {
-            next = node->left->list_start;
-            for (u64 i = 0; i < least_size; i++) {
-                next = next->list_next;
-            }
-            log_error_token(STR("This variable didn't have it's expression:"), state->scanner, next->token, 0);
-        }
-
-
-        return false;
+    if (!should_wait) {
+        node->analyzed = true;
     }
 
     return result;
 }
-*/
+
 
 #define GREEN_COLOR 63, 255, 63
 
@@ -697,18 +725,26 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
 }
 
 b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
+
+    // @cleanup
+#ifdef DEBUG
     log_write(STR("TRY: "));
     log_print(file);
+#endif
 
     if (!is_file_exists(file)) { 
+#ifdef DEBUG
         log_push_color(ERROR_COLOR);
         log_write(STR(" FAIL\n"));
         log_pop_color();
+#endif
         return false;
     } else { 
+#ifdef DEBUG
         log_push_color(GREEN_COLOR);
         log_write(STR(" OK\n"));
         log_pop_color();
+#endif
 
         *valid_file = load_and_process_file(compiler, string_copy(file, compiler->strings));
     }
@@ -778,6 +814,13 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         case AST_UNION_DEF:
                 return analyze_union(state, node);
 
+        case AST_ENUM_DEF: 
+                return analyze_enum(state, node);
+
+        case AST_UNARY_PROTO_DEF: 
+                return analyze_prototype_def(state, node);
+
+
         case AST_UNARY_VAR_DEF:
                 return analyze_unary_var_def(state, node, &should_wait);
                 
@@ -787,8 +830,8 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         case AST_BIN_MULT_DEF: 
                 return analyze_bin_var_def(state, node, &should_wait);
 
-        case AST_UNARY_PROTO_DEF: 
-                return analyze_prototype_def(state, node);
+        case AST_TERN_MULT_DEF:
+                return analyze_tern_def(state, node, &should_wait);
 
                              /*
         case AST_NAMED_MODULE:
@@ -796,12 +839,6 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
             log_error_token(STR("Named modules dont work right now."), state->scanner, node->token, 0);
             node->analyzed = true;
             break;
-
-
-        case AST_ENUM_DEF:   return scan_enum_def(state, node);
-
-
-        case AST_TERN_MULT_DEF: return scan_tern_var_defs(state, node);
                              */
 
         default:
@@ -844,10 +881,12 @@ b32 analyze_and_compile(compiler_t *compiler) {
     while (max_iterations-- > 0 && not_finished) {
         not_finished = false;
 
+#ifdef DEBUG
         log_push_color(GREEN_COLOR);
         log_update_color();
         fprintf(stderr, "step: %zu\n", curr_index);
         log_pop_color();
+#endif
         curr_index++;
 
         for (u64 i = 0; i < compiler->files.capacity; i++) {

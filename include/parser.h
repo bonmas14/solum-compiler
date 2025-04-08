@@ -42,7 +42,7 @@ enum ast_types_t {
     AST_UNARY_NOT,
     AST_NAMED_MODULE,
 
-    AST_ENUM_DELC, 
+    AST_ENUM_DECL, 
 
     // bin
     AST_BIN_ASSIGN,
@@ -81,6 +81,8 @@ enum ast_types_t {
     AST_WHILE_STMT,
     AST_RET_STMT,
 
+    AST_BREAK_STMT,
+    AST_CONTINUE_STMT,
 
     // DECLARATIONS 
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword

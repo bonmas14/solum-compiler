@@ -1,4 +1,5 @@
 
+use: "enum";
 use: "all_definition_types";
 use: "all_unary";
 use: "prototypes";

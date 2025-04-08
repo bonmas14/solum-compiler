@@ -2,7 +2,6 @@ use: "core";
 use: "examples";
 // unary def
 
-
 A : struct = {
     s: s32;
     u: u32;
@@ -19,3 +18,8 @@ B : struct = {
 __bin_one_type1, __bin_one_type2 : s32;
 __bin_two_types1, __bin_two_types2 : s32, u64;
 __bin_two_unkn_types1, __bin_two_unkn_types2 : A, B;
+
+
+tern1, tern2, tern3 : s32, f32, u32 = 123, 3.0, 12;
+tern4, tern5, tern6 : f32 = 123, 3.0, 12;
+tern7, tern8, tern9 : s32;
