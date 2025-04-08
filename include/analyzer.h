@@ -38,23 +38,57 @@ struct scope_entry_t {
     u32 type;
 
     ast_node_t *node;
-    hashmap_t<string_t, scope_entry_t> scope;
+    union {
+        // NOTE: if it is not in union, you need to change creation in analyzer
+        hashmap_t<string_t, scope_entry_t> scope; 
+
+        // ENTRY_FUNC
+        struct {
+            hashmap_t<string_t, scope_entry_t> func_params;
+            hashmap_t<string_t, scope_entry_t> func_returns;
+        };
+    };
+
+    // ENTRY_TYPE
+    u32 def_type; // types_t
+
+    union {
+        struct {
+            u32 size;
+            u32 align;
+
+            // members are in scope!
+        } comp_type;
+
+        struct {
+            u32 count_of_elements;
+        } enum_type;
+    };
 
     // ENTRY_VAR
     
     // b32 array_type;
     // u32 array_count;
+    
     u32 pointer_depth;
+    b32 is_std;
+
+    struct {
+        b32 is_unsigned;
+        b32 is_boolean;
+        b32 is_float;
+        u32 size; // 0 = void
+    } std;
+
+    string_t type_name;
 };
 
 enum types_t {
     TYPE_ERROR = 0,
-    TYPE_STD, 
     TYPE_STRUCT,
     TYPE_UNION,
     TYPE_ENUM,
     TYPE_PROTO,
-
 };
 
 enum entry_type_t {

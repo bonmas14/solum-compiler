@@ -1,0 +1,5 @@
+// so for game of life we need pointers and arrays
+
+main : () -> s32 = {
+    return 0;
+}
