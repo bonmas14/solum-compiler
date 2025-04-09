@@ -27,7 +27,10 @@ struct scanner_t {
 
 struct token_t {
     u32 type;
+
+    scanner_t *from;
     u32 c0, c1, l0, l1; //  without human readable offsets
+    
     union {
         u64 const_int;
         f64 const_double;
@@ -146,8 +149,8 @@ token_t peek_next_token(scanner_t *state, allocator_t * allocator);
 
 // --- logging for scanner
 
-void print_lines_of_code(scanner_t *state, s64 start_shift, s64 stop_shift, token_t token, u64 left_pad);
-void log_info_token(scanner_t *state, token_t token, u64 left_pad);
-void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);
-void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad);
+void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 left_pad);
+void log_info_token(string_t text, token_t token);
+void log_warning_token(string_t text, token_t token);
+void log_error_token(string_t text, token_t token);
 #endif // SCANNER_H

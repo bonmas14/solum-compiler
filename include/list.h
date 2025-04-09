@@ -72,7 +72,7 @@ b32 list_create(list_t<DataType> *list, u64 init_size) {
     list->data      = (DataType*)ALLOC(init_size * sizeof(DataType));
 
     if (list->data == NULL) {
-        log_error(STR("Area: Couldn't create list."));
+        log_error(STRING("Area: Couldn't create list."));
         return false; 
     }
 
@@ -82,12 +82,12 @@ b32 list_create(list_t<DataType> *list, u64 init_size) {
 template<typename DataType>
 b32 list_delete(list_t<DataType> *list) {
     if (list == NULL) {
-        log_error(STR("Area: Reference to list wasn't valid."));
+        log_error(STRING("Area: Reference to list wasn't valid."));
         return false;
     }
 
     if (list->data == NULL) {
-        log_error(STR("Area: Area was already deleted."));
+        log_error(STRING("Area: Area was already deleted."));
         return false;
     }
 
@@ -146,7 +146,7 @@ DataType *list_get(list_t<DataType> *list, u64 index) {
     list_create_if_needed(list);
 
     if (index >= list->count) {
-        log_error(STR("Area: Index is greater than count of elements."));
+        log_error(STRING("Area: Index is greater than count of elements."));
         return NULL;
     }
 
@@ -158,7 +158,7 @@ DataType *list_get(list_t<DataType> *list, u64 index) {
 template<typename DataType>
 void list_create_if_needed(list_t<DataType> *list) {
     if (list->data == NULL && !list_create(list, STANDART_LIST_SIZE)) {
-        log_error(STR("tried to create list but failed."));
+        log_error(STRING("tried to create list but failed."));
     }
 }
 
@@ -168,7 +168,7 @@ b32 list_grow(list_t<DataType> *list) {
     DataType *data = (DataType*)ALLOC(list->grow_size * sizeof(DataType));
 
     if (data == NULL) {
-        log_error(STR("Area: Couldn't grow list."));
+        log_error(STRING("Area: Couldn't grow list."));
         return false;
     }
 

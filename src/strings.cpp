@@ -63,7 +63,7 @@ char *string_to_c_string(string_t a, allocator_t *alloc) {
     u8* data = (u8*)mem_alloc(alloc, a.size + 1);
 
     if (data == NULL) {
-        log_error(STR("string conversion failed, buy more ram, or provide normal allocator..."));
+        log_error(STRING("string conversion failed, buy more ram, or provide normal allocator..."));
         return NULL;
     }
 
@@ -141,12 +141,12 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
     list_t<string_t> splits = {};
 
     if (input.size <= pattern.size) {
-        log_error(STR("Pattern is bigger than input."));
+        log_error(STRING("Pattern is bigger than input."));
         return splits;
     }
 
     if (pattern.size == 0) {
-        log_error(STR("Pattern is empty."));
+        log_error(STRING("Pattern is empty."));
         return splits;
     }
 
@@ -166,7 +166,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
 
         u8* buffer = (u8*)mem_alloc(alloc, size);
         if (buffer == NULL) { 
-            log_error(STR("buy more ram... split allocation failed"));
+            log_error(STRING("buy more ram... split allocation failed"));
             assert(false);
             return splits;
         }
@@ -190,7 +190,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
         u8* buffer = (u8*)mem_alloc(alloc, size);
 
         if (buffer == NULL) { 
-            log_error(STR("buy more ram... split allocation failed"));
+            log_error(STRING("buy more ram... split allocation failed"));
             assert(false);
             return splits;
         }
@@ -214,7 +214,7 @@ string_t string_copy(string_t a, allocator_t *alloc) {
     u8* data = (u8*)mem_alloc(alloc, a.size);
 
     if (data == NULL) {
-        log_error(STR("string copy failed, buy more ram, or provide normal allocator..."));
+        log_error(STRING("string copy failed, buy more ram, or provide normal allocator..."));
         return (string_t) {.size = 0, .data = NULL };
     }
 
@@ -251,7 +251,7 @@ string_t string_substring(string_t input, u64 start, u64 size, allocator_t *allo
 
     assert(size > 0);
     if (start > (input.size - size)) {
-        log_error(STR("start position with size overlapping the input string."));
+        log_error(STRING("start position with size overlapping the input string."));
         return {};
     }
     u8* data = (u8*)mem_alloc(alloc, size);
@@ -373,7 +373,7 @@ void string_tests(void) {
 
     assert(string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
-    log_info(STR("STRINGS: OK"));
+    log_info(STRING("STRINGS: OK"));
 
     temp_reset();
 }

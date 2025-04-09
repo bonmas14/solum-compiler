@@ -14,7 +14,7 @@
 #ifdef DEBUG
 #define ZERO_CHECK(ptr, size) \
         for (u64 i = 0; i < size; i++) \
-            { if ((*(((u8*)ptr) + i) != 0)) { log_error(STR("area block is not zero")); assert(false); }}
+            { if ((*(((u8*)ptr) + i) != 0)) { log_error(STRING("area block is not zero")); assert(false); }}
 #else
 #define ZERO_CHECK(ptr, size) 
 #endif

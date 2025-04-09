@@ -611,7 +611,7 @@ ast_node_t parse_cast_expression(parser_state_t *state) {
 
         if (expr.type == AST_EMPTY) {
             result.type = AST_ERROR;
-            log_error_token(STR("Error while parsing cast. No expression found."), state->scanner, result.token, 0);
+            log_error_token(STRING("Error while parsing cast. No expression found."), result.token);
             return result;
         }
 
@@ -675,7 +675,7 @@ ast_node_t parse_separated_expressions(parser_state_t *state) {
         ast_node_t node = parse_assignment_expression(state);
 
         if (node.type == AST_EMPTY) {
-            log_error_token(STR("Separated expression was closed on ','."), state->scanner, current, 0);
+            log_error_token(STRING("Separated expression was closed on ','."), current);
             break;
         }
 
@@ -758,7 +758,7 @@ ast_node_t parse_primary_type(parser_state_t *state) {
 
         default:
             result.type = AST_ERROR;
-            log_error_token(STR("Couldn't use this token as type."), state->scanner, result.token, 0);
+            log_error_token(STRING("Couldn't use this token as type."), result.token);
             break;
     }
 
@@ -869,7 +869,7 @@ ast_node_t parse_parameter_list(parser_state_t *state) {
             advance_token(state->scanner, talloc);
             current = peek_token(state->scanner, talloc);
         } else if (current.type != ')') {
-            log_error_token(STR("wrong token in parameter list"), state->scanner, current, 0);
+            log_error_token(STRING("wrong token in parameter list"), current);
             break;
         }
     }
@@ -908,7 +908,7 @@ ast_node_t parse_return_list(parser_state_t *state) {
             advance_token(state->scanner, talloc);
             current = peek_token(state->scanner, talloc);
         } else if (current.type != '=') {
-            log_error_token(STR("wrong token in return list"), state->scanner, current, 0);
+            log_error_token(STRING("wrong token in return list"), current);
             break;
         }
     }
@@ -940,7 +940,7 @@ ast_node_t parse_function_type(parser_state_t *state) {
 
     if (returns.type == AST_ERROR) {
         result.type = AST_ERROR;
-        log_warning_token(STR("couldn't parse return list in function."), state->scanner, result.token, 0);
+        log_warning_token(STRING("couldn't parse return list in function."), result.token);
     }
 
     add_right_node(state, &result, &returns);
@@ -1027,7 +1027,7 @@ ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *nam
 
     if (type.type == AST_FUNC_TYPE) {
         node.type = AST_ERROR;
-        log_error_token(STR("You can't define multiple funcitons in same statement."), state->scanner, type.token, 0);
+        log_error_token(STRING("You can't define multiple funcitons in same statement."), type.token);
         panic_skip(state);
         return node;
     }
@@ -1042,7 +1042,7 @@ ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *nam
         return node;
     } else if (token.type != '=') {
         node.type = AST_ERROR;
-        log_error_token(STR("expected assignment or semicolon after expression."), state->scanner, type.token, 0);
+        log_error_token(STRING("expected assignment or semicolon after expression."), type.token);
         panic_skip(state);
         return node;
     }
@@ -1165,7 +1165,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
             case TOK_F64:
             case TOK_BOOL8:
             case TOK_BOOL32:
-                log_error_token(STR("cant use float and bool types in enum definition"), state->scanner, type.token, 0);
+                log_error_token(STRING("cant use float and bool types in enum definition"), type.token);
                 result.type = AST_ERROR;
                 return result;
 
@@ -1173,7 +1173,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
                 break;
         }
     } else {
-        log_error_token(STR("cant use not integer types in enum definition"), state->scanner, type.token, 0);
+        log_error_token(STRING("cant use not integer types in enum definition"), type.token);
         result.type = AST_ERROR;
         return result;
     }
@@ -1399,7 +1399,7 @@ ast_node_t parse_enum_decl(parser_state_t *state) {
     allocator_t *talloc = get_temporary_allocator();
 
     if (!consume_token(TOKEN_IDENT, state->scanner, &name, true, state->strings)) {
-        log_error_token(STR("Declaration should start from identifier"), state->scanner, peek_token(state->scanner, talloc), 0);
+        log_error_token(STRING("Declaration should start from identifier"), peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
         return result;
@@ -1408,7 +1408,7 @@ ast_node_t parse_enum_decl(parser_state_t *state) {
     result.token = name;
 
     if (!consume_token('=', state->scanner, NULL, true, get_temporary_allocator())) {
-        log_error_token(STR("Declaration should have expression"), state->scanner, peek_token(state->scanner, talloc), 0);
+        log_error_token(STRING("Declaration should have expression"), peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
         return result;
@@ -1460,7 +1460,7 @@ ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
 
     if (!consume_token('{', state->scanner, &start, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
-        log_error_token(STR("Expected opening of a block."), state->scanner, start, 0);
+        log_error_token(STRING("Expected opening of a block."), start);
         return result;
     }
 
@@ -1474,7 +1474,7 @@ ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
 
     if (!consume_token('}', state->scanner, &stop, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
-        log_error_token(STR("Expected closing of a block."), state->scanner, stop, 0);
+        log_error_token(STRING("Expected closing of a block."), stop);
         return result;
     }
 
@@ -1485,7 +1485,7 @@ b32 parse_file(compiler_t *compiler, string_t filename) {
     source_file_t *file = hashmap_get(&compiler->files, filename);
 
     if (file == NULL) {
-        log_error(STR("no such file in table."));
+        log_error(STRING("no such file in table."));
         return false;
     }
 

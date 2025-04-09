@@ -63,7 +63,7 @@ b32 stack_create(stack_t<DataType> *stack, u64 init_size) {
     stack->data      = (DataType*)ALLOC(init_size * sizeof(DataType));
 
     if (stack->data == NULL) {
-        log_error(STR("Couldn't create stack."));
+        log_error(STRING("Couldn't create stack."));
         return false; 
     }
 
@@ -73,12 +73,12 @@ b32 stack_create(stack_t<DataType> *stack, u64 init_size) {
 template<typename DataType>
 b32 stack_delete(stack_t<DataType> *stack) {
     if (stack == NULL) {
-        log_error(STR("Reference to stack wasn't valid."));
+        log_error(STRING("Reference to stack wasn't valid."));
         return false;
     }
 
     if (stack->data == NULL) {
-        log_error(STR("Stack was already deleted."));
+        log_error(STRING("Stack was already deleted."));
         return false;
     }
 
@@ -105,7 +105,7 @@ DataType stack_pop(stack_t<DataType> *stack) {
     stack_create_if_needed(stack);
 
     if (stack->index == 0) {
-        log_error(STR("Stack doesn't have elements in it to pop."));
+        log_error(STRING("Stack doesn't have elements in it to pop."));
         return {};
     }
 
@@ -117,7 +117,7 @@ DataType stack_peek(stack_t<DataType> *stack) {
     stack_create_if_needed(stack);
     
     if (stack->index == 0) {
-        log_error(STR("Stack doesn't have elements in it to peek at."));
+        log_error(STRING("Stack doesn't have elements in it to peek at."));
         return {};
     }
 
@@ -128,7 +128,7 @@ DataType stack_peek(stack_t<DataType> *stack) {
 template<typename DataType>
 void stack_create_if_needed(stack_t<DataType> *stack) {
     if (stack->data == NULL && !stack_create(stack, STANDART_STACK_SIZE)) {
-        log_error(STR("Tried to create stack but failed."));
+        log_error(STRING("Tried to create stack but failed."));
     }
 }
 
@@ -138,7 +138,7 @@ b32 stack_grow(stack_t<DataType> *stack) {
     DataType *data = (DataType*)ALLOC(stack->grow_size * sizeof(DataType));
 
     if (data == NULL) {
-        log_error(STR("Couldn't grow stack."));
+        log_error(STRING("Couldn't grow stack."));
         return false;
     }
 

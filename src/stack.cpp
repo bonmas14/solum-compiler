@@ -19,5 +19,5 @@ void stack_tests(void) {
 
     stack_delete(&stack);
 
-    log_info(STR("STACK: OK"));
+    log_info(STRING("STACK: OK"));
 }

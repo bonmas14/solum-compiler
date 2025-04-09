@@ -18,7 +18,7 @@ string_t get_global_modules_search_path(void) {
     char *env = getenv(MODULES_PATH);
 
     if (env == NULL) {
-        log_error(STR("Couldn't find environment variable for modules path... please run install script"));
+        log_error(STRING("Couldn't find environment variable for modules path... please run install script"));
         return {};
     }
 
@@ -47,7 +47,7 @@ source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc) {
     file.scanner = (scanner_t*)mem_alloc(alloc, sizeof(scanner_t));
 
     if (file.scanner == NULL) { 
-        log_error(STR("Buy more ram, or provide normal alloc [create_source_file]."));
+        log_error(STRING("Buy more ram, or provide normal alloc [create_source_file]."));
     }
 
     return file; 

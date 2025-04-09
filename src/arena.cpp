@@ -4,7 +4,7 @@ arena_t *arena_create(u64 init_size) {
     arena_t * arena = (arena_t*)ALLOC(init_size + sizeof(arena_t));
 
     if (arena == NULL) {
-        log_error(STR("Arena't create arena."));
+        log_error(STRING("Arena't create arena."));
         return NULL;
     }
 
@@ -32,15 +32,15 @@ ALLOCATOR_PROC(arena_allocator_proc) {
             return arena_allocate((arena_t*)data, size);
 
         case ALLOC_REALLOCATE:
-            log_warning(STR("arena allocator doesn't reallocate."));
+            log_warning(STRING("arena allocator doesn't reallocate."));
             return NULL;
 
         case ALLOC_DEALLOCATE:
-            log_warning(STR("arena allocator doesn't deallocate allocated memory the whole arena"));
+            log_warning(STRING("arena allocator doesn't deallocate allocated memory the whole arena"));
             return NULL;
 
         default:
-            log_error(STR("unexpected allocator message."));
+            log_error(STRING("unexpected allocator message."));
             assert(false);
             break;
     }
@@ -118,5 +118,5 @@ void arena_tests(void) {
 
     arena_delete(arena);
     
-    log_info(STR("ARENA: OK"));
+    log_info(STRING("ARENA: OK"));
 }

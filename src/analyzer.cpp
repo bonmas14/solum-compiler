@@ -16,7 +16,6 @@
 //    a, a : s32 = 123;
 
 struct analyzer_state_t {
-    scanner_t  *scanner;
     compiler_t *compiler;
     stack_t<hashmap_t<string_t, scope_entry_t>*> *scopes;
 
@@ -33,12 +32,6 @@ hashmap_t<string_t, scope_entry_t> create_scope(void) {
     scope.hash_func    = get_string_hash;
     scope.compare_func = compare_string_keys;
     return scope;
-}
-
-void report_already_used(analyzer_state_t *state, string_t key, ast_node_t *already_used_node) {
-    string_t decorated_name = string_temp_concat(string_temp_concat(STRING("The identifier '"), key), STRING("' "));
-    string_t info = string_temp_concat(decorated_name, STRING("is already used before.\n\0"));
-    log_error_token((u8*)string_to_c_string(info, get_temporary_allocator()), state->scanner, already_used_node->token, 0);
 }
 
 b32 check_if_unique(scope_entry_t *entry, ast_node_t *new_node) {
@@ -73,11 +66,21 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
         scope_entry_t *entry = hashmap_get(scope, key);
 
         if (!check_if_unique(entry, node)) {
+
+            string_t buffer = {};
+
+            buffer = string_temp_concat(string_temp_concat(STRING("The identifier '"), key), STRING("' "));
+            buffer = string_temp_concat(buffer, STRING("is already used before."));
+            log_error_token(buffer, node->token);
+
+            buffer = string_temp_concat(string_temp_concat(STRING("'"), entry->node->token.data.string), STRING("' "));
+            buffer = string_temp_concat(buffer, STRING("was used here:"));
+            log_info_token(buffer, entry->node->token);
+
             return false;
         }
 
         *output = entry;
-
         return true;
     }
 
@@ -91,13 +94,13 @@ b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t k
         // @cleanup @speed @todo: doesnt work for pointers...
     for (u64 i = 0; i < state->local_deps->index; i++) {
         if (string_compare(key, state->local_deps->data[i])) {
-            log_error_token(STR("Identifier can not be resolved because it's definition is recursive."), state->scanner, entry->node->token, 0);
+            log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
             return false;
         }
 
         for (u64 j = 0; j < deps->index; j++) {
             if (string_compare(state->local_deps->data[i], deps->data[j])) {
-                log_error_token(STR("Identifier can not be resolved because type definition is recursive."), state->scanner, entry->node->token, 0);
+                log_error_token(STRING("Identifier can not be resolved because type definition is recursive."), entry->node->token);
                 return false;
             }
         }
@@ -139,23 +142,6 @@ b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *fa
 }
 
 // -----------------
-
-
-// TODO:
-/*
-
-    1. обработчик типов в analyze_definition 
-    который будет добавлять данные в scope_entry
-
-    2. анализ выражений и типов
-
-    3. compile time вычисление
-
-    4. тайпчек
-
-    5. компиляция
-
-*/
 
 void set_std_info(token_t token, var_type_info_t *info) {
     info->is_std = true;
@@ -291,7 +277,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, name, &entry)) {
-        report_already_used(state, key, name);
         return false;
     }
 
@@ -331,13 +316,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                     break;
 
                 case ENTRY_FUNC: 
-                    log_error(STR("Cant use FUNC as a type of variable [@better_message]"));
+                    log_error(STRING("Cant use FUNC as a type of variable [@better_message]"));
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
                     return false;
 
                 default:
-                    log_error(STR("Unexpected type..."));
+                    log_error(STRING("Unexpected type..."));
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
                     return false;
@@ -354,7 +339,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         case AST_FUNC_TYPE: 
         {
             if (!can_do_func) {
-                log_error(STR("Cant do functions for multiple var decl..."));
+                log_error(STRING("Cant do functions for multiple var decl..."));
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -372,7 +357,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
         case AST_VOID_TYPE: // fallthrough
             if (!is_pointer) {
-                log_error_token(STR("Cant make variable with void type..."), state->scanner, type->token, 0);
+                log_error_token(STRING("Cant make variable with void type..."), type->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -385,13 +370,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
         case AST_MUL_AUTO:
         case AST_AUTO_TYPE:
-            log_error_token(STR("Cant evaluate the types right now..."), state->scanner, type->token, 0);
+            log_error_token(STRING("Cant evaluate the types right now..."), type->token);
             entry->type = ENTRY_ERROR;
             entry->node->analyzed = true;
             return false;
 
         case AST_ARR_TYPE:
-            log_error(STR("we dont support arrays right now"));
+            log_error(STRING("we dont support arrays right now"));
             entry->type = ENTRY_ERROR;
             entry->node->analyzed = true;
             return false;
@@ -400,7 +385,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             assert(false);
 
         default:
-            log_error(STR("unexpected type of ast node..."));
+            log_error(STRING("unexpected type of ast node..."));
             entry->node->analyzed = true;
             return false;
     } 
@@ -477,13 +462,13 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                         break;
 
                     case ENTRY_FUNC: 
-                        log_error_token(STR("Cant use FUNC as a return type [@better_message]"), state->scanner, current_type->token, 0);
+                        log_error_token(STRING("Cant use FUNC as a return type [@better_message]"), current_type->token);
                         entry->type = ENTRY_ERROR;
                         result = false;
                         break;
 
                     default:
-                        log_error_token(STR("Unexpected type... [@better_message]"), state->scanner, current_type->token, 0);
+                        log_error_token(STRING("Unexpected type... [@better_message]"), current_type->token);
                         entry->type = ENTRY_ERROR;
                         result = false;
                         break;
@@ -491,7 +476,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
                 info.type_name = type_key;
             } else if (failed) {
-                log_error_token(STR("Failed when accessing name of type"), state->scanner, current_type->token, 0);
+                log_error_token(STRING("Failed when accessing name of type"), current_type->token);
                 result = false;
                 break;
             } else if (!is_pointer) {
@@ -500,7 +485,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         } else switch (current_type->type) {
             case AST_VOID_TYPE: // fallthrough
                 if (!is_pointer) {
-                    log_error_token(STR("Cant return void."), state->scanner, current_type->token, 0);
+                    log_error_token(STRING("Cant return void."), current_type->token);
                     entry->type = ENTRY_ERROR;
                     result = false;
                     break;
@@ -510,7 +495,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                 break;
 
             case AST_ARR_TYPE:
-                log_error(STR("we dont support arrays right now"));
+                log_error(STRING("we dont support arrays right now"));
                 entry->type = ENTRY_ERROR;
                 result = false;
                 break;
@@ -521,7 +506,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                 assert(false);
 
             default:
-                log_error(STR("unexpected type of ast node..."));
+                log_error(STRING("unexpected type of ast node..."));
                 result = false;
                 break;
         } 
@@ -574,7 +559,6 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
         return false;
     }
 
@@ -626,7 +610,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
             next = next->list_next;
         }
 
-        log_error_token(STR("This variable didn't have it's own type:"), state->scanner, next->token, 0);
+        log_error_token(STRING("This variable didn't have it's own type:"), next->token);
         return false;
     }
 
@@ -703,7 +687,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
             next = next->list_next;
         }
 
-        log_error_token(STR("This variable didn't have it's own type:"), state->scanner, next->token, 0);
+        log_error_token(STRING("This variable didn't have it's own type:"), next->token);
         return false;
     }
 
@@ -739,13 +723,13 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                 next = next->list_next;
             }
 
-            log_error_token(STR("Trailing expression without its variable:"), state->scanner, next->token, 0);
+            log_error_token(STRING("Trailing expression without its variable:"), next->token);
         } else {
             next = node->left->list_start;
             for (u64 i = 0; i < least_size; i++) {
                 next = next->list_next;
             }
-            log_error_token(STR("This variable didn't have it's expression:"), state->scanner, next->token, 0);
+            log_error_token(STRING("This variable didn't have it's expression:"), next->token);
         }
 
         return false;
@@ -780,12 +764,12 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 } break;
             case AST_BIN_UNKN_DEF:
             case AST_TERN_MULT_DEF:
-                log_error_token(STR("Cant use initialization in member declaration."), state->scanner, entry->node->token, 0);
+                log_error_token(STRING("Cant use initialization in member declaration."), entry->node->token);
                 result = false;
                 break;
 
             default:
-                log_error_token(STR("Cant use this as member of type."), state->scanner, entry->node->token, 0);
+                log_error_token(STRING("Cant use this as member of type."), entry->node->token);
                 result = false;
                 break;
 
@@ -810,7 +794,6 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
         return false;
     }
 
@@ -840,7 +823,6 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
         return false;
     }
 
@@ -882,7 +864,6 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
         return false;
     }
 
@@ -924,7 +905,6 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
-        report_already_used(state, key, node);
         return false;
     }
 
@@ -1005,7 +985,7 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
     }
 
     if (!hashmap_add(&compiler->files, filename, &file)) {
-        log_error(STR("Couldn't add file to work with."));
+        log_error(STRING("Couldn't add file to work with."));
         return false;
     }
 
@@ -1020,21 +1000,21 @@ b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
 
     // @cleanup
 #ifdef DEBUG
-    log_write(STR("TRY: "));
-    log_print(file);
+    log_write(STRING("TRY: "));
+    log_write(file);
 #endif
 
     if (!is_file_exists(file)) { 
 #ifdef DEBUG
         log_push_color(ERROR_COLOR);
-        log_write(STR(" FAIL\n"));
+        log_write(STRING(" FAIL\n"));
         log_pop_color();
 #endif
         return false;
     } else { 
 #ifdef DEBUG
         log_push_color(GREEN_COLOR);
-        log_write(STR(" OK\n"));
+        log_write(STRING(" OK\n"));
         log_pop_color();
 #endif
 
@@ -1052,13 +1032,15 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
     // /<compiler>/<file>.slm
     // /<compiler>/<file>/module.slm
 
+
+    string_t from_file = node->token.from->filename;
     string_t directory, name = node->token.data.string;
 
-    s64 slash = index_of_last_file_slash(state->scanner->filename);
+    s64 slash = index_of_last_file_slash(from_file);
     if (slash == -1) {
         directory = string_copy(STRING("./"), talloc);
     } else {
-        directory = string_substring(state->scanner->filename, 0, slash + 1, talloc);
+        directory = string_substring(from_file, 0, slash + 1, talloc);
     }
 
     b32 valid_file;
@@ -1083,7 +1065,7 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
         return valid_file;
     }
 
-    log_error_token(STR("Couldn't find corresponding file to this declaration."), state->scanner, node->token, 0);
+    log_error_token(STRING("Couldn't find corresponding file to this declaration."), node->token);
     node->analyzed = true;
     return false;
 }
@@ -1128,13 +1110,12 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
                              /*
         case AST_NAMED_MODULE:
             // ENTRY_NAMESPACE
-            log_error_token(STR("Named modules dont work right now."), state->scanner, node->token, 0);
             node->analyzed = true;
             break;
                              */
 
         default:
-            log_error_token(STR("Wrong type of construct."), state->scanner, node->token, 0);
+            log_error_token(STRING("Wrong type of construct."), node->token);
             break;
     }
 
@@ -1265,7 +1246,6 @@ b32 analyze_and_compile(compiler_t *compiler) {
             if (pair.deleted)   continue;
 
             analyzer_state_t state = {};
-            state.scanner  = pair.value.scanner;
             state.compiler = compiler;
             state.scopes   = &scopes;
             
@@ -1295,14 +1275,14 @@ b32 analyze_and_compile(compiler_t *compiler) {
     }
 
     if (!result) {
-        log_error(STR("Had an analyze error, wont go further."));
+        log_error(STRING("Had an analyze error, wont go further."));
         return false;
     } else if (not_finished) { 
-        log_error(STR("There is undefined types..."));
+        log_error(STRING("There is undefined types..."));
         return false;
     } else {
 #ifdef DEBUG
-        log_info(STR("Everything is okay, compiling."));
+        log_info(STRING("Everything is okay, compiling."));
 #endif
     }
 

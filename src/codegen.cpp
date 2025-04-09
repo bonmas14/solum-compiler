@@ -269,7 +269,7 @@ void generate_expression(compiler_t *compiler, ast_node_t *expression) {
             // fprintf(compiler->codegen->file, ")");
             break;
         default:
-            log_error(STR("what is this token"));
+            log_error(STRING("what is this token"));
             break;
     }
 }

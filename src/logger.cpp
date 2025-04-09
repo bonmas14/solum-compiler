@@ -1,6 +1,7 @@
 #include "logger.h"
 #include "list.h"
 #include "strings.h"
+#include "talloc.h"
 
 #define LOGGER_COLOR_STACK_SIZE 256
 
@@ -43,36 +44,29 @@ void add_left_pad(FILE * file, u64 amount) {
     while (amount-- > 0) fprintf(file, " ");
 }
 
-void log_print(string_t string) {
-    assert(string.data != NULL);
-    
+void log_write(string_t text) {
     log_update_color();
-    fprintf(stderr, "%.*s", (int)string.size, string.data);
+    fprintf(stderr, "%s", string_to_c_string(text, get_temporary_allocator()));
 }
 
-void log_write(u8 *text) {
-    log_update_color();
-    fprintf(stderr, "%s", text);
-}
-
-void log_info(u8 *text) {
+void log_info(string_t text) {
     log_push_color(INFO_COLOR);
     log_update_color();
-    fprintf(stderr, "INFO: %s\n", text);
+    fprintf(stderr, "INFO: %s\n", string_to_c_string(text, get_temporary_allocator()));
     log_pop_color();
 }
 
-void log_warning(u8 *text) {
+void log_warning(string_t text) {
     log_push_color(WARNING_COLOR);
     log_update_color();
-    fprintf(stderr, "WARNING: %s\n", text);
+    fprintf(stderr, "WARNING: %s\n", string_to_c_string(text, get_temporary_allocator()));
     log_pop_color();
 }
 
-void log_error(u8 *text) {
+void log_error(string_t text) {
     log_push_color(ERROR_COLOR);
     log_update_color();
-    fprintf(stderr, "ERROR: %s\n", text);
+    fprintf(stderr, "ERROR: %s\n", string_to_c_string(text, get_temporary_allocator()));
     log_pop_color();
 }
 

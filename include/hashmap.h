@@ -92,7 +92,7 @@ b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t
     map->entries   = (kv_pair_t<KeyType, DataType>*)ALLOC(sizeof(kv_pair_t<KeyType, DataType>) * init_size);
 
     if (map->entries == NULL) {
-        log_warning(STR("Hashmap: Couldn't initialize map"));
+        log_warning(STRING("Hashmap: Couldn't initialize map"));
         return false;
     }
 
@@ -156,7 +156,7 @@ b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value)
 
     if (map->load > (map->capacity * MAX_HASHMAP_LOAD)) {
         if (!rebuild_map(map)) {
-            log_error(STR("Map is full't insert element to but we resize it and still failed."));
+            log_error(STRING("Map is full't insert element to but we resize it and still failed."));
         }
     }
 
@@ -210,7 +210,7 @@ b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
 template<typename KeyType, typename DataType>
 void create_map_if_needed(hashmap_t<KeyType, DataType> *map) {
     if (map->entries == NULL && !hashmap_create(map, STANDART_MAP_SIZE, map->hash_func, map->compare_func)) {
-        log_error(STR("tried to create hashmap and failed."));
+        log_error(STRING("tried to create hashmap and failed."));
     }
 }
 

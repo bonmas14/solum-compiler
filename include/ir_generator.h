@@ -12,6 +12,19 @@ struct ir_opcode_t {
     u64 arg3;
 };
 
+/*
+#[derive(Default, Clone)]
+pub struct ПП {
+    pub код: Vec<Инструкция>,
+    pub иниц_данные: Vec<u8>,
+    pub размер_неиниц_данных: usize,
+    pub заплатки_неиниц_указателей: Vec<usize>,
+    pub строки: HashMap<String, usize>,
+    pub внешние_символы: HashMap<String, usize>,
+    pub библиотеки: HashMap<String, usize>,
+}
+*/
+
 // IMM 
 // MV
 // LD

@@ -45,7 +45,7 @@ void gen_expr_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t *ex
         case AST_FUNC_CALL:
         case AST_MEMBER_ACCESS:
         case AST_ARRAY_ACCESS:
-            log_error(STR("Not supported at all..."));
+            log_error(STRING("Not supported at all..."));
             break;
         case AST_SEPARATION:
             break;
@@ -71,11 +71,11 @@ void gen_expr_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t *ex
         case AST_BIN_BIT_RSHIFT:
             gen_expr_ir(state, opcodes, expr->left);
             gen_expr_ir(state, opcodes, expr->right);
-            log_error(STR("Not supported..."));
+            log_error(STRING("Not supported..."));
             break;
 
         default:
-            log_error(STR("Not supported at all..."));
+            log_error(STRING("Not supported at all..."));
             break;
     }
 }
@@ -161,9 +161,7 @@ list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement) {
 
 void print_ir_opcode(ir_opcode_t *code) {
     allocator_t *temp = get_temporary_allocator();
-
     u8* buffer = (u8*)mem_alloc(temp, 128);
-
     sprintf((char*)buffer, "ir_code: OP: [%llu] [%llu],[%llu],[%llu]\n", code->operation, code->arg1, code->arg2, code->arg3);
-    log_info(buffer);
+    log_info((string_t) { .size = c_string_length((char*)buffer), .data = buffer } );
 }

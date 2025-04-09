@@ -10,7 +10,7 @@ struct {
 
 allocator_t *preserve_allocator_from_stack(allocator_t allocator) {
     if (__global_allocators_buffer.current_index >= ALLOCATOR_GLOBAL_BUFF_SIZE) {
-        log_error(STR("Allcator stack is full"));
+        log_error(STRING("Allcator stack is full"));
         return NULL;
     }
 

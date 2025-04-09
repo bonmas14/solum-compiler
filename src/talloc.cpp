@@ -17,15 +17,15 @@ ALLOCATOR_PROC(temporary_allocator_proc) {
             return temp_allocate(size);
 
         case ALLOC_REALLOCATE:
-            log_warning(STR("Temp allocator is in static memory... we cant reallocate here"));
+            log_warning(STRING("Temp allocator is in static memory... we cant reallocate here"));
             return NULL;
 
         case ALLOC_DEALLOCATE:
-            log_warning(STR("Temp allocator is in static memory... we cant deallocate here"));
+            log_warning(STRING("Temp allocator is in static memory... we cant deallocate here"));
             return NULL;
 
         default:
-            log_error(STR("unexpected allocator message."));
+            log_error(STRING("unexpected allocator message."));
             assert(false);
             break;
     }
@@ -49,7 +49,7 @@ void *temp_allocate(u64 size) {
     assert(TEMP_MEM_SIZE > __talloc_data.position);
 
     if (size > TEMP_MEM_SIZE) {
-        log_error(STR("Trying to allocate more memory than exists in __talloc_data."));
+        log_error(STRING("Trying to allocate more memory than exists in __talloc_data."));
         assert(false);
         return NULL;
     }
@@ -63,7 +63,7 @@ void *temp_allocate(u64 size) {
         return address;
     }
 
-    log_warning(STR("__talloc_data wrapped."));
+    log_warning(STRING("__talloc_data wrapped."));
 
     if (new_position > TEMP_MEM_SIZE) {
         __talloc_data.position = size;
@@ -97,5 +97,5 @@ void temp_tests(void) {
     assert(data1 == data2);
     temp_reset();
 
-    log_info(STR("TALLOC: OK"));
+    log_info(STRING("TALLOC: OK"));
 }

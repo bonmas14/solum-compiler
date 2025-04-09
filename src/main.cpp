@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc <= 1) {
-        log_info(STR("usage: prog [FILE]"));
+        log_info(STRING("usage: prog [FILE]"));
         log_color_reset();
         return 0;
     }

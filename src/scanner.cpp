@@ -126,7 +126,7 @@ static b32 process_string(scanner_t *state, token_t *token, allocator_t * alloc)
         if (match_char(state, 0)) {
             token->type = TOKEN_EOF;
 
-            log_error_token(STR("Scanner: unexpected End Of Line."), state, *token, 0);
+            log_error_token(STRING("Scanner: unexpected End Of Line."), *token);
             return false;
         }
 
@@ -267,7 +267,7 @@ static b32 parse_const_integer(scanner_t *state, string_t *buffer, token_t *toke
 
     if (index >= (MAX_INT_CONST_SIZE - 1)) {
         // @todo better logging
-        log_warning(STR("Scanner: size of a constant is greater than maximum size."));
+        log_warning(STRING("Scanner: size of a constant is greater than maximum size."));
         buffer->size = (MAX_INT_CONST_SIZE - 1);
         return false;
     } else {
@@ -313,7 +313,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
     if (!parse_const_integer(state, &not_parsed_constant, token, type)) {
         token->type = TOKEN_ERROR; 
 
-        log_error(STR("Couldn't parse integer."));
+        log_error(STRING("Couldn't parse integer."));
 
         return false;
     }
@@ -326,7 +326,7 @@ static b32 process_number(scanner_t *state, token_t *token) {
         token->data.const_int = before_delimeter;
     } else if (char_is_typed_digit(type, peek_next_char(state))) {
         if (type != PARSE_DIGIT_INT) {
-            log_error_token(STR("floats can be declared only in decimal format."), state, *token, 0);
+            log_error_token(STRING("floats can be declared only in decimal format."), *token);
             token->type = TOKEN_ERROR;
             return false;
         }
@@ -373,7 +373,7 @@ static b32 process_word(scanner_t *state, token_t *token, allocator_t * alloc) {
     }
 
     if (i == MAX_IDENT_SIZE) {
-        log_error_token(STR("Scanner: Identifier was too big."), state, *token, 0);
+        log_error_token(STRING("Scanner: Identifier was too big."), *token);
         token->type = TOKEN_ERROR;
         return false;
     } 
@@ -410,13 +410,14 @@ void eat_all_spaces(scanner_t *state) {
     }
 }
 
-token_t advance_token(scanner_t *state, allocator_t * alloc) {
+token_t advance_token(scanner_t *state, allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
     assert(alloc != NULL);
 
     eat_all_spaces(state);
 
     token_t token = {};
+    token.from = state;
 
     if (match_char(state, 0)) {
         token.c0 = token.c1 = state->current_char;
@@ -534,6 +535,7 @@ token_t advance_token(scanner_t *state, allocator_t * alloc) {
             process_string(state, &token, alloc); // @todo. do we need to check the value? 
                                            // right now we just ignore the result
                                            // because in failure it returns only TOKEN_EOF
+            assert(token.from != NULL);
             return token;
         } break;
 
@@ -545,7 +547,7 @@ token_t advance_token(scanner_t *state, allocator_t * alloc) {
                 stepback_char(state);
                 process_number(state, &token); // @todo add handlers for false case
             } else {
-                log_error(STR("Unexpected symbol in code."));
+                log_error(STRING("Unexpected symbol in code."));
                 token.type = TOKEN_ERROR;
             }
         } break;
@@ -554,6 +556,7 @@ token_t advance_token(scanner_t *state, allocator_t * alloc) {
     token.c1 = state->current_char;
     token.l1 = state->current_line;
 
+    assert(token.from != NULL);
     return token;
 }
 
@@ -561,7 +564,9 @@ token_t advance_token(scanner_t *state, allocator_t * alloc) {
 token_t peek_token(scanner_t *state, allocator_t * alloc) {
     scanner_t peek_state = *state;
 
-    token_t token  = advance_token(&peek_state, alloc);
+    token_t token = advance_token(state, alloc);
+
+    *state = peek_state;
 
     return token;
 }
@@ -569,9 +574,11 @@ token_t peek_token(scanner_t *state, allocator_t * alloc) {
 token_t peek_next_token(scanner_t *state, allocator_t * alloc) {
     scanner_t peek_state = *state;
 
-    advance_token(&peek_state, alloc);
-    token_t token = advance_token(&peek_state, alloc);
+    token_t token;
+    token = advance_token(state, alloc);
+    token = advance_token(state, alloc);
 
+    *state = peek_state;
     return token;
 }
 
@@ -583,7 +590,7 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_rep
         token  = &local_token;
     }
 
-    *token = peek_token(&peek_state, alloc);
+    *token = peek_token(state, alloc);
 
     allocator_t *talloc = get_temporary_allocator();
 
@@ -594,14 +601,14 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_rep
         name.size = 1;
         name.data = (u8*)&token_type;
 
-        char *str = string_to_c_string(string_concat(STRING("Expected token (@todo introspection...)'"), 
-                    string_concat(name, STRING("' here:"), talloc), talloc), talloc);
+        string_t str = string_concat(STRING("Expected token (@todo introspection...)'"),
+                       string_concat(name, STRING("' here:"), talloc), talloc);
 
-        log_error_token(STR(str), state, *token, 0);
+        log_error_token(str, *token);
+        *state = peek_state;
         return false;
     } else {
-        advance_token(&peek_state, talloc);
-        *state = peek_state;
+        advance_token(state, talloc);
     }
 
     return true;
@@ -618,8 +625,8 @@ b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *outpu
     FILE *file = fopen(string_temp_to_c_string(filename), "rb");
 
     if (file == NULL) {
-        log_error(STR("Scanner: Could not open file."));
-        log_error((u8*)string_temp_to_c_string(filename)); 
+        log_error(STRING("Scanner: Could not open file."));
+        log_error(filename); 
         return false;
     }
 
@@ -634,8 +641,8 @@ b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *outpu
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
     if (bytes_read < file_size) {
-        log_error(STR("Scanner: Could not read file."));
-        log_error((u8*)string_temp_to_c_string(filename)); 
+        log_error(STRING("Scanner: Could not read file."));
+        log_error(filename); 
         return false;
     }
 
@@ -678,9 +685,9 @@ b32 scanner_open(string_t *filename, string_t *string, scanner_t *state) {
     return true;
 }
 
-void print_lines_of_code(scanner_t *state, s64 start_shift, s64 stop_shift, token_t token, u64 left_pad) {
-    assert(state != NULL);
+void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 left_pad) {
     assert(token.l1 >= token.l0);
+    scanner_t *state = token.from;
 
     b32 cancel_empty_line_skip = false;
 
@@ -765,43 +772,44 @@ void print_lines_of_code(scanner_t *state, s64 start_shift, s64 stop_shift, toke
     }
 }
 
-void print_info(scanner_t *state, token_t token) {
+void print_info(token_t token) {
     log_push_color(255, 255, 255);
 
     log_update_color();
-    fprintf(stderr, "%.*s:%zu,%zu:\n", (int)state->filename.size, (char*)state->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    fprintf(stderr, "%.*s:%zu,%zu:\n", (int)token.from->filename.size, (char*)token.from->filename.data, token.l0 + 1LL, token.c0 + 1LL);
     log_pop_color();
 }
 
-void log_info_token(scanner_t *state, token_t token, u64 left_pad) {
+void log_info_token(string_t text, token_t token) {
     log_push_color(255, 255, 255);
-    print_info(state, token);
-    print_lines_of_code(state, 0, 0, token, left_pad);
-    log_write(STR("\n"));
+    log_info(text);
+    print_info(token);
+    print_lines_of_code(token, 3, 3, 0);
+    log_write(STRING("\n"));
     log_pop_color();
 }
 
-void log_warning_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
+void log_warning_token(string_t text, token_t token) {
     log_push_color(WARNING_COLOR);
     log_warning(text);
-    print_info(state, token);
+    print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(state, 2, 0, token, left_pad);
-    log_write(STR("\n"));
+    print_lines_of_code(token, 3, 3, 0);
+    log_write(STRING("\n"));
 
     log_pop_color();
     log_pop_color();
 }
 
-void log_error_token(u8 *text, scanner_t *state, token_t token, u64 left_pad) {
+void log_error_token(string_t text, token_t token) {
     log_push_color(ERROR_COLOR);
     log_error(text);
-    print_info(state, token);
+    print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(state, 3, 0, token, left_pad);
-    log_write(STR("\n"));
+    print_lines_of_code(token, 3, 3, 0);
+    log_write(STRING("\n"));
 
     log_pop_color();
     log_pop_color();
