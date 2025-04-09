@@ -1,12 +1,6 @@
 @echo off
 
-:: Assuming that only msvc sets this variable
-if not defined INCLUDE (
-    set vc="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-    call %vc% 
-)
-
-
+set "exe_name=slm"
 set "cc=clang-cl"
 set "lld=lld-link"
 
@@ -17,12 +11,12 @@ set "obj_main_path=obj\"
 set "compile_config=/nologo /c /std:c++14 /Gd /TP /Z7 /W4 /WX- /EHsc /diagnostics:column /fp:precise -m64 /Iinclude /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE"
 
 if "%1"=="Release" (
-    set "name=%bin_path%slm-r"
+    set "name=%bin_path%%exe_name%-r"
     set "obj_path=%obj_main_path%Release\\"
     set "complie=%compile_config% /Ox /Oi /GF /MT /GS /Gy /D NDEBUG"
     set "link_config=/INCREMENTAL:NO /OPT:REF /OPT:ICF"
 ) else (
-    set "name=%bin_path%slm-d"
+    set "name=%bin_path%%exe_name%-d"
     set "obj_path=%obj_main_path%Debug\\"
     set "complie=%compile_config% /JMC /Od /MTd /GS /D DEBUG"
     set "link_config=/INCREMENTAL"
@@ -40,9 +34,7 @@ if not exist %obj_path% (
     mkdir %obj_path%
 )
 
-echo:
 echo Compiling...
-
 
 for %%f in ("%src_path%*.cpp") do (
     echo File: %%f
@@ -67,9 +59,9 @@ for %%f in ("%obj_path%*.obj") do (
     set "obj_files=!obj_files! %%f"
 )
 
+echo %lld% %link% !obj_files!
 %lld% %link% !obj_files!
 
-echo %lld% %link% !obj_files!
 echo:
 echo Done!
 
