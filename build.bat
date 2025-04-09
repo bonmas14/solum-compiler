@@ -1,8 +1,10 @@
 @echo off
 
-setlocal
-set vc="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-call %vc% 
+:: Assuming that only msvc sets this variable
+if not defined INCLUDE (
+    set vc="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+    call %vc% 
+)
 
 
 set "cc=clang-cl"
@@ -71,5 +73,4 @@ echo %lld% %link% !obj_files!
 echo:
 echo Done!
 
-endlocal
 endlocal
