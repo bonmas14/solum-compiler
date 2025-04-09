@@ -1188,6 +1188,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
         result.type = AST_ERROR;
         return result;
     }
+    add_right_node(state, &result, &type);
     add_left_node(state, &result, &left);
 
     return result;

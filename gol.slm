@@ -1,5 +1,5 @@
 // so for game of life we need pointers and arrays
 
-main : () -> s32 = {
+main : (argc : s32, argv : ^^u8) -> s32 = {
     return 0;
 }
