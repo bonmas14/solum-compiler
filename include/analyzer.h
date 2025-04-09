@@ -33,6 +33,19 @@ struct ast_node_t;
 // v.a =
 //
 
+struct var_type_info_t {
+    u32 pointer_depth;
+    b32 is_std;
+    string_t type_name;
+
+    struct {
+        b32 is_unsigned;
+        b32 is_boolean;
+        b32 is_float;
+        u32 size; // 0 = void
+    } std;
+};
+
 struct scope_entry_t {
     b32 configured;
     u32 type;
@@ -45,7 +58,9 @@ struct scope_entry_t {
         // ENTRY_FUNC
         struct {
             hashmap_t<string_t, scope_entry_t> func_params;
-            hashmap_t<string_t, scope_entry_t> func_returns;
+            list_t<var_type_info_t> return_typenames;
+            b32 from_prototype;
+            string_t prototype_name;
         };
     };
 

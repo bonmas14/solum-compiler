@@ -59,9 +59,6 @@ void add_blank_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, sc
     entry.func_params.hash_func    = get_string_hash;
     entry.func_params.compare_func = compare_string_keys;
 
-    entry.func_returns.hash_func    = get_string_hash;
-    entry.func_returns.compare_func = compare_string_keys;
-
     if (!hashmap_add(scope, key, &entry))
         assert(false);
 
@@ -160,6 +157,69 @@ b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *fa
 
 */
 
+void set_std_info(token_t token, var_type_info_t *info) {
+    info->is_std = true;
+
+    switch (token.type) {
+        case TOK_S8:
+            info->std.size = 1;
+            break;
+        case TOK_S16:
+            info->std.size = 2;
+            break;
+        case TOK_S32:
+            info->std.size = 4;
+            break;
+        case TOK_S64:
+            info->std.size = 8;
+            break;
+
+        case TOK_U8:
+            info->std.is_unsigned = true;
+            info->std.size = 1;
+            break;
+        case TOK_U16:
+            info->std.is_unsigned = true;
+            info->std.size = 2;
+            break;
+        case TOK_U32:
+            info->std.is_unsigned = true;
+            info->std.size = 4;
+            break;
+        case TOK_U64:
+            info->std.is_unsigned = true;
+            info->std.size = 8;
+            break;
+
+        case TOK_BOOL8:
+            info->std.is_boolean = true;
+            info->std.size = 1;
+            break;
+
+        case TOK_BOOL32:
+            info->std.is_boolean = true;
+            info->std.size = 4;
+            break;
+
+        case TOK_VOID:
+            info->std.size = 0;
+            break;
+
+        case TOK_F32:
+            info->std.is_float = true;
+            info->std.size = 4;
+            break;
+
+        case TOK_F64:
+            info->std.is_float = true;
+            info->std.size = 8;
+            break;
+
+        default:
+            assert(false);
+            break;
+    }
+}
 
 void set_std_info(token_t token, scope_entry_t *entry) {
     entry->is_std = true;
@@ -240,11 +300,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         entry->configured = true;
     }
 
-    if (type->type == AST_ARR_TYPE) {
-        log_error_token(STR("Type can not be a array right now."), state->scanner, type->token, 0);
-        return false;
-    }
-
     b32 is_pointer = false;
     b32 failed     = false;
 
@@ -266,7 +321,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
             switch (output_type->type) {
                 case ENTRY_PROTOTYPE:
+                    entry->type = ENTRY_FUNC;
+                    entry->from_prototype = true;
+                    entry->prototype_name = type_key;
+                    break;
+
                 case ENTRY_TYPE:
+                    entry->type = ENTRY_VAR;
                     break;
 
                 case ENTRY_FUNC: 
@@ -282,7 +343,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                     return false;
             }
 
-            entry->type = ENTRY_VAR;
             entry->type_name = type_key;
             entry->node->analyzed = true;
         } else if (failed) {
@@ -300,12 +360,15 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                 return false;
             }
 
+            entry->type = ENTRY_FUNC;
+
             if (!analyze_function(state, entry, should_wait)) {
+                entry->type = ENTRY_ERROR;
+                entry->node->analyzed = true;
                 return false;
             }
         }
         break;
-
 
         case AST_VOID_TYPE: // fallthrough
             if (!is_pointer) {
@@ -346,20 +409,11 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 }
 
 b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
-    entry->type = ENTRY_FUNC;
-
     ast_node_t *func = entry->node;
     ast_node_t *type_node  = func->left;
-    ast_node_t *block_node = func->right;
 
     // name: left is type right is block/expr
     assert(type_node->type  == AST_FUNC_TYPE);
-
-    if (block_node->type != AST_BLOCK_IMPERATIVE) {
-        log_error_token(STR("Right now we only support imperative block."), state->scanner, func->token, 0);
-        entry->node->analyzed = true;
-        return false;
-    }
 
     string_t key = entry->node->token.data.string;
     stack_push(state->scopes, &entry->func_params);
@@ -375,9 +429,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
     for (u64 i = 0; i < type_node->left->child_count; i++) {
         assert(next_type->type == AST_PARAM_DEF);
 
-        string_t name = next_type->token.data.string;
-
-        if (analyze_definition(state, false, next_type, next_type->left, should_wait)) {
+        if (!analyze_definition(state, false, next_type, next_type->left, should_wait)) {
             result = false;
         }
 
@@ -388,13 +440,109 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         next_type = next_type->list_next;
     }
 
+    next_type = type_node->right->list_start;
+    for (u64 i = 0; i < type_node->right->child_count; i++) {
+        if (next_type->analyzed) {
+            next_type = next_type->list_next;
+            continue;
+        }
+
+        var_type_info_t info = {};
+
+        b32 is_pointer = false;
+        b32 failed     = false;
+
+        ast_node_t *current_type = next_type;
+
+
+        while (current_type->type == AST_PTR_TYPE) {
+            info.pointer_depth++;
+            current_type = current_type->left;
+            is_pointer = true;
+        }
+
+        if (current_type->type == AST_UNKN_TYPE) {
+            string_t type_key = current_type->token.data.string;
+
+            if (!is_pointer && state->local_deps->index > 0) {
+                stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+            }
+
+            scope_entry_t *output_type = NULL; 
+
+            if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
+                switch (output_type->type) {
+                    case ENTRY_PROTOTYPE:
+                    case ENTRY_TYPE:
+                        break;
+
+                    case ENTRY_FUNC: 
+                        log_error_token(STR("Cant use FUNC as a return type [@better_message]"), state->scanner, current_type->token, 0);
+                        entry->type = ENTRY_ERROR;
+                        result = false;
+                        break;
+
+                    default:
+                        log_error_token(STR("Unexpected type... [@better_message]"), state->scanner, current_type->token, 0);
+                        entry->type = ENTRY_ERROR;
+                        result = false;
+                        break;
+                }
+
+                info.type_name = type_key;
+            } else if (failed) {
+                log_error_token(STR("Failed when accessing name of type"), state->scanner, current_type->token, 0);
+                result = false;
+                break;
+            } else if (!is_pointer) {
+                *should_wait = true;
+            }
+        } else switch (current_type->type) {
+            case AST_VOID_TYPE: // fallthrough
+                if (!is_pointer) {
+                    log_error_token(STR("Cant return void."), state->scanner, current_type->token, 0);
+                    entry->type = ENTRY_ERROR;
+                    result = false;
+                    break;
+                }
+            case AST_STD_TYPE:
+                set_std_info(current_type->token, &info);
+                break;
+
+            case AST_ARR_TYPE:
+                log_error(STR("we dont support arrays right now"));
+                entry->type = ENTRY_ERROR;
+                result = false;
+                break;
+
+            case AST_MUL_AUTO:
+            case AST_AUTO_TYPE:
+            case AST_PTR_TYPE: 
+                assert(false);
+
+            default:
+                log_error(STR("unexpected type of ast node..."));
+                result = false;
+                break;
+        } 
+
+        if (!result || *should_wait)
+            break;
+
+        list_add(&entry->return_typenames, &info);
+        next_type->analyzed = true;
+        next_type = next_type->list_next;
+    }
+
+
     stack_pop(state->local_deps);
     stack_pop(state->scopes);
 
-    // here we analyze return list...
+    if (!*should_wait) {
+        entry->node->analyzed = true;
+    }
 
-    entry->node->analyzed = true;
-    return true;
+    return result;
 }
 
 b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
@@ -493,7 +641,6 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
         if (*should_wait) {
             return true;
         }
-
 
         name = name->list_next;
         type = type->list_next;
@@ -676,22 +823,9 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->scopes, &entry->scope);
-    stack_push(state->local_deps, key);
+    result = analyze_function(state, entry, &should_wait);
 
-    {
-        stack_t<string_t> type_deps = {};
-        hashmap_add(state->type_deps, key, &type_deps);
-    }
-
-    // @todo: function type processing...
-    result = true;
-    //    result = analyze_and_add_type_members(state, &should_wait, entry); 
-
-    stack_pop(state->local_deps);
-    stack_pop(state->scopes);
-
-    if (!should_wait) {
+    if (result && !should_wait) {
         node->analyzed = true;
     }
 
@@ -1012,6 +1146,35 @@ b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
 // #run 
 // other code
 //
+void print_var_info(var_type_info_t info) {
+    if (info.pointer_depth) {
+        if (info.pointer_depth == 1) {
+            fprintf(stderr, " pointer");
+        } else {
+            fprintf(stderr, " pointer(%u)", info.pointer_depth);
+        }
+    }
+
+    if (info.is_std) {
+        fprintf(stderr, " (%s, %s%s%u bytes)", info.std.is_unsigned ? "unsigned" : "signed", info.std.is_boolean ? "boolean, " : "", info.std.is_float ? "float, " : "", info.std.size);
+    } else {
+        fprintf(stderr, " %s", string_to_c_string(info.type_name, get_temporary_allocator()));
+    }
+}
+
+var_type_info_t entry_to_info(scope_entry_t e) {
+    var_type_info_t i = {};
+
+    i.std.is_unsigned = e.std.is_unsigned;
+    i.std.is_boolean = e.std.is_boolean;
+    i.pointer_depth = e.pointer_depth;
+    i.std.is_float = e.std.is_float;
+    i.type_name = e.type_name;
+    i.std.size = e.std.size;
+    i.is_std = e.is_std;
+
+    return i;
+}
 
 void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, u64 depth) {
     allocator_t *talloc = get_temporary_allocator();
@@ -1021,21 +1184,7 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
 
     if (pair.value.type == ENTRY_VAR) {
         fprintf(stderr, " VAR");
-        scope_entry_t e = pair.value;
-
-        if (e.pointer_depth) {
-            if (e.pointer_depth == 1) {
-                fprintf(stderr, " pointer");
-            } else {
-                fprintf(stderr, " pointer(%u)", e.pointer_depth);
-            }
-        }
-
-        if (e.is_std) {
-            fprintf(stderr, " (%s, %s%s%u bytes)", e.std.is_unsigned ? "unsigned" : "signed", e.std.is_boolean ? "boolean, " : "", e.std.is_float ? "float, " : "", e.std.size);
-        } else {
-            fprintf(stderr, " %s", string_to_c_string(e.type_name, get_temporary_allocator()));
-        }
+        print_var_info(entry_to_info(pair.value));
     } else if (pair.value.type == ENTRY_TYPE) {
         fprintf(stderr, " TYPE");
     } else if (pair.value.type == ENTRY_FUNC) {
@@ -1044,12 +1193,13 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
         fprintf(stderr, " PROTO");
     }
 
-    if (pair.value.scope.capacity == 0) {
-        fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
+
+    if (pair.value.type == ENTRY_FUNC && pair.value.from_prototype) {
+        add_left_pad(stderr, (depth + 1) * 4);
+        fprintf(stderr, " -> from prototype: %s\n", string_to_c_string(pair.value.prototype_name, talloc));
         return;
     }
-
-    fprintf(stderr, "\n");
 
     for (u64 j = 0; j < pair.value.scope.capacity; j++) {
         kv_pair_t<string_t, scope_entry_t> member = pair.value.scope.entries[j];
@@ -1059,11 +1209,24 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
 
         print_entry(compiler, member, depth + 1);
     }
+
+    if (pair.value.type == ENTRY_VAR)
+        return;
+
+    if (pair.value.type == ENTRY_TYPE)
+        return;
+
+    for (u64 j = 0; j < pair.value.return_typenames.count; j++) {
+        var_type_info_t info = pair.value.return_typenames.data[j];
+        add_left_pad(stderr, (depth + 1) * 4);
+        fprintf(stderr, " -> RET VAL %llu", j);
+        print_var_info(info);
+        fprintf(stderr, "\n");
+    }
 }
 
 b32 analyze_and_compile(compiler_t *compiler) {
     assert(compiler != NULL);
-    allocator_t *talloc = get_temporary_allocator();
 
     b32 result       = true;
     b32 not_finished = true;
@@ -1138,7 +1301,9 @@ b32 analyze_and_compile(compiler_t *compiler) {
         log_error(STR("There is undefined types..."));
         return false;
     } else {
+#ifdef DEBUG
         log_info(STR("Everything is okay, compiling."));
+#endif
     }
 
     hashmap_delete(&type_deps);

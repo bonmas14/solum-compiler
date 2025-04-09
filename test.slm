@@ -1,9 +1,7 @@
-// use: "core";
+use: "core";
 use: "examples";
 // unary def
 
-
-/*
 A : struct = {
     s: s32;
     u: u32;
@@ -27,4 +25,3 @@ tern4, tern5, tern6 : f32 = 123, 3.0, 12;
 tern7, tern8, tern9 : s32;
 
 another : A;
-*/
