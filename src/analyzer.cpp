@@ -23,7 +23,7 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
-b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait);
+b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
 
 // ------------ helpers
 
@@ -143,13 +143,8 @@ b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *fa
 
         scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
 
-        switch (entry->type) {
-            case ENTRY_PROTOTYPE:
-            case ENTRY_TYPE:
-                is_pointer = true;
-                break;
-            default:
-                break;
+        if (entry->type == ENTRY_PROTOTYPE) {
+            is_pointer = true;
         }
 
         if (!is_pointer && !check_dependencies(state, entry, key)) {
@@ -569,7 +564,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
             entry->type = ENTRY_FUNC;
 
-            if (!analyze_function(state, entry, should_wait)) {
+            if (!analyze_function(state, false, entry, should_wait)) {
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -613,7 +608,10 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
     } 
 
-    entry->node->analyzed = true;
+    if (!*should_wait) {
+        entry->node->analyzed = true;
+    }
+
     entry->expr = expr;
 
     if (entry->type == ENTRY_FUNC) {
@@ -631,7 +629,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     return true;
 }
 
-b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
+b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait) {
     ast_node_t *func = entry->node;
     ast_node_t *type_node  = func->left;
     assert(type_node->type  == AST_FUNC_TYPE);
@@ -672,7 +670,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
         var_type_info_t info = {};
 
-        b32 is_pointer = false;
+        b32 is_pointer = is_prototype;
         b32 failed     = false;
 
         ast_node_t *current_type = next_type;
@@ -1129,7 +1127,7 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    result = analyze_function(state, entry, &should_wait);
+    result = analyze_function(state, true, entry, &should_wait);
 
     if (result && !should_wait) {
         node->analyzed = true;
@@ -1483,8 +1481,10 @@ var_type_info_t entry_to_info(scope_entry_t e) {
 void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, u64 depth) {
     allocator_t *talloc = get_temporary_allocator();
 
+    assert(depth <= 8); // cause we have some hardcoded offset down there...
+
     add_left_pad(stderr, depth * 4);
-    fprintf(stderr, " -> %s", string_to_c_string(pair.key, talloc));
+    fprintf(stderr, " -> %-*s", (int)(32 - depth * 4), string_to_c_string(pair.key, talloc));
 
     if (pair.value.type == ENTRY_VAR) {
         fprintf(stderr, " VAR");
