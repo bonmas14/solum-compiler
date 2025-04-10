@@ -20,9 +20,9 @@ void mem_copy(u8 *dest, u8 *source, u64 size) {
 
 #ifdef DEBUG
     if (dest < source) {
-        assert((source - dest) >= (s64)size);
+        assert((uintptr_t)(source - dest) >= (uintptr_t)size);
     } else {
-        assert((dest - source) >= (s64)size);
+        assert((uintptr_t)(dest - source) >= (uintptr_t)size);
     }
 #endif // DEBUG
 
