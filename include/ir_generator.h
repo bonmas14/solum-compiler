@@ -96,7 +96,7 @@ enum ir_opcodes_t {
     IR_JUMP,
 };
 
-list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement);
+list_t<ir_opcode_t> global_statement_ir(compiler_t *state, ast_node_t *statement);
 void print_ir_opcode(ir_opcode_t *code);
 
 #endif // IR_GEN_H

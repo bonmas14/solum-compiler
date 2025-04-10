@@ -23,7 +23,7 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
-b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait);
+b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
 
 // ------------ helpers
 
@@ -88,6 +88,19 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
     return true;
 }
 
+scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
+    for (u64 i = 0; i < state->scopes->index; i++) {
+        if (!hashmap_contains(state->scopes->data[i], key))
+            continue;
+
+        scope_entry_t e = *hashmap_get(state->scopes->data[i], key);
+        return e;
+    }
+
+    assert(false);
+    return {};
+}
+
 b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t key) {
     stack_t<string_t> *deps = hashmap_get(state->type_deps, key);
 
@@ -95,12 +108,22 @@ b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t k
     for (u64 i = 0; i < state->local_deps->index; i++) {
         if (string_compare(key, state->local_deps->data[i])) {
             log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
+
+            allocator_t * talloc = get_temporary_allocator();
+            scope_entry_t e      = get_entry_to_report(state, state->local_deps->data[i]);
+
+            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_deps->data[i], STRING("'"), talloc), talloc), e.node->token);
             return false;
         }
 
         for (u64 j = 0; j < deps->index; j++) {
             if (string_compare(state->local_deps->data[i], deps->data[j])) {
                 log_error_token(STRING("Identifier can not be resolved because type definition is recursive."), entry->node->token);
+
+                allocator_t * talloc = get_temporary_allocator();
+                scope_entry_t e      = get_entry_to_report(state, deps->data[j]);
+
+                log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(deps->data[j], STRING("'"), talloc), talloc), e.node->token);
                 return false;
             }
         }
@@ -271,7 +294,188 @@ void set_std_info(token_t token, scope_entry_t *entry) {
     }
 }
 
-b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *name, ast_node_t *type, b32 *should_wait) {
+struct expr_type_t {
+    b32 is_default;
+    b32 is_prototype;
+    b32 is_std;
+
+    u32 pointer_depth;
+
+    struct {
+        b32 is_weak;
+        b32 is_float;
+        b32 is_boolean;
+        b32 is_unsigned;
+        b32 size;
+    } std;
+
+    union {
+        string_t prototype_name;
+        string_t type_name;
+    };
+};
+
+expr_type_t copy_entry_type(scope_entry_t *e) {
+    expr_type_t i = {};
+
+    i.std.is_unsigned = e->std.is_unsigned;
+    i.std.is_boolean = e->std.is_boolean;
+    i.pointer_depth = e->pointer_depth;
+    i.std.is_float = e->std.is_float;
+    i.type_name = e->type_name;
+    i.std.size = e->std.size;
+    i.is_std = e->is_std;
+
+    return i;
+
+}
+
+b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *expr, b32 *should_wait) {
+    b32 result = true;
+
+    expr_type_t left  = {};
+    expr_type_t right = {};
+
+    if (expr->type == AST_PRIMARY) switch (expr->token.type) {
+        case TOKEN_CONST_FP:
+            type->is_std = true;
+            type->std.is_float = true;
+            type->std.is_weak = true;
+            break;
+        case TOKEN_CONST_INT:
+            type->is_std = true;
+            type->std.is_weak = true;
+            break;
+        case TOKEN_CONST_STRING:
+            log_error_token(STRING("Cant use strings right now..."), expr->token);
+            result = false;
+            break;
+
+        case TOK_DEFAULT:
+            type->is_default = true;
+            break;
+
+        case TOKEN_IDENT:
+            {
+                string_t var_name = expr->token.data.string;
+
+                scope_entry_t *output_type = NULL; 
+                b32 failed = false;
+
+                if (get_if_exists(state, false, var_name, &failed, &output_type)) {
+                    switch (output_type->type) {
+                        case ENTRY_VAR:
+                            *type = copy_entry_type(output_type);
+                            break;
+
+                        case ENTRY_PROTOTYPE:
+                            type->is_prototype = true;
+                            type->prototype_name = output_type->prototype_name;
+                            break;
+
+                        case ENTRY_TYPE:
+                            log_error_token(STRING("Cant use Type in expression"), expr->token);
+                            result = false;
+                            break;
+
+                        case ENTRY_FUNC: 
+                            log_error_token(STRING("Cant use Func in expression"), expr->token);
+                            result = false;
+                            break;
+
+                        default:
+                            log_error(STRING("Unexpected entry..."));
+                            result = false;
+                            break;
+                    }
+
+                } else if (failed) {
+                    result = false;
+                } else {
+                    *should_wait = true;
+                }
+            } break;
+    } else switch (expr->type) {
+        case AST_UNARY_DEREF:
+        case AST_UNARY_REF:
+        case AST_UNARY_NEGATE:
+        case AST_UNARY_NOT:
+        {
+            if (!analyze_expression(state, &left, expr->left, should_wait)) {
+                result = false;
+            }
+            
+            // check type before putting it up!
+        } break;
+
+
+        case AST_BIN_CAST:
+            // left is type
+            break;
+
+        case AST_BIN_ASSIGN:
+        case AST_BIN_GR:
+        case AST_BIN_LS:
+        case AST_BIN_GEQ:
+        case AST_BIN_LEQ:
+        case AST_BIN_EQ:
+        case AST_BIN_NEQ:
+        case AST_BIN_LOG_OR:
+        case AST_BIN_LOG_AND:
+        case AST_BIN_ADD:
+        case AST_BIN_SUB:
+        case AST_BIN_MUL:
+        case AST_BIN_DIV:
+        case AST_BIN_MOD:
+        case AST_BIN_BIT_XOR:
+        case AST_BIN_BIT_OR:
+        case AST_BIN_BIT_AND:
+        case AST_BIN_BIT_LSHIFT:
+        case AST_BIN_BIT_RSHIFT:
+        case AST_FUNC_CALL:
+        case AST_MEMBER_ACCESS:
+        case AST_ARRAY_ACCESS:
+        {
+            if (!analyze_expression(state, &left, expr->left, should_wait)) {
+                result = false;
+            }
+            if (!analyze_expression(state, &right, expr->right, should_wait)) {
+                result = false;
+            }
+
+            // check types!!!
+        } break;
+
+            // list
+        case AST_BIN_SWAP:
+            log_error_token(STRING("AST_BIN_SWAP DOESNT WORK RN"), expr->token);
+            break;
+        case AST_SEPARATION:
+        {
+            log_error_token(STRING("AST_SEPARATION DOESNT WORK RN"), expr->token);
+            return false;
+            ast_node_t *next = expr->list_start;
+            for (u64 i = 0; i < expr->child_count; i++) {
+                if (!analyze_expression(state, &left, next, should_wait)) 
+                    result = false;
+
+                // check type... 
+                if (*should_wait)
+                    break;
+                next = next->list_next;
+            }
+
+        } break;
+    }
+
+    if (!*should_wait) {
+        expr->analyzed = true;
+    }
+
+    return result;
+}
+
+b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototype, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
     string_t key = name->token.data.string;
 
     scope_entry_t *entry = NULL;
@@ -285,7 +489,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         entry->configured = true;
     }
 
-    b32 is_pointer = false;
+    b32 is_pointer = is_prototype;
     b32 failed     = false;
 
     while (type->type == AST_PTR_TYPE) {
@@ -306,9 +510,14 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
             switch (output_type->type) {
                 case ENTRY_PROTOTYPE:
-                    entry->type = ENTRY_FUNC;
-                    entry->from_prototype = true;
-                    entry->prototype_name = type_key;
+                    if (can_do_func) {
+                        entry->type = ENTRY_FUNC;
+                        entry->from_prototype = true;
+                        entry->prototype_name = type_key;
+                    } else {
+                        entry->type = ENTRY_VAR;
+                        entry->type_name = type_key;
+                    }
                     break;
 
                 case ENTRY_TYPE:
@@ -329,7 +538,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             }
 
             entry->type_name = type_key;
-            entry->node->analyzed = true;
         } else if (failed) {
             return false;
         } else if (!is_pointer) {
@@ -347,7 +555,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
             entry->type = ENTRY_FUNC;
 
-            if (!analyze_function(state, entry, should_wait)) {
+            if (!analyze_function(state, false, entry, should_wait)) {
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -364,12 +572,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             }
         case AST_STD_TYPE:
             entry->type = ENTRY_VAR;
-            entry->node->analyzed = true;
             set_std_info(type->token, entry);
             break;
 
         case AST_MUL_AUTO:
         case AST_AUTO_TYPE:
+            assert(expr != NULL);
+
             log_error_token(STRING("Cant evaluate the types right now..."), type->token);
             entry->type = ENTRY_ERROR;
             entry->node->analyzed = true;
@@ -390,15 +599,30 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
     } 
 
+    entry->node->analyzed = true;
+    entry->expr = expr;
+
+    if (entry->type == ENTRY_FUNC) {
+        if (expr->type != AST_BLOCK_IMPERATIVE) {
+            log_error_token(STRING("cant do functions with expression body."), expr->token);
+            return false;
+        }
+
+        // going through to check for undef symbols?
+    } else if (entry->type == ENTRY_VAR) {
+        // @todo auto types here
+    }
+
+
     return true;
 }
 
-b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
+b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait) {
     ast_node_t *func = entry->node;
     ast_node_t *type_node  = func->left;
-
-    // name: left is type right is block/expr
     assert(type_node->type  == AST_FUNC_TYPE);
+
+    entry->expr = func->right;
 
     string_t key = entry->node->token.data.string;
     stack_push(state->scopes, &entry->func_params);
@@ -408,13 +632,13 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         stack_t<string_t> type_deps = {};
         hashmap_add(state->type_deps, key, &type_deps);
     }
-    
+
     b32 result = true;
     ast_node_t *next_type = type_node->left->list_start;
     for (u64 i = 0; i < type_node->left->child_count; i++) {
         assert(next_type->type == AST_PARAM_DEF);
 
-        if (!analyze_definition(state, false, next_type, next_type->left, should_wait)) {
+        if (!analyze_definition(state, false, is_prototype, next_type, next_type->left, NULL, should_wait)) {
             result = false;
         }
 
@@ -434,7 +658,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
         var_type_info_t info = {};
 
-        b32 is_pointer = false;
+        b32 is_pointer = is_prototype;
         b32 failed     = false;
 
         ast_node_t *current_type = next_type;
@@ -519,7 +743,6 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         next_type = next_type->list_next;
     }
 
-
     stack_pop(state->local_deps);
     stack_pop(state->scopes);
 
@@ -536,7 +759,7 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     assert(node        != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, false, node, node->left, should_wait)) {
+    if (!analyze_definition(state, false, false, node, node->left, NULL, should_wait)) {
         return false;
     }
 
@@ -588,7 +811,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, next, node->right, should_wait)) {
+            if (!analyze_definition(state, false, false, next, node->right, NULL, should_wait)) {
                 return false;
             }
 
@@ -618,7 +841,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
     ast_node_t * type = node->right->list_start;
 
     for (u64 i = 0; i < node->left->child_count; i++) {
-        if (!analyze_definition(state, false, name, type, should_wait)) {
+        if (!analyze_definition(state, false, false, name, type, NULL, should_wait)) {
             return false;
         }
 
@@ -642,7 +865,7 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(should_wait != NULL);
 
 
-    if (!analyze_definition(state, true, node, node->left, should_wait)) {
+    if (!analyze_definition(state, true, false, node, node->left, node->right, should_wait)) {
         return false;
     }
 
@@ -654,18 +877,22 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 }
 
 b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
-    assert(node->type == AST_TERN_MULT_DEF);
+    assert(node->type  == AST_TERN_MULT_DEF);
+    assert(node->right->type == AST_SEPARATION);
     assert(state != NULL);
     assert(node  != NULL);
     assert(should_wait != NULL);
 
     ast_node_t *type_node = node->center;
 
-    if (type_node->type != AST_MUL_TYPES) {
+    b32 mult_types = type_node->type == AST_MUL_TYPES;
+    b32 mult_expr  = node->right->child_count > 1;
+
+    if (!mult_types && !mult_expr) {
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, next, node->center, should_wait)) {
+            if (!analyze_definition(state, false, false, next, node->center, node->right->list_start, should_wait)) {
                 return false;
             }
 
@@ -680,59 +907,142 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         return true;
     }
 
-    if (node->left->child_count != node->center->child_count) {
-        ast_node_t * next = node->left->list_start;
+    if (mult_types && !mult_expr) {
+        if (node->left->child_count != node->center->child_count) {
+            ast_node_t * next;
+            u64 least_size = MIN(node->left->child_count, node->center->child_count);
 
-        while (next->list_next != NULL) {
-            next = next->list_next;
-        }
+            if (least_size >= node->left->child_count) {
+                next = node->center->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
 
-        log_error_token(STRING("This variable didn't have it's own type:"), next->token);
-        return false;
-    }
+                log_error_token(STRING("Trailing type without its identifier:"), next->token);
+            } else {
+                next = node->left->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
+                log_error_token(STRING("This variable didn't have it's type:"), next->token);
+            }
 
-    ast_node_t * name = node->left->list_start;
-    ast_node_t * type = node->center->list_start;
-
-    for (u64 i = 0; i < node->left->child_count; i++) {
-        if (!analyze_definition(state, false, name, type, should_wait)) {
+            node->analyzed = true;
             return false;
         }
 
-        if (*should_wait) {
-            return true;
+        ast_node_t * name = node->left->list_start;
+        ast_node_t * type = node->center->list_start;
+
+        for (u64 i = 0; i < node->left->child_count; i++) {
+            if (!analyze_definition(state, false, false, name, type, node->right->list_start, should_wait)) {
+                return false;
+            }
+
+            if (*should_wait) {
+                return true;
+            }
+
+            name = name->list_next;
+            type = type->list_next;
+        }
+    }
+
+    if (!mult_types && mult_expr) {
+        if (node->left->child_count != node->right->child_count) {
+            ast_node_t * next;
+            u64 least_size = MIN(node->left->child_count, node->right->child_count);
+
+            if (least_size >= node->left->child_count) {
+                next = node->right->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
+
+                log_error_token(STRING("Trailing expression without its identifier:"), next->token);
+            } else {
+                next = node->left->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
+                log_error_token(STRING("This variable didn't have it's expression:"), next->token);
+            }
+
+            node->analyzed = true;
+            return false;
         }
 
+        ast_node_t * name = node->left->list_start;
+        ast_node_t * type = node->center;
+        ast_node_t * expr = node->right->list_start;
 
-        name = name->list_next;
-        type = type->list_next;
-    }
+        for (u64 i = 0; i < node->left->child_count; i++) {
+            if (!analyze_definition(state, false, false, name, type, expr, should_wait)) {
+                return false;
+            }
 
-    if (node->right->type != AST_SEPARATION) {
-        // one expression for all
-        return true;
-    }
+            if (*should_wait) {
+                return true;
+            }
 
-    if (node->left->child_count != node->right->child_count) {
-        ast_node_t * next;
-        u64 least_size = MIN(node->left->child_count, node->right->child_count);
+            name = name->list_next;
+            expr = expr->list_next;
+        }
+    } 
 
-        if (least_size >= node->left->child_count) {
-            next = node->right->list_start;
-            for (u64 i = 0; i < least_size; i++) {
+    if (mult_types && mult_expr) {
+        if (node->left->child_count != node->center->child_count) {
+            ast_node_t * next = node->left->list_start;
+
+            while (next->list_next != NULL) {
                 next = next->list_next;
             }
 
-            log_error_token(STRING("Trailing expression without its variable:"), next->token);
-        } else {
-            next = node->left->list_start;
-            for (u64 i = 0; i < least_size; i++) {
-                next = next->list_next;
-            }
-            log_error_token(STRING("This variable didn't have it's expression:"), next->token);
+            log_error_token(STRING("This variable didn't have it's own type:"), next->token);
+            node->analyzed = true;
+            return false;
         }
 
-        return false;
+        if (node->left->child_count != node->right->child_count) {
+            ast_node_t * next;
+            u64 least_size = MIN(node->left->child_count, node->right->child_count);
+
+            if (least_size >= node->left->child_count) {
+                next = node->right->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
+
+                log_error_token(STRING("Trailing expression without its variable:"), next->token);
+            } else {
+                next = node->left->list_start;
+                for (u64 i = 0; i < least_size; i++) {
+                    next = next->list_next;
+                }
+                log_error_token(STRING("This variable didn't have it's expression:"), next->token);
+            }
+
+            node->analyzed = true;
+            return false;
+        }
+
+        ast_node_t * name = node->left->list_start;
+        ast_node_t * type = node->center->list_start;
+        ast_node_t * expr = node->right->list_start;
+
+        for (u64 i = 0; i < node->left->child_count; i++) {
+            if (!analyze_definition(state, false, false, name, type, expr, should_wait)) {
+                return false;
+            }
+
+            if (*should_wait) {
+                return true;
+            }
+
+            name = name->list_next;
+            type = type->list_next;
+            expr = expr->list_next;
+        }
     }
 
     node->analyzed = true;
@@ -743,7 +1053,7 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
     ast_node_t * block = entry->node->left;
     ast_node_t * next  = block->list_start;
 
-    b32 result      = true;
+    b32 result = true;
 
     for (u64 i = 0; i < block->child_count; i++) {
         switch (next->type) {
@@ -806,7 +1116,7 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    result = analyze_function(state, entry, &should_wait);
+    result = analyze_function(state, true, entry, &should_wait);
 
     if (result && !should_wait) {
         node->analyzed = true;
@@ -1264,6 +1574,10 @@ b32 analyze_and_compile(compiler_t *compiler) {
 
                 if (!analyze_statement(compiler, &state, node)) {
                     result = false;
+                } else {
+                    // we can compile
+    
+                    // global_statement_ir();
                 }
             }
 

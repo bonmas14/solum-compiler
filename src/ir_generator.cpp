@@ -143,14 +143,8 @@ void gen_bin_unkn_ir(compiler_t *state, list_t<ir_opcode_t> *opcodes, ast_node_t
     gen_block_ir(state, opcodes, node->right);
 }
 
-list_t<ir_opcode_t> gen_statement_ir(compiler_t *state, ast_node_t *statement) {
+list_t<ir_opcode_t> global_statement_ir(compiler_t *state, ast_node_t *statement) {
     list_t<ir_opcode_t> ir_code = {};
-
-    // so here we will generate code for statements
-    //
-    // supported things:
-    //
-    //
 
     for (u64 i = 0; i < ir_code.count; i++) {
         print_ir_opcode(list_get(&ir_code, i));

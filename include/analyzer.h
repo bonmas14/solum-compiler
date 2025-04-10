@@ -51,6 +51,11 @@ struct scope_entry_t {
     u32 type;
 
     ast_node_t *node;
+    ast_node_t *expr;
+
+    // ENTRY_TYPE
+    u32 def_type; // types_t
+    
     union {
         // NOTE: if it is not in union, you need to change creation in analyzer
         hashmap_t<string_t, scope_entry_t> scope; 
@@ -62,22 +67,6 @@ struct scope_entry_t {
             b32 from_prototype;
             string_t prototype_name;
         };
-    };
-
-    // ENTRY_TYPE
-    u32 def_type; // types_t
-
-    union {
-        struct {
-            u32 size;
-            u32 align;
-
-            // members are in scope!
-        } comp_type;
-
-        struct {
-            u32 count_of_elements;
-        } enum_type;
     };
 
     // ENTRY_VAR
@@ -112,7 +101,7 @@ enum entry_type_t {
     ENTRY_TYPE,
     ENTRY_PROTOTYPE,
     ENTRY_FUNC,
-    ENTRY_NAMESPACE,
+    // ENTRY_NAMESPACE,
 };
 
 b32 analyze_and_compile(compiler_t *compiler);

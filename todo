@@ -12,6 +12,27 @@ for debug purposes
 
 - constants
 
+- fix the problem with fact that if it is a pointer check dependencies can break info...,
+currently this dont work:
+
+...
+
+P : () -> A = prototype;
+A : struct = {
+    p : P;
+}
+
+// asserts at string copy, because list_add added empty string!
+...
+
+A : struct = {
+    p : ^V;
+}
+
+V : struct = { a : A; }
+
+// just dont print the A.p type in debug output
+...
 
 ideas:
 

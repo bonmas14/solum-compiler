@@ -652,6 +652,7 @@ ast_node_t parse_assignment_expression(parser_state_t *state) {
     return result;
 }
 
+// @todo, default, between these funcs
 ast_node_t parse_separated_expressions(parser_state_t *state) {
     ast_node_t node = parse_cast_expression(state);
     if (node.type == AST_EMPTY) return node;
