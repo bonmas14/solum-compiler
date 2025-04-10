@@ -23,7 +23,7 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
-b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
+b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait);
 
 // ------------ helpers
 
@@ -142,6 +142,15 @@ b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *fa
             continue;
 
         scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
+
+        switch (entry->type) {
+            case ENTRY_PROTOTYPE:
+            case ENTRY_TYPE:
+                is_pointer = true;
+                break;
+            default:
+                break;
+        }
 
         if (!is_pointer && !check_dependencies(state, entry, key)) {
             *failed = true;
@@ -475,7 +484,7 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *e
     return result;
 }
 
-b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototype, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
+b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
     string_t key = name->token.data.string;
 
     scope_entry_t *entry = NULL;
@@ -486,16 +495,21 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototyp
 
     if (!entry->configured) {
         entry->node = name;
-        entry->configured = true;
     }
 
-    b32 is_pointer = is_prototype;
+    b32 is_pointer = false;
     b32 failed     = false;
 
     while (type->type == AST_PTR_TYPE) {
-        entry->pointer_depth++;
+        if (!entry->configured) {
+            entry->pointer_depth++;
+        }
         type = type->left;
         is_pointer = true;
+    }
+
+    if (!entry->configured) {
+        entry->configured = true;
     }
 
     if (type->type == AST_UNKN_TYPE) {
@@ -540,7 +554,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototyp
             entry->type_name = type_key;
         } else if (failed) {
             return false;
-        } else if (!is_pointer) {
+        } else  {
             *should_wait = true;
         }
     } else switch (type->type) {
@@ -555,7 +569,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototyp
 
             entry->type = ENTRY_FUNC;
 
-            if (!analyze_function(state, false, entry, should_wait)) {
+            if (!analyze_function(state, entry, should_wait)) {
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -617,7 +631,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, b32 is_prototyp
     return true;
 }
 
-b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait) {
+b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
     ast_node_t *func = entry->node;
     ast_node_t *type_node  = func->left;
     assert(type_node->type  == AST_FUNC_TYPE);
@@ -638,7 +652,7 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
     for (u64 i = 0; i < type_node->left->child_count; i++) {
         assert(next_type->type == AST_PARAM_DEF);
 
-        if (!analyze_definition(state, false, is_prototype, next_type, next_type->left, NULL, should_wait)) {
+        if (!analyze_definition(state, false, next_type, next_type->left, NULL, should_wait)) {
             result = false;
         }
 
@@ -658,11 +672,10 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
 
         var_type_info_t info = {};
 
-        b32 is_pointer = is_prototype;
+        b32 is_pointer = false;
         b32 failed     = false;
 
         ast_node_t *current_type = next_type;
-
 
         while (current_type->type == AST_PTR_TYPE) {
             info.pointer_depth++;
@@ -703,7 +716,7 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
                 log_error_token(STRING("Failed when accessing name of type"), current_type->token);
                 result = false;
                 break;
-            } else if (!is_pointer) {
+            } else {
                 *should_wait = true;
             }
         } else switch (current_type->type) {
@@ -759,7 +772,7 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     assert(node        != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, false, false, node, node->left, NULL, should_wait)) {
+    if (!analyze_definition(state, false, node, node->left, NULL, should_wait)) {
         return false;
     }
 
@@ -811,7 +824,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, false, next, node->right, NULL, should_wait)) {
+            if (!analyze_definition(state, false, next, node->right, NULL, should_wait)) {
                 return false;
             }
 
@@ -841,7 +854,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
     ast_node_t * type = node->right->list_start;
 
     for (u64 i = 0; i < node->left->child_count; i++) {
-        if (!analyze_definition(state, false, false, name, type, NULL, should_wait)) {
+        if (!analyze_definition(state, false, name, type, NULL, should_wait)) {
             return false;
         }
 
@@ -865,7 +878,7 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(should_wait != NULL);
 
 
-    if (!analyze_definition(state, true, false, node, node->left, node->right, should_wait)) {
+    if (!analyze_definition(state, true, node, node->left, node->right, should_wait)) {
         return false;
     }
 
@@ -892,7 +905,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, false, next, node->center, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, next, node->center, node->right->list_start, should_wait)) {
                 return false;
             }
 
@@ -935,7 +948,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * type = node->center->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, false, name, type, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, name, type, node->right->list_start, should_wait)) {
                 return false;
             }
 
@@ -977,7 +990,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, false, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, name, type, expr, should_wait)) {
                 return false;
             }
 
@@ -1031,7 +1044,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, false, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, name, type, expr, should_wait)) {
                 return false;
             }
 
@@ -1116,7 +1129,7 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    result = analyze_function(state, true, entry, &should_wait);
+    result = analyze_function(state, entry, &should_wait);
 
     if (result && !should_wait) {
         node->analyzed = true;

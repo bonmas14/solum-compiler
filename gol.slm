@@ -1,24 +1,17 @@
 // so for game of life we need pointers and arrays
 
-a, b, c : b32, s32, u64 = default;
+// a, b, c : b32, s32, u64 = default;
 
+
+
+// Proto : struct = { a : A; }
 
 Proto : () -> A = prototype;
-
 
 A : struct = {
     p : Proto;
 }
 
-// Proto : struct = { a : A; }
-
-
-/*
 main : (argc : s32, argv : ^^u8) -> s32 = {
-
-    
-
-
     return 0;
 }
-*/
