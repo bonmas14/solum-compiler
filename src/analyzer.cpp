@@ -298,23 +298,29 @@ void set_std_info(token_t token, scope_entry_t *entry) {
     }
 }
 
+enum {
+    CONST_TYPE_FLOAT = 0x10,
+    CONST_TYPE_BOOL  = 0x20,
+    CONST_TYPE_UINT  = 0x40,
+    CONST_TYPE_INT   = 0x80,
+};
+
 struct expr_type_t {
     b32 is_default;
     b32 is_prototype;
-    b32 is_std;
+    b32 is_const;
 
     u32 pointer_depth;
 
     struct {
         b32 is_weak;
-        b32 is_float;
-        b32 is_boolean;
-        b32 is_unsigned;
+        u32 flags;
         b32 size;
-    } std;
+    } const_info;
 
     union {
         string_t prototype_name;
+        b32 is_std;
         string_t type_name;
     };
 };
@@ -322,13 +328,16 @@ struct expr_type_t {
 expr_type_t copy_entry_type(scope_entry_t *e) {
     expr_type_t i = {};
 
-    i.std.is_unsigned = e->std.is_unsigned;
-    i.std.is_boolean = e->std.is_boolean;
-    i.pointer_depth = e->pointer_depth;
-    i.std.is_float = e->std.is_float;
+    // @todo, change to same logic in entry_type_t and var_type_info_t
+    i.const_info.flags  = e->std.is_unsigned ? CONST_TYPE_UINT : CONST_TYPE_INT;
+    i.const_info.flags |= e->std.is_boolean ? CONST_TYPE_BOOL : 0;
+    i.const_info.flags |= e->std.is_float ? CONST_TYPE_FLOAT : 0;
+    
+    i.const_info.size = e->std.size;
+    i.pointer_depth   = e->pointer_depth;
+    
     i.type_name = e->type_name;
-    i.std.size = e->std.size;
-    i.is_std = e->is_std;
+    i.is_std    = e->is_std;
 
     return i;
 }
@@ -348,6 +357,41 @@ b32 compare_and_create_new(expr_type_t *out, token_t where, expr_type_t a, expr_
         log_error_token(STRING("cant use this keyword in this context..."), where);
         return false;
     }
+
+    if (a.pointer_depth > 0 && b.pointer_depth > 0) {
+        log_error_token(STRING("cant add two pointer together..."), where);
+        return false;
+    } else if (a.pointer_depth > 0 || b.pointer_depth > 0) {
+        if (a.const_info.flags & CONST_TYPE_FLOAT || b.const_info.flags & CONST_TYPE_FLOAT) {
+            log_error_token(STRING("cant increment pointer if increment type is float..."), where);
+            return false;
+        }
+        return true;
+    }
+
+
+    if (!a.is_const && !b.is_const) {
+        if (a.is_std && b.is_std) {
+            if (a.const_info.size  == b.const_info.size
+             && a.const_info.flags == b.const_info.flags) {
+                    return true;
+            }
+        } else if (!a.is_std && !b.is_std && string_compare(a.type_name, b.type_name)) {
+            return true;
+        }
+
+        allocator_t *talloc = get_temporary_allocator();
+        string_t s;
+        s = string_concat(b.type_name, STRING("':"), talloc);
+        s = string_concat(STRING("' aganist '"), s, talloc);
+        s = string_concat(a.type_name, s, talloc);
+        s = string_concat(STRING("types mismatch, '"), s, talloc);
+
+        log_error_token(s, where);
+
+        return false;
+    }
+
     log_error_token(STRING("types dont match..."), where);
     return false;
 }
@@ -360,13 +404,13 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
 
     if (expr->type == AST_PRIMARY) switch (expr->token.type) {
         case TOKEN_CONST_FP:
-            type->is_std = true;
-            type->std.is_float = true;
-            type->std.is_weak = true;
+            type->is_const = true;
+            type->const_info.flags   = CONST_TYPE_FLOAT;
+            type->const_info.is_weak = true;
             break;
         case TOKEN_CONST_INT:
-            type->is_std = true;
-            type->std.is_weak = true;
+            type->is_const = true;
+            type->const_info.is_weak = true;
             break;
         case TOKEN_CONST_STRING:
             log_error_token(STRING("Cant use strings right now..."), expr->token);
@@ -394,8 +438,9 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
                         break;
 
                     case GET_NOT_ANALYZED:
-                        if (string_compare(*depend_on, var_name)) {
-
+                        if (depend_on == NULL) {
+                            *should_wait = true;
+                        } else if (string_compare(*depend_on, var_name)) {
                             log_error_token(STRING("Cant use variable before its initialization"), expr->token);
                             result = false;
                         } else {
@@ -447,10 +492,6 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
         {
             if (!analyze_expression(state, &left, depend_on, expr->left, should_wait)) {
                 result = false;
-            }
-
-            if (expr->type == AST_UNARY_NEGATE) {
-                left.std.is_unsigned = false;
             }
 
             *type = left;

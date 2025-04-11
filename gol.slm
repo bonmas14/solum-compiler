@@ -4,9 +4,6 @@
 
 
 
-// Proto : struct = { a : A; }
-
-/*
 Proto : () -> A = prototype;
 
 A : struct = {
@@ -16,14 +13,4 @@ A : struct = {
 main : (argc : s32, argv : ^^u8) -> s32 = {
     return 0;
 }
-
-
-*/
-
-/*
-fp : F;
-
-*/
-
-a, b : s32 = -1 + 3, 12.0 + 1.0;
 
