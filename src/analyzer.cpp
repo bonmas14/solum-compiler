@@ -66,7 +66,6 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
         scope_entry_t *entry = hashmap_get(scope, key);
 
         if (!check_if_unique(entry, node)) {
-
             string_t buffer = {};
 
             buffer = string_temp_concat(string_temp_concat(STRING("The identifier '"), key), STRING("' "));
@@ -101,12 +100,15 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
     return {};
 }
 
-b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t key) {
+b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t *entry, string_t key) {
     stack_t<string_t> *deps = hashmap_get(state->type_deps, key);
 
         // @cleanup @speed @todo: doesnt work for pointers...
     for (u64 i = 0; i < state->local_deps->index; i++) {
         if (string_compare(key, state->local_deps->data[i])) {
+            if (!report_error)
+                return false;
+
             log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
 
             allocator_t * talloc = get_temporary_allocator();
@@ -118,6 +120,9 @@ b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t k
 
         for (u64 j = 0; j < deps->index; j++) {
             if (string_compare(state->local_deps->data[i], deps->data[j])) {
+                if (!report_error)
+                    return false;
+
                 log_error_token(STRING("Identifier can not be resolved because type definition is recursive."), entry->node->token);
 
                 allocator_t * talloc = get_temporary_allocator();
@@ -132,40 +137,35 @@ b32 check_dependencies(analyzer_state_t *state, scope_entry_t *entry, string_t k
     return true;
 }
 
-b32 get_if_exists(analyzer_state_t *state, b32 is_pointer, string_t key, b32 *failed, scope_entry_t **output) {
-    UNUSED(output);
+enum {
+    GET_NOT_FIND,
+    GET_NOT_ANALYZED,
+    GET_DEPS_ERROR,
+    GET_SUCCESS,
+};
 
-    // scan up to global scope
+u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
+    UNUSED(output);
 
     for (u64 i = 0; i < state->scopes->index; i++) {
         if (!hashmap_contains(state->scopes->data[i], key))
             continue;
 
         scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
+        *output = entry;
 
-        if (entry->type == ENTRY_PROTOTYPE) {
-            is_pointer = true;
-        }
-
-        if (!is_pointer && !check_dependencies(state, entry, key)) {
-            *failed = true;
-            return false;
-        }
-
-        if (is_pointer && !entry->node->analyzed) {
-            *output = entry;
-            return true;
+        if (!check_dependencies(state, report_deps_error, entry, key)) {
+            return GET_DEPS_ERROR;
         }
         
         if (!entry->node->analyzed) {
-            return false;
+            return GET_NOT_ANALYZED;
         }
 
-        *output = entry;
-        return true;
+        return GET_SUCCESS;
     }
 
-    return false;
+    return GET_NOT_FIND;
 }
 
 // -----------------
@@ -331,10 +331,28 @@ expr_type_t copy_entry_type(scope_entry_t *e) {
     i.is_std = e->is_std;
 
     return i;
-
 }
 
-b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *expr, b32 *should_wait) {
+b32 compare_and_create_new(expr_type_t *out, token_t where, expr_type_t a, expr_type_t b) {
+    if (mem_compare((u8*)&a, (u8*)&b, sizeof(expr_type_t)) == 0) {
+        *out = a;
+        return true;
+    }
+
+    if (a.is_prototype || b.is_prototype) {
+        log_error_token(STRING("one of types was prototype..."), where);
+        return false;
+    }
+
+    if (a.is_default || b.is_default) {
+        log_error_token(STRING("cant use this keyword in this context..."), where);
+        return false;
+    }
+    log_error_token(STRING("types dont match..."), where);
+    return false;
+}
+
+b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
     b32 result = true;
 
     expr_type_t left  = {};
@@ -363,40 +381,62 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *e
             {
                 string_t var_name = expr->token.data.string;
 
+                if (state->local_deps->index > 0) {
+                    log_info(STRING("here"));
+                    stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), var_name);
+                }
+
                 scope_entry_t *output_type = NULL; 
-                b32 failed = false;
 
-                if (get_if_exists(state, false, var_name, &failed, &output_type)) {
-                    switch (output_type->type) {
-                        case ENTRY_VAR:
-                            *type = copy_entry_type(output_type);
-                            break;
+                switch (get_if_exists(state, true, var_name, &output_type)) {
+                    case GET_NOT_FIND:
+                        *should_wait = true;
+                        break;
 
-                        case ENTRY_PROTOTYPE:
-                            type->is_prototype = true;
-                            type->prototype_name = output_type->prototype_name;
-                            break;
+                    case GET_NOT_ANALYZED:
+                        if (string_compare(*depend_on, var_name)) {
 
-                        case ENTRY_TYPE:
-                            log_error_token(STRING("Cant use Type in expression"), expr->token);
+                            log_error_token(STRING("Cant use variable before its initialization"), expr->token);
                             result = false;
-                            break;
+                        } else {
+                            *should_wait = true;
+                        }
+                        break;
 
-                        case ENTRY_FUNC: 
-                            log_error_token(STRING("Cant use Func in expression"), expr->token);
-                            result = false;
-                            break;
+                    case GET_DEPS_ERROR:
+                        result = false;
+                        break;
 
-                        default:
-                            log_error(STRING("Unexpected entry..."));
-                            result = false;
-                            break;
-                    }
+                    case GET_SUCCESS: 
+                    {
+                        switch (output_type->type) {
+                            case ENTRY_VAR:
+                                *type = copy_entry_type(output_type);
+                                break;
 
-                } else if (failed) {
-                    result = false;
-                } else {
-                    *should_wait = true;
+                            case ENTRY_PROTOTYPE:
+                                type->is_prototype = true;
+                                type->prototype_name = output_type->prototype_name;
+                                break;
+
+                            case ENTRY_TYPE:
+                                log_error_token(STRING("Cant use Type in expression"), expr->token);
+                                result = false;
+                                break;
+
+                            case ENTRY_FUNC: 
+                                log_error_token(STRING("Cant use Func in expression"), expr->token);
+                                result = false;
+                                break;
+
+                            default:
+                                log_error(STRING("Unexpected entry..."));
+                                result = false;
+                                break;
+                        }
+
+                        type->type_name = var_name;
+                    } break;
                 }
             } break;
     } else switch (expr->type) {
@@ -405,9 +445,15 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *e
         case AST_UNARY_NEGATE:
         case AST_UNARY_NOT:
         {
-            if (!analyze_expression(state, &left, expr->left, should_wait)) {
+            if (!analyze_expression(state, &left, depend_on, expr->left, should_wait)) {
                 result = false;
             }
+
+            if (expr->type == AST_UNARY_NEGATE) {
+                left.std.is_unsigned = false;
+            }
+
+            *type = left;
             
             // check type before putting it up!
         } break;
@@ -438,16 +484,18 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *e
         case AST_BIN_BIT_RSHIFT:
         case AST_FUNC_CALL:
         case AST_MEMBER_ACCESS:
-        case AST_ARRAY_ACCESS:
-        {
-            if (!analyze_expression(state, &left, expr->left, should_wait)) {
-                result = false;
-            }
-            if (!analyze_expression(state, &right, expr->right, should_wait)) {
+        case AST_ARRAY_ACCESS: {
+            if (!analyze_expression(state, &left, depend_on, expr->left, should_wait)) {
                 result = false;
             }
 
-            // check types!!!
+            if (!analyze_expression(state, &right, depend_on, expr->right, should_wait)) {
+                result = false;
+            }
+
+            if (!compare_and_create_new(type, expr->token, left, right)) {
+                result = false;
+            }
         } break;
 
             // list
@@ -460,7 +508,7 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, ast_node_t *e
             return false;
             ast_node_t *next = expr->list_start;
             for (u64 i = 0; i < expr->child_count; i++) {
-                if (!analyze_expression(state, &left, next, should_wait)) 
+                if (!analyze_expression(state, &left, depend_on, next, should_wait)) 
                     result = false;
 
                 // check type... 
@@ -493,7 +541,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     }
 
     b32 is_pointer = false;
-    b32 failed     = false;
 
     while (type->type == AST_PTR_TYPE) {
         if (!entry->configured) {
@@ -516,41 +563,49 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
         scope_entry_t *output_type = NULL; 
 
-        if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
-            switch (output_type->type) {
-                case ENTRY_PROTOTYPE:
-                    if (can_do_func) {
-                        entry->type = ENTRY_FUNC;
-                        entry->from_prototype = true;
-                        entry->prototype_name = type_key;
-                    } else {
+        switch (get_if_exists(state, !is_pointer, type_key, &output_type)) {
+            case GET_NOT_FIND:
+            case GET_NOT_ANALYZED:
+                *should_wait = true;
+                break;
+
+            case GET_DEPS_ERROR:
+                if (!is_pointer) {
+                    return false;
+                }
+            case GET_SUCCESS: 
+            {
+                switch (output_type->type) {
+                    case ENTRY_PROTOTYPE:
+                        if (can_do_func) {
+                            entry->type = ENTRY_FUNC;
+                            entry->from_prototype = true;
+                            entry->prototype_name = type_key;
+                        } else {
+                            entry->type = ENTRY_VAR;
+                            entry->type_name = type_key;
+                        }
+                        break;
+
+                    case ENTRY_TYPE:
                         entry->type = ENTRY_VAR;
-                        entry->type_name = type_key;
-                    }
-                    break;
+                        break;
 
-                case ENTRY_TYPE:
-                    entry->type = ENTRY_VAR;
-                    break;
+                    case ENTRY_FUNC: 
+                        log_error(STRING("Cant use FUNC as a type of variable [@better_message]"));
+                        entry->type = ENTRY_ERROR;
+                        entry->node->analyzed = true;
+                        return false;
 
-                case ENTRY_FUNC: 
-                    log_error(STRING("Cant use FUNC as a type of variable [@better_message]"));
-                    entry->type = ENTRY_ERROR;
-                    entry->node->analyzed = true;
-                    return false;
+                    default:
+                        log_error(STRING("Unexpected type..."));
+                        entry->type = ENTRY_ERROR;
+                        entry->node->analyzed = true;
+                        return false;
+                }
 
-                default:
-                    log_error(STRING("Unexpected type..."));
-                    entry->type = ENTRY_ERROR;
-                    entry->node->analyzed = true;
-                    return false;
-            }
-
-            entry->type_name = type_key;
-        } else if (failed) {
-            return false;
-        } else  {
-            *should_wait = true;
+                entry->type_name = type_key;
+            } break;
         }
     } else switch (type->type) {
         case AST_FUNC_TYPE: 
@@ -608,10 +663,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
     } 
 
-    if (!*should_wait) {
-        entry->node->analyzed = true;
-    }
-
     entry->expr = expr;
 
     if (entry->type == ENTRY_FUNC) {
@@ -621,8 +672,17 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         }
 
         // going through to check for undef symbols?
-    } else if (entry->type == ENTRY_VAR) {
-        // @todo auto types here
+    } else if (entry->type == ENTRY_VAR && expr != NULL) {
+        expr_type_t type = {};
+        if (!analyze_expression(state, &type, &name->token.data.string, expr, should_wait)) {
+            return false;
+        }
+        // type info
+    }
+
+
+    if (!*should_wait) {
+        entry->node->analyzed = true;
     }
 
 
@@ -671,7 +731,6 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
         var_type_info_t info = {};
 
         b32 is_pointer = is_prototype;
-        b32 failed     = false;
 
         ast_node_t *current_type = next_type;
 
@@ -690,32 +749,38 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
 
             scope_entry_t *output_type = NULL; 
 
-            if (get_if_exists(state, is_pointer, type_key, &failed, &output_type)) {
-                switch (output_type->type) {
-                    case ENTRY_PROTOTYPE:
-                    case ENTRY_TYPE:
-                        break;
+            switch (get_if_exists(state, !is_pointer, type_key, &output_type)) {
+                case GET_NOT_FIND:
+                case GET_NOT_ANALYZED:
+                    *should_wait = true;
+                    break;
 
-                    case ENTRY_FUNC: 
-                        log_error_token(STRING("Cant use FUNC as a return type [@better_message]"), current_type->token);
-                        entry->type = ENTRY_ERROR;
-                        result = false;
-                        break;
+                case GET_DEPS_ERROR:
+                    if (!is_pointer) {
+                        return false;
+                    }
+                case GET_SUCCESS: 
+                {
+                    switch (output_type->type) {
+                        case ENTRY_PROTOTYPE:
+                        case ENTRY_TYPE:
+                            break;
 
-                    default:
-                        log_error_token(STRING("Unexpected type... [@better_message]"), current_type->token);
-                        entry->type = ENTRY_ERROR;
-                        result = false;
-                        break;
-                }
+                        case ENTRY_FUNC: 
+                            log_error_token(STRING("Cant use FUNC as a return type [@better_message]"), current_type->token);
+                            entry->type = ENTRY_ERROR;
+                            result = false;
+                            break;
 
-                info.type_name = type_key;
-            } else if (failed) {
-                log_error_token(STRING("Failed when accessing name of type"), current_type->token);
-                result = false;
-                break;
-            } else {
-                *should_wait = true;
+                        default:
+                            log_error_token(STRING("Unexpected type... [@better_message]"), current_type->token);
+                            entry->type = ENTRY_ERROR;
+                            result = false;
+                            break;
+                    }
+
+                    info.type_name = type_key;
+                } break;
             }
         } else switch (current_type->type) {
             case AST_VOID_TYPE: // fallthrough
