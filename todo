@@ -12,6 +12,12 @@ for debug purposes
 
 - constants
 
+- we have complie flag... just validate a node and try to compile function body
+then if you cant add or evaluate something, you just dont put compiled bool to true on entity
+
+- change types from flags to just enum as in good training language.
+because its superior way of dealing with types
+
 ideas:
 
 - soft inlining - is when compiler generates output source code but inlines all of functions on source level. 
