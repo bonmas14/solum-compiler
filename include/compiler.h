@@ -27,9 +27,8 @@ struct compiler_t {
     allocator_t *strings;
     allocator_t *nodes;
 
-    codegen_t  *codegen;
-
-    string_t modules_path;
+    codegen_t   *codegen;
+    string_t     modules_path;
 
     hashmap_t<string_t, scope_entry_t> scope;
     hashmap_t<string_t, source_file_t> files;
@@ -37,5 +36,6 @@ struct compiler_t {
 
 source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc);
 compiler_t create_compiler_instance(allocator_t *alloc);
+void compile(compiler_t *compiler);
 
 #endif

@@ -1,26 +1,20 @@
 #include "stddefines.h"
-#include "strings.h"
 
 #include "allocator.h"
-
-#include "talloc.h"
 #include "arena.h"
+#include "strings.h"
 
-#include "list.h"
-#include "hashmap.h"
-#include "stack.h"
-
-
-#include "scanner.h"
-#include "parser.h"
-#include "analyzer.h"
-#include "ir_generator.h"
-#include "backend.h"
+#include "compiler.h"
 
 allocator_t * default_allocator;
 allocator_t __allocator;
 
 #if defined(DEBUG)
+
+#include "talloc.h"
+#include "list.h"
+#include "hashmap.h"
+#include "stack.h"
 
 void debug_tests(void) {
     hashmap_tests();
@@ -65,7 +59,7 @@ int main(int argc, char **argv) {
     string_t filename = string_copy(STRING(argv[1]), default_allocator);
 
     if (load_and_process_file(&state, filename)) {
-        analyze_and_compile(&state);
+        compile(&state);
     }
 
     log_color_reset();

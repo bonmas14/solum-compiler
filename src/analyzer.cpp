@@ -23,7 +23,29 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
+struct expr_type_t {
+    b32 is_default;
+    b32 is_prototype;
+    b32 is_const;
+    b32 is_std;
+
+    u32 pointer_depth;
+
+    struct {
+        b32 is_weak;
+        u32 flags;
+        b32 size;
+    } const_info;
+
+    union {
+        string_t prototype_name;
+        string_t type_name;
+    };
+};
+
 b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
+b32 analyze_statement(analyzer_state_t *state, ast_node_t *node, b32 *should_wait);
+b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
 
 // ------------ helpers
 
@@ -305,26 +327,6 @@ enum {
     CONST_TYPE_INT   = 0x80,
 };
 
-struct expr_type_t {
-    b32 is_default;
-    b32 is_prototype;
-    b32 is_const;
-
-    u32 pointer_depth;
-
-    struct {
-        b32 is_weak;
-        u32 flags;
-        b32 size;
-    } const_info;
-
-    union {
-        string_t prototype_name;
-        b32 is_std;
-        string_t type_name;
-    };
-};
-
 expr_type_t copy_entry_type(scope_entry_t *e) {
     expr_type_t i = {};
 
@@ -392,8 +394,8 @@ b32 compare_and_create_new(expr_type_t *out, token_t where, expr_type_t a, expr_
         return false;
     }
 
-    log_error_token(STRING("types dont match..."), where);
-    return false;
+    log_error_token(STRING("types dont match... but right now we ignore"), where);
+    return true;
 }
 
 b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
@@ -546,7 +548,8 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
         case AST_SEPARATION:
         {
             log_error_token(STRING("AST_SEPARATION DOESNT WORK RN"), expr->token);
-            return false;
+            return true;
+
             ast_node_t *next = expr->list_start;
             for (u64 i = 0; i < expr->child_count; i++) {
                 if (!analyze_expression(state, &left, depend_on, next, should_wait)) 
@@ -712,12 +715,25 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
         }
 
-        // going through to check for undef symbols?
+        ast_node_t *stmt = expr->list_start;
+        for (u64 i = 0; i < expr->child_count; i++) {
+            if (!analyze_statement(state, stmt, should_wait)) {
+                return false;
+            }
+
+            if (*should_wait) {
+                break;
+            }
+
+            stmt = stmt->list_next;
+        }
     } else if (entry->type == ENTRY_VAR && expr != NULL) {
         expr_type_t type = {};
+
         if (!analyze_expression(state, &type, &name->token.data.string, expr, should_wait)) {
             return false;
         }
+
         // type info
     }
 
@@ -1451,14 +1467,13 @@ b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
     return true;
 }
 
-b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
+b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
     allocator_t *talloc = get_temporary_allocator();
 
     // ./<file>.slm
     // ./<file>/module.slm
     // /<compiler>/<file>.slm
     // /<compiler>/<file>/module.slm
-
 
     string_t from_file = node->token.from->filename;
     string_t directory, name = node->token.data.string;
@@ -1499,61 +1514,210 @@ b32 find_and_add_file(compiler_t *compiler, analyzer_state_t *state, ast_node_t 
 
 // --------------------
 
-b32 analyze_statement(compiler_t *compiler, analyzer_state_t *state, ast_node_t *node) {
+
+b32 analyze_statement(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
     temp_reset();
 
     assert(!node->analyzed);
-    b32 should_wait = false;
+    b32 result = false;
 
     switch (node->type) {
         case AST_UNNAMED_MODULE:
-                return find_and_add_file(compiler, state, node);
+            log_error_token(STRING("cant load files from functions."), node->token);
+            result = false;
+            break;
 
         case AST_STRUCT_DEF: 
-                return analyze_struct(state, node);
+        case AST_UNION_DEF:
+        case AST_ENUM_DEF: 
+        case AST_UNARY_PROTO_DEF: 
+            log_error_token(STRING("cant create types not in global scope."), node->token);
+            result = false;
+            break;
+
+
+        case AST_IF_STMT: {
+            expr_type_t type = {};
+            result = analyze_expression(state, &type, NULL, node->left, should_wait);
+
+            if (result) {
+                result = analyze_statement(state, node->right, should_wait);
+            }
+        } break;
+        case AST_ELIF_STMT:
+            // @todo, check for binded if statement
+            break;
+        case AST_ELSE_STMT:
+            // @todo, check for binded if statement
+            result = analyze_statement(state, node->right, should_wait);
+            break;
+        case AST_WHILE_STMT: {
+            expr_type_t type = {};
+            result = analyze_expression(state, &type, NULL, node->left, should_wait);
+
+            if (result) {
+                result = analyze_statement(state, node->right, should_wait);
+            }
+        } break;
+        case AST_RET_STMT: {
+            expr_type_t type = {};
+
+            result = analyze_expression(state, &type, NULL, node->left, should_wait);
+
+            if (!should_wait) node->analyzed = true;
+        } break;
+
+        case AST_BREAK_STMT:
+        case AST_CONTINUE_STMT:
+                           // should be inside of a loop
+            break;
+
+        case AST_UNARY_VAR_DEF:
+            result = analyze_unary_var_def(state, node, should_wait);
+            break;
+
+        case AST_BIN_UNKN_DEF: 
+            result = analyze_unkn_def(state, node, should_wait);
+            break;
+
+        case AST_BIN_MULT_DEF: 
+            result = analyze_bin_var_def(state, node, should_wait);
+            break;
+
+        case AST_TERN_MULT_DEF:
+            result = analyze_tern_def(state, node, should_wait);
+            break;
+
+        default: {
+            expr_type_t type = {};
+            result = analyze_expression(state, &type, NULL, node, should_wait);
+        } break;
+    }
+
+    if (!should_wait) node->analyzed = true;
+    return result;
+}
+
+b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
+    temp_reset();
+
+    assert(!node->analyzed);
+    b32 result, should_wait = false;
+
+    switch (node->type) {
+        case AST_UNNAMED_MODULE:
+            assert(false);
+
+        case AST_STRUCT_DEF: 
+            result = analyze_struct(state, node);
+            break;
 
         case AST_UNION_DEF:
-                return analyze_union(state, node);
+            result = analyze_union(state, node);
+            break;
 
         case AST_ENUM_DEF: 
-                return analyze_enum(state, node);
+            result = analyze_enum(state, node);
+            break;
 
         case AST_UNARY_PROTO_DEF: 
-                return analyze_prototype(state, node);
+            result = analyze_prototype(state, node);
+            break;
 
 
         case AST_UNARY_VAR_DEF:
-                return analyze_unary_var_def(state, node, &should_wait);
-                
+            result = analyze_unary_var_def(state, node, &should_wait);
+            break;
+
         case AST_BIN_UNKN_DEF: 
-                return analyze_unkn_def(state, node, &should_wait);
+            result = analyze_unkn_def(state, node, &should_wait);
+            break;
 
         case AST_BIN_MULT_DEF: 
-                return analyze_bin_var_def(state, node, &should_wait);
+            result = analyze_bin_var_def(state, node, &should_wait);
+            break;
 
         case AST_TERN_MULT_DEF:
-                return analyze_tern_def(state, node, &should_wait);
-
-                             /*
-        case AST_NAMED_MODULE:
-            // ENTRY_NAMESPACE
-            node->analyzed = true;
+            result = analyze_tern_def(state, node, &should_wait);
             break;
-                             */
 
         default:
             log_error_token(STRING("Wrong type of construct."), node->token);
+            result = false;
             break;
     }
 
-    return false;
+    return result;
 }
 
 // priorities of compiling funcitons
 //
 // #run 
 // other code
-//
+var_type_info_t entry_to_info(scope_entry_t e) {
+    var_type_info_t i = {};
+
+    i.std.is_unsigned = e.std.is_unsigned;
+    i.std.is_boolean  = e.std.is_boolean;
+    i.pointer_depth   = e.pointer_depth;
+    i.std.is_float    = e.std.is_float;
+
+    i.type_name = e.type_name;
+    i.std.size  = e.std.size;
+    i.is_std    = e.is_std;
+
+    return i;
+}
+
+b32 analyzer_preload_all_files(compiler_t *compiler) {
+    assert(compiler != NULL);
+
+    b32 result       = true;
+    b32 not_finished = true;
+
+    while (not_finished) {
+        not_finished = false;
+
+        for (u64 i = 0; i < compiler->files.capacity; i++) {
+            kv_pair_t<string_t, source_file_t> pair = compiler->files.entries[i];
+
+            if (!pair.occupied) continue;
+            if (pair.deleted)   continue;
+
+            for (u64 j = 0; j < pair.value.parsed_roots.count; j++) {
+                temp_reset();
+                ast_node_t *node = *list_get(&pair.value.parsed_roots, j);
+
+                if (node->analyzed || node->type != AST_UNNAMED_MODULE) {
+                    continue;
+                } 
+
+                not_finished = true;
+
+                if (!find_and_add_file(compiler, node)) {
+                    result = false;
+                }
+            }
+
+            if (!result) {
+                not_finished = false;
+                break;
+            }
+        }
+    }
+
+    if (!result) {
+        log_error(STRING("Couldn't find a file."));
+        return false;
+    }
+
+#ifdef DEBUG
+    log_info(STRING("All files loaded!"));
+#endif
+
+    return result;
+}
+
 void print_var_info(var_type_info_t info) {
     if (info.pointer_depth) {
         if (info.pointer_depth == 1) {
@@ -1568,20 +1732,6 @@ void print_var_info(var_type_info_t info) {
     } else {
         fprintf(stderr, " %s", string_to_c_string(info.type_name, get_temporary_allocator()));
     }
-}
-
-var_type_info_t entry_to_info(scope_entry_t e) {
-    var_type_info_t i = {};
-
-    i.std.is_unsigned = e.std.is_unsigned;
-    i.std.is_boolean = e.std.is_boolean;
-    i.pointer_depth = e.pointer_depth;
-    i.std.is_float = e.std.is_float;
-    i.type_name = e.type_name;
-    i.std.size = e.std.size;
-    i.is_std = e.is_std;
-
-    return i;
 }
 
 void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, u64 depth) {
@@ -1642,15 +1792,12 @@ b32 analyze_and_compile(compiler_t *compiler) {
     b32 not_finished = true;
 
     stack_t<hashmap_t<string_t, scope_entry_t>*> scopes = {};
-
     stack_t<string_t> local_deps = {};
     stack_create(&local_deps, 16);
 
     hashmap_t<string_t, stack_t<string_t>> type_deps = {};
     hashmap_create(&type_deps, 128, get_string_hash, compare_string_keys);
-
     stack_push(&scopes, &compiler->scope);
-
 
     // @todo @fix, change so we wont have infinite loop on undefined declarations
     u64 max_iterations = 10;
@@ -1691,12 +1838,8 @@ b32 analyze_and_compile(compiler_t *compiler) {
 
                 not_finished = true;
 
-                if (!analyze_statement(compiler, &state, node)) {
+                if (!analyze_global_statement(&state, node)) {
                     result = false;
-                } else {
-                    // we can compile
-    
-                    // global_statement_ir();
                 }
             }
 

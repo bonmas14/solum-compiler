@@ -78,3 +78,18 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
 
     return compiler;
 }
+
+b32 analyze_and_compile(compiler_t *compiler);
+
+void compile(compiler_t *compiler) {
+    if (!analyzer_preload_all_files(compiler)) {
+        return;
+    }
+
+    analyze_and_compile(compiler);
+
+
+
+
+}
+

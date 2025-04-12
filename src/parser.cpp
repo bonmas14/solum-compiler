@@ -1290,8 +1290,11 @@ ast_node_t parse_statement(parser_state_t *state) {
 
             ast_node_t expr = parse_assignment_expression(state);
             check_value(expr.type != AST_EMPTY);
+            if (!consume_token(TOK_THEN, state->scanner, NULL, false, get_temporary_allocator())) {
+                node.type = AST_ERROR;
+            }
             
-            ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
+            ast_node_t stmt = parse_statement(state);
             add_left_node(state, &node, &expr);
             add_right_node(state, &node, &stmt);
         } break;
@@ -1301,14 +1304,37 @@ ast_node_t parse_statement(parser_state_t *state) {
             node.token = advance_token(state->scanner, state->strings);
             if (peek_token(state->scanner, get_temporary_allocator()).type == TOK_IF) {
                 node = parse_statement(state);
+                if (node.type == AST_ERROR) {
+                    node.type = AST_ERROR;
+                    break;
+                }
                 assert(node.type == AST_IF_STMT);
                 node.type = AST_ELIF_STMT;
             } else {
                 node.type = AST_ELSE_STMT;
 
-                ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
+                ast_node_t stmt = parse_statement(state);
                 add_left_node(state, &node, &stmt);
             }
+        } break;
+
+        case TOK_FOR: 
+        { 
+            log_error_token(STRING("@todo for stmt"), name);
+            node.type  = AST_ERROR;
+            node.token = advance_token(state->scanner, state->strings);
+            break;
+
+            ignore_semicolon = true;
+            node.type  = AST_WHILE_STMT;
+            node.token = advance_token(state->scanner, state->strings);
+
+            ast_node_t expr = parse_assignment_expression(state);
+            check_value(expr.type != AST_EMPTY);
+
+            ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
+            add_left_node(state, &node, &expr);
+            add_right_node(state, &node, &stmt);
         } break;
 
         case TOK_WHILE: {

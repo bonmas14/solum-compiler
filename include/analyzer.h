@@ -104,7 +104,12 @@ enum entry_type_t {
     // ENTRY_NAMESPACE,
 };
 
+b32 analyzer_preload_all_files(compiler_t *compiler);
 b32 analyze_and_compile(compiler_t *compiler);
+
+b32 analyzer_get_analyzed_node(compiler_t *compiler, ast_node_t *node);
+b32 analyzer_validate_node(compiler_t *compiler, ast_node_t *node);
+
 b32 load_and_process_file(compiler_t *compiler, string_t filename);
 
 #endif // ANALYZER_H

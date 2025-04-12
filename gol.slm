@@ -2,15 +2,10 @@
 
 // a, b, c : b32, s32, u64 = default;
 
-
-
-Proto : () -> A = prototype;
-
-A : struct = {
-    p : Proto;
-}
-
 main : (argc : s32, argv : ^^u8) -> s32 = {
-    return 0;
+    if argc < 1 then return -1;
+    else             return  0;
+
+    a : s32 = 3;
 }
 
