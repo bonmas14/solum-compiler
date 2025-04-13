@@ -1296,26 +1296,29 @@ ast_node_t parse_statement(parser_state_t *state) {
             
             ast_node_t stmt = parse_statement(state);
             add_left_node(state, &node, &expr);
+
+            if (!consume_token(TOK_ELSE, state->scanner, NULL, true, get_temporary_allocator())) {
+                add_right_node(state, &node, &stmt);
+                break;
+            } else {
+                add_center_node(state, &node, &stmt);
+            }
+
+            node.type = AST_IF_ELSE_STMT;
+            stmt = parse_statement(state);
+
+            if (node.type == AST_ERROR) {
+                node.type = AST_ERROR;
+                break;
+            }
+
             add_right_node(state, &node, &stmt);
         } break;
 
         case TOK_ELSE: {
-            ignore_semicolon = true;
-            node.token = advance_token(state->scanner, state->strings);
-            if (peek_token(state->scanner, get_temporary_allocator()).type == TOK_IF) {
-                node = parse_statement(state);
-                if (node.type == AST_ERROR) {
-                    node.type = AST_ERROR;
-                    break;
-                }
-                assert(node.type == AST_IF_STMT);
-                node.type = AST_ELIF_STMT;
-            } else {
-                node.type = AST_ELSE_STMT;
-
-                ast_node_t stmt = parse_statement(state);
-                add_left_node(state, &node, &stmt);
-            }
+            log_error_token(STRING("Else statement without if statement before..."), name);
+            node.type = AST_ERROR;
+            break;
         } break;
 
         case TOK_FOR: 

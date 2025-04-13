@@ -75,9 +75,8 @@ enum ast_types_t {
     AST_MEMBER_ACCESS,
     AST_ARRAY_ACCESS,
 
-    AST_IF_STMT,
-    AST_ELSE_STMT,
-    AST_ELIF_STMT,
+    AST_IF_STMT, // bin  l = expr
+    AST_IF_ELSE_STMT, // tern l = expr c = if r = else
     AST_WHILE_STMT,
     AST_RET_STMT,
 

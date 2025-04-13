@@ -9,6 +9,23 @@
 #include "talloc.h"
 #include "strings.h"
 
+
+enum {
+    GET_NOT_FIND,
+    GET_NOT_ANALYZED,
+    GET_DEPS_ERROR,
+    GET_SUCCESS,
+};
+
+enum {
+    STMT_ERR,
+    STMT_OK,
+    
+    STMT_RETURN,
+    STMT_BREAK,
+    STMT_CONTINUE,
+};
+
 // @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY).
 // caching the tokens or just changing them all to use temp alloc
 // so in multiple definitions we getting multiple errors that are for one entry_type
@@ -23,29 +40,9 @@ struct analyzer_state_t {
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
-struct expr_type_t {
-    b32 is_default;
-    b32 is_prototype;
-    b32 is_const;
-    b32 is_std;
-
-    u32 pointer_depth;
-
-    struct {
-        b32 is_weak;
-        u32 flags;
-        b32 size;
-    } const_info;
-
-    union {
-        string_t prototype_name;
-        string_t type_name;
-    };
-};
-
 b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
-b32 analyze_statement(analyzer_state_t *state, ast_node_t *node, b32 *should_wait);
-b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
+u32 analyze_statement(analyzer_state_t *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait);
+b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
 
 // ------------ helpers
 
@@ -140,6 +137,8 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
             return false;
         }
 
+        if (deps == NULL) continue;
+
         for (u64 j = 0; j < deps->index; j++) {
             if (string_compare(state->local_deps->data[i], deps->data[j])) {
                 if (!report_error)
@@ -159,13 +158,6 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
     return true;
 }
 
-enum {
-    GET_NOT_FIND,
-    GET_NOT_ANALYZED,
-    GET_DEPS_ERROR,
-    GET_SUCCESS,
-};
-
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
     UNUSED(output);
 
@@ -174,7 +166,10 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
             continue;
 
         scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
-        *output = entry;
+
+        if (output) {
+            *output = entry;
+        }
 
         if (!check_dependencies(state, report_deps_error, entry, key)) {
             return GET_DEPS_ERROR;
@@ -327,162 +322,50 @@ enum {
     CONST_TYPE_INT   = 0x80,
 };
 
-expr_type_t copy_entry_type(scope_entry_t *e) {
-    expr_type_t i = {};
-
-    // @todo, change to same logic in entry_type_t and var_type_info_t
-    i.const_info.flags  = e->std.is_unsigned ? CONST_TYPE_UINT : CONST_TYPE_INT;
-    i.const_info.flags |= e->std.is_boolean ? CONST_TYPE_BOOL : 0;
-    i.const_info.flags |= e->std.is_float ? CONST_TYPE_FLOAT : 0;
-    
-    i.const_info.size = e->std.size;
-    i.pointer_depth   = e->pointer_depth;
-    
-    i.type_name = e->type_name;
-    i.is_std    = e->is_std;
-
-    return i;
-}
-
-b32 compare_and_create_new(expr_type_t *out, token_t where, expr_type_t a, expr_type_t b) {
-    if (mem_compare((u8*)&a, (u8*)&b, sizeof(expr_type_t)) == 0) {
-        *out = a;
-        return true;
-    }
-
-    if (a.is_prototype || b.is_prototype) {
-        log_error_token(STRING("one of types was prototype..."), where);
-        return false;
-    }
-
-    if (a.is_default || b.is_default) {
-        log_error_token(STRING("cant use this keyword in this context..."), where);
-        return false;
-    }
-
-    if (a.pointer_depth > 0 && b.pointer_depth > 0) {
-        log_error_token(STRING("cant add two pointer together..."), where);
-        return false;
-    } else if (a.pointer_depth > 0 || b.pointer_depth > 0) {
-        if (a.const_info.flags & CONST_TYPE_FLOAT || b.const_info.flags & CONST_TYPE_FLOAT) {
-            log_error_token(STRING("cant increment pointer if increment type is float..."), where);
-            return false;
-        }
-        return true;
-    }
-
-
-    if (!a.is_const && !b.is_const) {
-        if (a.is_std && b.is_std) {
-            if (a.const_info.size  == b.const_info.size
-             && a.const_info.flags == b.const_info.flags) {
-                    return true;
-            }
-        } else if (!a.is_std && !b.is_std && string_compare(a.type_name, b.type_name)) {
-            return true;
-        }
-
-        allocator_t *talloc = get_temporary_allocator();
-        string_t s;
-        s = string_concat(b.type_name, STRING("':"), talloc);
-        s = string_concat(STRING("' aganist '"), s, talloc);
-        s = string_concat(a.type_name, s, talloc);
-        s = string_concat(STRING("types mismatch, '"), s, talloc);
-
-        log_error_token(s, where);
-
-        return false;
-    }
-
-    log_error_token(STRING("types dont match... but right now we ignore"), where);
-    return true;
-}
-
-b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
+b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
     b32 result = true;
-
-    expr_type_t left  = {};
-    expr_type_t right = {};
 
     if (expr->type == AST_PRIMARY) switch (expr->token.type) {
         case TOKEN_CONST_FP:
-            type->is_const = true;
-            type->const_info.flags   = CONST_TYPE_FLOAT;
-            type->const_info.is_weak = true;
-            break;
         case TOKEN_CONST_INT:
-            type->is_const = true;
-            type->const_info.is_weak = true;
-            break;
         case TOKEN_CONST_STRING:
-            log_error_token(STRING("Cant use strings right now..."), expr->token);
-            result = false;
-            break;
-
         case TOK_DEFAULT:
-            type->is_default = true;
-            break;
+            expr->analyzed = true;
+            return result;
 
-        case TOKEN_IDENT:
-            {
+        case TOKEN_IDENT: {
                 string_t var_name = expr->token.data.string;
 
-                if (state->local_deps->index > 0) {
-                    log_info(STRING("here"));
-                    stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), var_name);
-                }
-
-                scope_entry_t *output_type = NULL; 
-
-                switch (get_if_exists(state, true, var_name, &output_type)) {
+                scope_entry_t *output = NULL; 
+                switch (get_if_exists(state, true, var_name, &output)) {
                     case GET_NOT_FIND:
                         *should_wait = true;
                         break;
 
                     case GET_NOT_ANALYZED:
-                        if (depend_on == NULL) {
-                            *should_wait = true;
-                        } else if (string_compare(*depend_on, var_name)) {
-                            log_error_token(STRING("Cant use variable before its initialization"), expr->token);
-                            result = false;
-                        } else {
-                            *should_wait = true;
-                        }
+                        *should_wait = true;
                         break;
 
                     case GET_DEPS_ERROR:
                         result = false;
                         break;
 
-                    case GET_SUCCESS: 
-                    {
-                        switch (output_type->type) {
-                            case ENTRY_VAR:
-                                *type = copy_entry_type(output_type);
-                                break;
+                    case GET_SUCCESS: switch (output->type) {
+                        case ENTRY_VAR:
+                        case ENTRY_FUNC:
+                            break;
 
-                            case ENTRY_PROTOTYPE:
-                                type->is_prototype = true;
-                                type->prototype_name = output_type->prototype_name;
-                                break;
+                        case ENTRY_PROTOTYPE:
+                        case ENTRY_TYPE:
+                            log_error_token(STRING("Cant use Type in expression"), expr->token);
+                            result = false;
+                            break;
 
-                            case ENTRY_TYPE:
-                                log_error_token(STRING("Cant use Type in expression"), expr->token);
-                                result = false;
-                                break;
 
-                            case ENTRY_FUNC: 
-                                log_error_token(STRING("Cant use Func in expression"), expr->token);
-                                result = false;
-                                break;
-
-                            default:
-                                log_error(STRING("Unexpected entry..."));
-                                result = false;
-                                break;
-                        }
-
-                        type->type_name = var_name;
+                        default:
+                            log_error(STRING("Unexpected entry..."));
+                            result = false;
+                            break;
                     } break;
                 }
             } break;
@@ -491,15 +374,8 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
         case AST_UNARY_REF:
         case AST_UNARY_NEGATE:
         case AST_UNARY_NOT:
-        {
-            if (!analyze_expression(state, &left, depend_on, expr->left, should_wait)) {
-                result = false;
-            }
-
-            *type = left;
-            
-            // check type before putting it up!
-        } break;
+            result = analyze_expression(state, expected_count_of_expressions, depend_on, expr->left, should_wait);
+            break;
 
 
         case AST_BIN_CAST:
@@ -527,37 +403,36 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
         case AST_BIN_BIT_RSHIFT:
         case AST_FUNC_CALL:
         case AST_MEMBER_ACCESS:
-        case AST_ARRAY_ACCESS: {
-            if (!analyze_expression(state, &left, depend_on, expr->left, should_wait)) {
+        case AST_ARRAY_ACCESS:
+            if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->left, should_wait)) {
                 result = false;
             }
 
-            if (!analyze_expression(state, &right, depend_on, expr->right, should_wait)) {
+            if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->right, should_wait)) {
                 result = false;
             }
+            break;
 
-            if (!compare_and_create_new(type, expr->token, left, right)) {
-                result = false;
-            }
-        } break;
-
-            // list
         case AST_BIN_SWAP:
             log_error_token(STRING("AST_BIN_SWAP DOESNT WORK RN"), expr->token);
             break;
-        case AST_SEPARATION:
-        {
-            log_error_token(STRING("AST_SEPARATION DOESNT WORK RN"), expr->token);
-            return true;
-
+        case AST_SEPARATION: {
             ast_node_t *next = expr->list_start;
+
+            if (expr->child_count != expected_count_of_expressions) {
+                log_error_token(STRING("Not expected count of elements"), expr->token);
+                result = false;
+                break;
+            }
+
+            // element count should match other size or amount of return argumets
             for (u64 i = 0; i < expr->child_count; i++) {
-                if (!analyze_expression(state, &left, depend_on, next, should_wait)) 
+                if (!analyze_expression(state, expected_count_of_expressions, depend_on, next, should_wait)) 
                     result = false;
 
-                // check type... 
                 if (*should_wait)
                     break;
+
                 next = next->list_next;
             }
 
@@ -565,6 +440,10 @@ b32 analyze_expression(analyzer_state_t *state, expr_type_t *type, string_t *dep
     }
 
     if (!*should_wait) {
+        expr->analyzed = true;
+    }
+
+    if (!result) {
         expr->analyzed = true;
     }
 
@@ -625,6 +504,9 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                             entry->type = ENTRY_FUNC;
                             entry->from_prototype = true;
                             entry->prototype_name = type_key;
+
+                            entry->func_params = hashmap_clone(&output_type->func_params);
+                            entry->return_typenames = list_clone(&output_type->return_typenames);
                         } else {
                             entry->type = ENTRY_VAR;
                             entry->type_name = type_key;
@@ -652,8 +534,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             } break;
         }
     } else switch (type->type) {
-        case AST_FUNC_TYPE: 
-        {
+        case AST_FUNC_TYPE: {
             if (!can_do_func) {
                 log_error(STRING("Cant do functions for multiple var decl..."));
                 entry->type = ENTRY_ERROR;
@@ -715,10 +596,29 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
         }
 
+        stack_push(state->scopes, &entry->func_params);
+        stack_push(state->local_deps, key);
+
         ast_node_t *stmt = expr->list_start;
+
         for (u64 i = 0; i < expr->child_count; i++) {
-            if (!analyze_statement(state, stmt, should_wait)) {
-                return false;
+            switch (analyze_statement(state, entry->return_typenames.count, false, stmt, should_wait)) {
+                case STMT_BREAK:
+                case STMT_CONTINUE:
+                    log_error_token(STRING("Cant use break or continue outside of loop."), stmt->token);
+                    return false;
+
+                case STMT_ERR:
+                    return false;
+
+                case STMT_RETURN:
+                    if (i != (expr->child_count - 1)) {
+                        log_warning_token(STRING("There are statemets after return."), stmt->token);
+                    }
+                    break;
+
+                case STMT_OK:
+                    break;
             }
 
             if (*should_wait) {
@@ -727,14 +627,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
             stmt = stmt->list_next;
         }
-    } else if (entry->type == ENTRY_VAR && expr != NULL) {
-        expr_type_t type = {};
 
-        if (!analyze_expression(state, &type, &name->token.data.string, expr, should_wait)) {
+        stack_pop(state->scopes);
+        stack_pop(state->local_deps);
+    } else if (entry->type == ENTRY_VAR && expr != NULL) {
+        if (!analyze_expression(state, 1, &name->token.data.string, expr, should_wait)) {
             return false;
         }
-
-        // type info
     }
 
 
@@ -1515,16 +1414,20 @@ b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
 // --------------------
 
 
-b32 analyze_statement(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait) {
     temp_reset();
 
     assert(!node->analyzed);
-    b32 result = false;
+    u32 result = STMT_ERR;
 
     switch (node->type) {
+        case AST_BLOCK_IMPERATIVE:
+            log_error_token(STRING("Blocks are not supported currently..."), node->token);
+            result = STMT_ERR;
+            break;
         case AST_UNNAMED_MODULE:
             log_error_token(STRING("cant load files from functions."), node->token);
-            result = false;
+            result = STMT_ERR;
             break;
 
         case AST_STRUCT_DEF: 
@@ -1532,65 +1435,83 @@ b32 analyze_statement(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
         case AST_ENUM_DEF: 
         case AST_UNARY_PROTO_DEF: 
             log_error_token(STRING("cant create types not in global scope."), node->token);
-            result = false;
+            result = STMT_ERR;
             break;
 
 
         case AST_IF_STMT: {
-            expr_type_t type = {};
-            result = analyze_expression(state, &type, NULL, node->left, should_wait);
-
-            if (result) {
-                result = analyze_statement(state, node->right, should_wait);
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+                result = STMT_ERR;
+                break;
+            }
+            result = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
+            if (result != STMT_ERR) {
+                result = STMT_OK;
             }
         } break;
-        case AST_ELIF_STMT:
-            // @todo, check for binded if statement
-            break;
-        case AST_ELSE_STMT:
-            // @todo, check for binded if statement
-            result = analyze_statement(state, node->right, should_wait);
-            break;
+
+        case AST_IF_ELSE_STMT: {
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+                result = STMT_ERR;
+                break;
+            }
+
+            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
+            b32 rr = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
+
+            if (lr == rr && lr == STMT_RETURN) {
+                result = STMT_RETURN;
+            } else if (lr == STMT_ERR || rr == STMT_ERR) {
+                result = STMT_ERR;
+            } else {
+                result = STMT_OK;
+            }
+        } break;
+
         case AST_WHILE_STMT: {
-            expr_type_t type = {};
-            result = analyze_expression(state, &type, NULL, node->left, should_wait);
-
-            if (result) {
-                result = analyze_statement(state, node->right, should_wait);
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+                result = STMT_ERR;
+                break;
             }
+
+            result = analyze_statement(state, expect_return_amount, true, node->right, should_wait);
         } break;
+
         case AST_RET_STMT: {
-            expr_type_t type = {};
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+                result = STMT_ERR;
+                break;
+            }
 
-            result = analyze_expression(state, &type, NULL, node->left, should_wait);
-
-            if (!should_wait) node->analyzed = true;
+            result = STMT_RETURN;
         } break;
 
         case AST_BREAK_STMT:
+            result = STMT_BREAK;
+            break;
+
         case AST_CONTINUE_STMT:
-                           // should be inside of a loop
+            result = STMT_CONTINUE;
             break;
 
         case AST_UNARY_VAR_DEF:
-            result = analyze_unary_var_def(state, node, should_wait);
+            result = analyze_unary_var_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_BIN_UNKN_DEF: 
-            result = analyze_unkn_def(state, node, should_wait);
+            result = analyze_unkn_def(state, node, should_wait)? STMT_OK : STMT_ERR;
             break;
 
         case AST_BIN_MULT_DEF: 
-            result = analyze_bin_var_def(state, node, should_wait);
+            result = analyze_bin_var_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_TERN_MULT_DEF:
-            result = analyze_tern_def(state, node, should_wait);
+            result = analyze_tern_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         default: {
-            expr_type_t type = {};
-            result = analyze_expression(state, &type, NULL, node, should_wait);
+            result = analyze_expression(state, expect_return_amount, NULL, node, should_wait) ? STMT_OK : STMT_ERR;
         } break;
     }
 
@@ -1866,6 +1787,7 @@ b32 analyze_and_compile(compiler_t *compiler) {
     stack_delete(&scopes);
 
     log_update_color();
+
     fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
 
     for (u64 i = 0; i < compiler->scope.capacity; i++) {
@@ -1879,28 +1801,5 @@ b32 analyze_and_compile(compiler_t *compiler) {
 
     fprintf(stderr, "-----------------------------\n");
 
-
     return result;
 }
-
-// first thing is to add all types into one place and resolve them all
-// then we will do same to prototypes and variables
-// after that main part. functions and variables
-// first thing - we resolve all of type info, before starting going deep
-// and then we run resolving for every func body.
-//
-//
-// use: "core";
-//
-// release_build : b32 = false;
-//
-// entry : (args : []string) -> s32 = {
-// }
-//
-// #run entry();
-//
-
-// then we will make dependency "graph" for compiling, but we need to start somewhere
-// 
-// for example we start with some definition and try to resolve it's type, 
-// if we cant do that, we will go

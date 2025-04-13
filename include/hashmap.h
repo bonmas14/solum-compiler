@@ -49,6 +49,9 @@ template<typename KeyType, typename DataType>
 b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func);
 
 template<typename KeyType, typename DataType>
+hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map);
+
+template<typename KeyType, typename DataType>
 b32 hashmap_delete(hashmap_t<KeyType, DataType> *map);
 
 // ----------- Control 
@@ -97,6 +100,28 @@ b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t
     }
 
     return true;
+}
+
+template<typename KeyType, typename DataType>
+hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map) {
+    hashmap_t<KeyType, DataType> clone = {};
+
+    if (map->capacity == 0) {
+        map->hash_func    = map->hash_func;
+        map->compare_func = map->compare_func;
+        return clone;
+    }
+
+    
+    if (!hashmap_create(&clone, map->capacity, map->hash_func, map->compare_func)) {
+        return {};
+    }
+
+    check_value(clone.entries != NULL);
+
+    clone.load = map->load;
+    mem_copy((u8*)clone.entries, (u8*)map->entries, clone.capacity * sizeof(kv_pair_t<KeyType, DataType>));
+    return clone;
 }
 
 template<typename KeyType, typename DataType>

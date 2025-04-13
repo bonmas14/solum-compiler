@@ -26,6 +26,8 @@ struct list_t {
 template<typename DataType>
 b32 list_create(list_t<DataType> *list, u64 init_size);
 template<typename DataType>
+list_t<DataType> list_clone(list_t<DataType> *list);
+template<typename DataType>
 b32 list_delete(list_t<DataType> *list);
 
 // --------- Control
@@ -79,6 +81,21 @@ b32 list_create(list_t<DataType> *list, u64 init_size) {
     return true;
 }
 
+template<typename DataType>
+list_t<DataType> list_clone(list_t<DataType> *list) {
+    list_t<DataType> clone = {};
+
+    if (list->current_size == 0)
+        return {};
+
+    if (!list_create(&clone, list->current_size))
+        return {};
+
+    mem_copy((u8*)clone.data, (u8*)list->data, sizeof(list_t<DataType>) * list->count);
+    clone.count = list->count;
+
+    return clone;
+}
 template<typename DataType>
 b32 list_delete(list_t<DataType> *list) {
     if (list == NULL) {
