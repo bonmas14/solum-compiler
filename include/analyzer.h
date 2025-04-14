@@ -33,17 +33,35 @@ struct ast_node_t;
 // v.a =
 //
 
-struct var_type_info_t {
-    u32 pointer_depth;
-    b32 is_std;
-    string_t type_name;
 
-    struct {
-        b32 is_unsigned;
-        b32 is_boolean;
-        b32 is_float;
-        u32 size; // 0 = void
-    } std;
+enum types_t {
+    TYPE_ERROR,
+    TYPE_UNKN,
+
+    TYPE_u8,
+    TYPE_u16,
+    TYPE_u32,
+    TYPE_u64,
+
+    TYPE_s8,
+    TYPE_s16,
+    TYPE_s32,
+    TYPE_s64,
+    
+    TYPE_f32,
+    TYPE_f64,
+
+    TYPE_b8,
+    TYPE_b32,
+
+    TYPE_void,
+};
+
+struct type_info_t {
+    u32 type;
+    u32 size;
+    u32 pointer_depth;
+    string_t type_name;
 };
 
 struct scope_entry_t {
@@ -63,8 +81,7 @@ struct scope_entry_t {
         // ENTRY_FUNC
         struct {
             hashmap_t<string_t, scope_entry_t> func_params;
-            list_t<var_type_info_t> return_typenames;
-            b32 from_prototype;
+            list_t<type_info_t> return_typenames;
             string_t prototype_name;
         };
     };
@@ -73,26 +90,8 @@ struct scope_entry_t {
     
     // b32 array_type;
     // u32 array_count;
-    
-    u32 pointer_depth;
-    b32 is_std;
 
-    struct {
-        b32 is_unsigned;
-        b32 is_boolean;
-        b32 is_float;
-        u32 size; // 0 = void
-    } std;
-
-    string_t type_name;
-};
-
-enum types_t {
-    TYPE_ERROR = 0,
-    TYPE_STRUCT,
-    TYPE_UNION,
-    TYPE_ENUM,
-    TYPE_PROTO,
+    type_info_t info;
 };
 
 enum entry_type_t {
@@ -105,10 +104,7 @@ enum entry_type_t {
 };
 
 b32 analyzer_preload_all_files(compiler_t *compiler);
-b32 analyze_and_compile(compiler_t *compiler);
-
-b32 analyzer_get_analyzed_node(compiler_t *compiler, ast_node_t *node);
-b32 analyzer_validate_node(compiler_t *compiler, ast_node_t *node);
+b32 analyze(compiler_t *compiler);
 
 b32 load_and_process_file(compiler_t *compiler, string_t filename);
 

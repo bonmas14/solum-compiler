@@ -4,6 +4,20 @@
 #include "hashmap.h"
 #include "scanner.h"
 
+
+// 
+// #   #  ###  ##### #####
+// ##  # #   #   #   #     
+// # # # #   #   #   ### 
+// #  ## #   #   #   #    
+// #   #  ###    #   #####   
+//
+// OUTPUT OF THIS IR GENERATOR SHOULD NOT DEPEND ON
+// PREVIOUS STEPS. 
+//
+// WE THROW AWAY THAT CRAP!
+// 
+
 enum ir_codes_t {
     IR_NOP = 0x0,
 };
@@ -15,19 +29,13 @@ struct ir_opcode_t {
 
 
 struct ir_t {
+    b32 is_valid;
+
     list_t<ir_opcode_t> code;
     list_t<ir_opcode_t> data;
-    list_t<ir_opcode_t> uninit;
+    u64                 uninit_size;
     hashmap_t<string_t, u64> strings;
     hashmap_t<string_t, u64> ext_symbols;
-};
-
-struct compiled_var_t {
-
-};
-
-struct compiled_const_t {
-    token_t name;
 };
 
 struct scope_t {
@@ -36,6 +44,4 @@ struct scope_t {
     u64 stack_size;
 };
 
-struct local_vars_t {
-    stack_t<scope_t> vars;
-};
+ir_t compile_program(compiler_t *compiler, scope_entry_t *entry_function);

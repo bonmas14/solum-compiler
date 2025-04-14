@@ -1,13 +1,20 @@
 #include "compiler.h"
 
 #include "arena.h"
+
+#include "list.h"
+#include "stack.h"
 #include "hashmap.h"
+
 #include "parser.h"
 #include "scanner.h"
 #include "analyzer.h"
 #include "backend.h"
 
+#include "ir.h"
+
 #include "strings.h"
+
 
 #ifdef _WIN32
 #define MODULES_PATH "SOLUM_MODULES"
@@ -79,17 +86,35 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
     return compiler;
 }
 
-b32 analyze_and_compile(compiler_t *compiler);
-
 void compile(compiler_t *compiler) {
     if (!analyzer_preload_all_files(compiler)) {
         return;
     }
 
-    analyze_and_compile(compiler);
+    if (!analyze(compiler)) {
+        return;
+    }
 
+    ir_t result = {};
 
+    for (u64 i = 0; i < compiler->scope.capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
 
+        if (!pair.occupied) continue;
+        if (pair.deleted)   continue;
 
+        if (string_compare(pair.key, STRING("main"))) {
+            result = compile_program(compiler, &pair.value);
+            break;
+        }
+    }
+
+    if (result.is_valid) {
+        log_info(STRING("Compiled successfully!!!!!"));
+    } else {
+        log_error(STRING("NOT COMPILED!@!!!LJ#LKj !!!!!"));
+    }
+
+    // codegen from IR here
 }
 

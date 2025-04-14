@@ -34,14 +34,15 @@ enum {
 
 struct analyzer_state_t {
     compiler_t *compiler;
-    stack_t<hashmap_t<string_t, scope_entry_t>*> *scopes;
+    stack_t<hashmap_t<string_t, scope_entry_t>*> *current_scope_stack;
 
-    stack_t<string_t>                      *local_deps;
+    // stack_t<string_t> *expr_deps;
+    stack_t<string_t> *local_type_deps;
     hashmap_t<string_t, stack_t<string_t>> *type_deps;
 };
 
-b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
-u32 analyze_statement(analyzer_state_t *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait);
+b32 analyze_function(analyzer_state_t   *state, b32 is_prototype, scope_entry_t *entry, b32 *should_wait);
+u32 analyze_statement(analyzer_state_t  *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait);
 b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
 
 // ------------ helpers
@@ -107,11 +108,11 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
 }
 
 scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
-    for (u64 i = 0; i < state->scopes->index; i++) {
-        if (!hashmap_contains(state->scopes->data[i], key))
+    for (u64 i = 0; i < state->current_scope_stack->index; i++) {
+        if (!hashmap_contains(state->current_scope_stack->data[i], key))
             continue;
 
-        scope_entry_t e = *hashmap_get(state->scopes->data[i], key);
+        scope_entry_t e = *hashmap_get(state->current_scope_stack->data[i], key);
         return e;
     }
 
@@ -123,24 +124,24 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
     stack_t<string_t> *deps = hashmap_get(state->type_deps, key);
 
         // @cleanup @speed @todo: doesnt work for pointers...
-    for (u64 i = 0; i < state->local_deps->index; i++) {
-        if (string_compare(key, state->local_deps->data[i])) {
+    for (u64 i = 0; i < state->local_type_deps->index; i++) {
+        if (string_compare(key, state->local_type_deps->data[i])) {
             if (!report_error)
                 return false;
 
             log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
 
             allocator_t * talloc = get_temporary_allocator();
-            scope_entry_t e      = get_entry_to_report(state, state->local_deps->data[i]);
+            scope_entry_t e      = get_entry_to_report(state, state->local_type_deps->data[i]);
 
-            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_deps->data[i], STRING("'"), talloc), talloc), e.node->token);
+            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_type_deps->data[i], STRING("'"), talloc), talloc), e.node->token);
             return false;
         }
 
         if (deps == NULL) continue;
 
         for (u64 j = 0; j < deps->index; j++) {
-            if (string_compare(state->local_deps->data[i], deps->data[j])) {
+            if (string_compare(state->local_type_deps->data[i], deps->data[j])) {
                 if (!report_error)
                     return false;
 
@@ -161,11 +162,11 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
     UNUSED(output);
 
-    for (u64 i = 0; i < state->scopes->index; i++) {
-        if (!hashmap_contains(state->scopes->data[i], key))
+    for (u64 i = 0; i < state->current_scope_stack->index; i++) {
+        if (!hashmap_contains(state->current_scope_stack->data[i], key))
             continue;
 
-        scope_entry_t *entry = hashmap_get(state->scopes->data[i], key);
+        scope_entry_t *entry = hashmap_get(state->current_scope_stack->data[i], key);
 
         if (output) {
             *output = entry;
@@ -187,63 +188,25 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 
 // -----------------
 
-void set_std_info(token_t token, var_type_info_t *info) {
-    info->is_std = true;
-
+void set_std_info(token_t token, type_info_t *info) {
     switch (token.type) {
-        case TOK_S8:
-            info->std.size = 1;
-            break;
-        case TOK_S16:
-            info->std.size = 2;
-            break;
-        case TOK_S32:
-            info->std.size = 4;
-            break;
-        case TOK_S64:
-            info->std.size = 8;
-            break;
+        case TOK_S8:  info->type = TYPE_s8;  info->size = 1; break;
+        case TOK_S16: info->type = TYPE_s16; info->size = 2; break;
+        case TOK_S32: info->type = TYPE_s32; info->size = 4; break;
+        case TOK_S64: info->type = TYPE_s64; info->size = 8; break;
 
-        case TOK_U8:
-            info->std.is_unsigned = true;
-            info->std.size = 1;
-            break;
-        case TOK_U16:
-            info->std.is_unsigned = true;
-            info->std.size = 2;
-            break;
-        case TOK_U32:
-            info->std.is_unsigned = true;
-            info->std.size = 4;
-            break;
-        case TOK_U64:
-            info->std.is_unsigned = true;
-            info->std.size = 8;
-            break;
+        case TOK_U8:  info->type = TYPE_u8;  info->size = 1; break;
+        case TOK_U16: info->type = TYPE_u16; info->size = 2; break;
+        case TOK_U32: info->type = TYPE_u32; info->size = 4; break;
+        case TOK_U64: info->type = TYPE_u64; info->size = 8; break;
 
-        case TOK_BOOL8:
-            info->std.is_boolean = true;
-            info->std.size = 1;
-            break;
+        case TOK_BOOL8:  info->type = TYPE_b8;  info->size = 1; break;
+        case TOK_BOOL32: info->type = TYPE_b32; info->size = 4; break;
 
-        case TOK_BOOL32:
-            info->std.is_boolean = true;
-            info->std.size = 4;
-            break;
+        case TOK_F32: info->type = TYPE_f32; info->size = 4; break;
+        case TOK_F64: info->type = TYPE_f64; info->size = 8; break;
 
-        case TOK_VOID:
-            info->std.size = 0;
-            break;
-
-        case TOK_F32:
-            info->std.is_float = true;
-            info->std.size = 4;
-            break;
-
-        case TOK_F64:
-            info->std.is_float = true;
-            info->std.size = 8;
-            break;
+        case TOK_VOID: info->type = TYPE_void; break;
 
         default:
             assert(false);
@@ -252,62 +215,24 @@ void set_std_info(token_t token, var_type_info_t *info) {
 }
 
 void set_std_info(token_t token, scope_entry_t *entry) {
-    entry->is_std = true;
-
     switch (token.type) {
-        case TOK_S8:
-            entry->std.size = 1;
-            break;
-        case TOK_S16:
-            entry->std.size = 2;
-            break;
-        case TOK_S32:
-            entry->std.size = 4;
-            break;
-        case TOK_S64:
-            entry->std.size = 8;
-            break;
+        case TOK_S8:  entry->info.type = TYPE_s8;  entry->info.size = 1; break;
+        case TOK_S16: entry->info.type = TYPE_s16; entry->info.size = 2; break;
+        case TOK_S32: entry->info.type = TYPE_s32; entry->info.size = 4; break;
+        case TOK_S64: entry->info.type = TYPE_s64; entry->info.size = 8; break;
 
-        case TOK_U8:
-            entry->std.is_unsigned = true;
-            entry->std.size = 1;
-            break;
-        case TOK_U16:
-            entry->std.is_unsigned = true;
-            entry->std.size = 2;
-            break;
-        case TOK_U32:
-            entry->std.is_unsigned = true;
-            entry->std.size = 4;
-            break;
-        case TOK_U64:
-            entry->std.is_unsigned = true;
-            entry->std.size = 8;
-            break;
+        case TOK_U8:  entry->info.type = TYPE_u8;  entry->info.size = 1; break;
+        case TOK_U16: entry->info.type = TYPE_u16; entry->info.size = 2; break;
+        case TOK_U32: entry->info.type = TYPE_u32; entry->info.size = 4; break;
+        case TOK_U64: entry->info.type = TYPE_u64; entry->info.size = 8; break;
 
-        case TOK_BOOL8:
-            entry->std.is_boolean = true;
-            entry->std.size = 1;
-            break;
+        case TOK_BOOL8:  entry->info.type = TYPE_b8;  entry->info.size = 1; break;
+        case TOK_BOOL32: entry->info.type = TYPE_b32; entry->info.size = 4; break;
 
-        case TOK_BOOL32:
-            entry->std.is_boolean = true;
-            entry->std.size = 4;
-            break;
+        case TOK_F32: entry->info.type = TYPE_f32; entry->info.size = 4; break;
+        case TOK_F64: entry->info.type = TYPE_f64; entry->info.size = 8; break;
 
-        case TOK_VOID:
-            entry->std.size = 0;
-            break;
-
-        case TOK_F32:
-            entry->std.is_float = true;
-            entry->std.size = 4;
-            break;
-
-        case TOK_F64:
-            entry->std.is_float = true;
-            entry->std.size = 8;
-            break;
+        case TOK_VOID: entry->info.type = TYPE_void; entry->info.size = 0; break;
 
         default:
             assert(false);
@@ -455,7 +380,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, name, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, name, &entry)) {
         return false;
     }
 
@@ -467,7 +392,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
     while (type->type == AST_PTR_TYPE) {
         if (!entry->configured) {
-            entry->pointer_depth++;
+            entry->info.pointer_depth++;
         }
         type = type->left;
         is_pointer = true;
@@ -480,8 +405,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     if (type->type == AST_UNKN_TYPE) {
         string_t type_key = type->token.data.string;
 
-        if (!is_pointer && state->local_deps->index > 0) {
-            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+        if (!is_pointer && state->local_type_deps->index > 0) {
+            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_type_deps)), type_key);
         }
 
         scope_entry_t *output_type = NULL; 
@@ -502,14 +427,14 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                     case ENTRY_PROTOTYPE:
                         if (can_do_func) {
                             entry->type = ENTRY_FUNC;
-                            entry->from_prototype = true;
                             entry->prototype_name = type_key;
 
                             entry->func_params = hashmap_clone(&output_type->func_params);
                             entry->return_typenames = list_clone(&output_type->return_typenames);
                         } else {
-                            entry->type = ENTRY_VAR;
-                            entry->type_name = type_key;
+                            entry->type      = ENTRY_VAR;
+                            entry->info.type = TYPE_UNKN;
+                            entry->info.type_name = type_key;
                         }
                         break;
 
@@ -530,7 +455,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                         return false;
                 }
 
-                entry->type_name = type_key;
+                entry->info.size      = output_type->info.size;
+                entry->info.type_name = type_key;
             } break;
         }
     } else switch (type->type) {
@@ -596,8 +522,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             return false;
         }
 
-        stack_push(state->scopes, &entry->func_params);
-        stack_push(state->local_deps, key);
+        stack_push(state->current_scope_stack, &entry->func_params);
+        stack_push(state->local_type_deps, key);
 
         ast_node_t *stmt = expr->list_start;
 
@@ -628,8 +554,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             stmt = stmt->list_next;
         }
 
-        stack_pop(state->scopes);
-        stack_pop(state->local_deps);
+        stack_pop(state->current_scope_stack);
+        stack_pop(state->local_type_deps);
     } else if (entry->type == ENTRY_VAR && expr != NULL) {
         if (!analyze_expression(state, 1, &name->token.data.string, expr, should_wait)) {
             return false;
@@ -653,8 +579,8 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
     entry->expr = func->right;
 
     string_t key = entry->node->token.data.string;
-    stack_push(state->scopes, &entry->func_params);
-    stack_push(state->local_deps, key);
+    stack_push(state->current_scope_stack, &entry->func_params);
+    stack_push(state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
@@ -684,7 +610,7 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
             continue;
         }
 
-        var_type_info_t info = {};
+        type_info_t info = {};
 
         b32 is_pointer = is_prototype;
 
@@ -699,8 +625,8 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
         if (current_type->type == AST_UNKN_TYPE) {
             string_t type_key = current_type->token.data.string;
 
-            if (!is_pointer && state->local_deps->index > 0) {
-                stack_push(hashmap_get(state->type_deps, stack_peek(state->local_deps)), type_key);
+            if (!is_pointer && state->local_type_deps->index > 0) {
+                stack_push(hashmap_get(state->type_deps, stack_peek(state->local_type_deps)), type_key);
             }
 
             scope_entry_t *output_type = NULL; 
@@ -735,6 +661,8 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
                             break;
                     }
 
+                    info.type = TYPE_UNKN;
+                    info.size = output_type->info.size;
                     info.type_name = type_key;
                 } break;
             }
@@ -775,8 +703,8 @@ b32 analyze_function(analyzer_state_t *state, b32 is_prototype, scope_entry_t *e
         next_type = next_type->list_next;
     }
 
-    stack_pop(state->local_deps);
-    stack_pop(state->scopes);
+    stack_pop(state->local_type_deps);
+    stack_pop(state->current_scope_stack);
 
     if (!*should_wait) {
         entry->node->analyzed = true;
@@ -813,7 +741,7 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     string_t       key   = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1135,7 +1063,7 @@ b32 analyze_prototype(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1164,7 +1092,7 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1178,8 +1106,8 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->scopes, &entry->scope);
-    stack_push(state->local_deps, key);
+    stack_push(state->current_scope_stack, &entry->scope);
+    stack_push(state->local_type_deps, key);
     
     {
         stack_t<string_t> type_deps = {};
@@ -1188,8 +1116,8 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->local_deps);
-    stack_pop(state->scopes);
+    stack_pop(state->local_type_deps);
+    stack_pop(state->current_scope_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1205,7 +1133,7 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1219,8 +1147,8 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->scopes, &entry->scope);
-    stack_push(state->local_deps, key);
+    stack_push(state->current_scope_stack, &entry->scope);
+    stack_push(state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
@@ -1229,8 +1157,8 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->local_deps);
-    stack_pop(state->scopes);
+    stack_pop(state->local_type_deps);
+    stack_pop(state->current_scope_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1246,7 +1174,7 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->scopes), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(state->current_scope_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1260,8 +1188,8 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->scopes, &entry->scope);
-    stack_push(state->local_deps, key);
+    stack_push(state->current_scope_stack, &entry->scope);
+    stack_push(state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
@@ -1279,8 +1207,8 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         set_std_info(node->right->token, &pair->value);
     }
 
-    stack_pop(state->local_deps);
-    stack_pop(state->scopes);
+    stack_pop(state->local_type_deps);
+    stack_pop(state->current_scope_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1570,26 +1498,6 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
 
     return result;
 }
-
-// priorities of compiling funcitons
-//
-// #run 
-// other code
-var_type_info_t entry_to_info(scope_entry_t e) {
-    var_type_info_t i = {};
-
-    i.std.is_unsigned = e.std.is_unsigned;
-    i.std.is_boolean  = e.std.is_boolean;
-    i.pointer_depth   = e.pointer_depth;
-    i.std.is_float    = e.std.is_float;
-
-    i.type_name = e.type_name;
-    i.std.size  = e.std.size;
-    i.is_std    = e.is_std;
-
-    return i;
-}
-
 b32 analyzer_preload_all_files(compiler_t *compiler) {
     assert(compiler != NULL);
 
@@ -1639,7 +1547,7 @@ b32 analyzer_preload_all_files(compiler_t *compiler) {
     return result;
 }
 
-void print_var_info(var_type_info_t info) {
+void print_var_info(type_info_t info) {
     if (info.pointer_depth) {
         if (info.pointer_depth == 1) {
             fprintf(stderr, " pointer");
@@ -1648,8 +1556,8 @@ void print_var_info(var_type_info_t info) {
         }
     }
 
-    if (info.is_std) {
-        fprintf(stderr, " (%s, %s%s%u bytes)", info.std.is_unsigned ? "unsigned" : "signed", info.std.is_boolean ? "boolean, " : "", info.std.is_float ? "float, " : "", info.std.size);
+    if (info.type != TYPE_UNKN) {
+        fprintf(stderr, " (std... %d)", info.type);
     } else {
         fprintf(stderr, " %s", string_to_c_string(info.type_name, get_temporary_allocator()));
     }
@@ -1665,7 +1573,7 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
 
     if (pair.value.type == ENTRY_VAR) {
         fprintf(stderr, " VAR");
-        print_var_info(entry_to_info(pair.value));
+        print_var_info(pair.value.info);
     } else if (pair.value.type == ENTRY_TYPE) {
         fprintf(stderr, " TYPE");
     } else if (pair.value.type == ENTRY_FUNC) {
@@ -1675,12 +1583,6 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
     }
 
     fprintf(stderr, "\n");
-
-    if (pair.value.type == ENTRY_FUNC && pair.value.from_prototype) {
-        add_left_pad(stderr, (depth + 1) * 4);
-        fprintf(stderr, " -> from prototype: %s\n", string_to_c_string(pair.value.prototype_name, talloc));
-        return;
-    }
 
     for (u64 j = 0; j < pair.value.scope.capacity; j++) {
         kv_pair_t<string_t, scope_entry_t> member = pair.value.scope.entries[j];
@@ -1698,7 +1600,7 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
         return;
 
     for (u64 j = 0; j < pair.value.return_typenames.count; j++) {
-        var_type_info_t info = pair.value.return_typenames.data[j];
+        type_info_t info = pair.value.return_typenames.data[j];
         add_left_pad(stderr, (depth + 1) * 4);
         fprintf(stderr, " -> RET VAL %llu", j);
         print_var_info(info);
@@ -1706,19 +1608,36 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
     }
 }
 
-b32 analyze_and_compile(compiler_t *compiler) {
+void print_all_definitions(compiler_t *compiler) {
+    log_update_color();
+
+    fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
+
+    for (u64 i = 0; i < compiler->scope.capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
+
+        if (!pair.occupied) continue;
+        if (pair.deleted)   continue;
+
+        print_entry(compiler, pair, 0);
+    }
+
+    fprintf(stderr, "-----------------------------\n");
+}
+
+b32 analyze(compiler_t *compiler) {
     assert(compiler != NULL);
 
     b32 result       = true;
     b32 not_finished = true;
 
-    stack_t<hashmap_t<string_t, scope_entry_t>*> scopes = {};
-    stack_t<string_t> local_deps = {};
-    stack_create(&local_deps, 16);
+    stack_t<hashmap_t<string_t, scope_entry_t>*> current_scope_stack = {};
+    stack_t<string_t> local_type_deps = {};
+    stack_create(&local_type_deps, 16);
 
     hashmap_t<string_t, stack_t<string_t>> type_deps = {};
     hashmap_create(&type_deps, 128, get_string_hash, compare_string_keys);
-    stack_push(&scopes, &compiler->scope);
+    stack_push(&current_scope_stack, &compiler->scope);
 
     // @todo @fix, change so we wont have infinite loop on undefined declarations
     u64 max_iterations = 10;
@@ -1744,9 +1663,9 @@ b32 analyze_and_compile(compiler_t *compiler) {
 
             analyzer_state_t state = {};
             state.compiler = compiler;
-            state.scopes   = &scopes;
+            state.current_scope_stack   = &current_scope_stack;
             
-            state.local_deps = &local_deps;
+            state.local_type_deps = &local_type_deps;
             state.type_deps = &type_deps;
 
             // we just need to try to compile, if we cant resolve something we add it, but just
@@ -1772,34 +1691,19 @@ b32 analyze_and_compile(compiler_t *compiler) {
     }
 
     if (!result) {
-        log_error(STRING("Had an analyze error, wont go further."));
-        return false;
+        log_error(STRING("Had an analyze error."));
+        result = false;
     } else if (not_finished) { 
         log_error(STRING("There is undefined types..."));
-        return false;
+        result = false;
     } else {
-#ifdef DEBUG
         log_info(STRING("Everything is okay, compiling."));
-#endif
     }
 
     hashmap_delete(&type_deps);
-    stack_delete(&scopes);
+    stack_delete(&current_scope_stack);
 
-    log_update_color();
-
-    fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
-
-    for (u64 i = 0; i < compiler->scope.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
-
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
-
-        print_entry(compiler, pair, 0);
-    }
-
-    fprintf(stderr, "-----------------------------\n");
+    print_all_definitions(compiler);
 
     return result;
 }
