@@ -99,7 +99,6 @@ enum token_type_t {
     TOK_BREAK,
     TOK_CONTINUE,
 
-    TOK_PROTOTYPE,
     TOK_EXTERNAL,
 
     TOK_MODULE,
@@ -131,7 +130,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "break", "continue",
 
-    "prototype", "external",
+    "external",
 
     "module", "use"
 };

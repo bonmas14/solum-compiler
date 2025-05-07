@@ -1,6 +1,7 @@
 #ifndef HASHMAP_H
 #define HASHMAP_H
 
+#include <typeinfo>
 #include "stddefines.h"
 #include "logger.h"
 #include "memctl.h"
@@ -85,11 +86,21 @@ template<typename KeyType, typename DataType>
 b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func) {
     assert(init_size > 0);
 
-    if (hash_func) map->hash_func = hash_func;
-    else           map->hash_func = get_hash_std;
+    if (hash_func) {
+        map->hash_func = hash_func;
+    } else if (typeid(KeyType) == typeid(string_t)) {
+        map->hash_func = get_string_hash;
+    } else {
+        map->hash_func = get_hash_std;
+    }
 
-    if (compare_func) map->compare_func = compare_func;
-    else              map->compare_func = compare_keys_std;
+    if (compare_func) {
+        map->compare_func = compare_func;
+    } else if (typeid(KeyType) == typeid(string_t)) {
+        map->compare_func = compare_string_keys;
+    } else {
+        map->compare_func = compare_keys_std;
+    }
 
     map->capacity  = init_size;
     map->entries   = (kv_pair_t<KeyType, DataType>*)ALLOC(sizeof(kv_pair_t<KeyType, DataType>) * init_size);

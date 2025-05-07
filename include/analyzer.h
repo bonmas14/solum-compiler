@@ -10,30 +10,6 @@ struct ast_node_t;
 #define MAX_COUNT_OF_PARAMS 16
 #define MAX_COUNT_OF_RETS 1 
 
-// func : (a : s32) -> s32 = { return a; }
-//
-// -> func
-//    -> a
-//       s32
-//    -> s32
-//    -> {}
-//
-// var : s32 = 43;
-//
-// var
-//     s32
-//
-// test : struct = {
-//     a : s32;
-//     b : s32;
-//     c : u64;
-// }
-//
-// v : test;
-// v.a =
-//
-
-
 enum types_t {
     TYPE_ERROR,
     TYPE_UNKN,
@@ -65,8 +41,8 @@ struct type_info_t {
 };
 
 struct scope_entry_t {
-    b32 configured;
     u32 type;
+    b32 uninit;
 
     ast_node_t *node;
     ast_node_t *expr;
@@ -74,17 +50,11 @@ struct scope_entry_t {
     // ENTRY_TYPE
     u32 def_type; // types_t
     
-    union {
-        // NOTE: if it is not in union, you need to change creation in analyzer
-        hashmap_t<string_t, scope_entry_t> scope; 
+    hashmap_t<string_t, scope_entry_t> scope; 
 
-        // ENTRY_FUNC
-        struct {
-            hashmap_t<string_t, scope_entry_t> func_params;
-            list_t<type_info_t> return_typenames;
-            string_t prototype_name;
-        };
-    };
+    // ENTRY_FUNC
+    hashmap_t<string_t, scope_entry_t> func_params;
+    list_t<type_info_t> return_typenames;
 
     // ENTRY_VAR
     
@@ -98,7 +68,6 @@ enum entry_type_t {
     ENTRY_ERROR = 0,
     ENTRY_VAR,
     ENTRY_TYPE,
-    ENTRY_PROTOTYPE,
     ENTRY_FUNC,
     // ENTRY_NAMESPACE,
 };

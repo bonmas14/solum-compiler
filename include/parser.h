@@ -89,7 +89,6 @@ enum ast_types_t {
     AST_PARAM_DEF, 
 
     AST_UNARY_VAR_DEF,
-    AST_UNARY_PROTO_DEF,
     AST_BIN_UNKN_DEF,
     AST_BIN_MULT_DEF,
     AST_TERN_MULT_DEF,

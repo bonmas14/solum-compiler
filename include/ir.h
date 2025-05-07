@@ -20,6 +20,25 @@
 
 enum ir_codes_t {
     IR_NOP = 0x0,
+
+
+    IR_PUSH_s, // [s64]
+    IR_PUSH_u, // [u64]
+
+    IR_POP,
+    IR_CLONE,
+
+    IR_GLOBAL, // push value from .data [s32]
+
+
+    IR_ALLOC, // [u64] allocate on stack
+    IR_FREE,  // [u64] free from stack
+
+
+    IR_RET,
+
+    IR_BRK, // break   (int3 eq)
+    IR_INV, // invalid (ud2  eq)
 };
 
 struct ir_opcode_t {
@@ -27,6 +46,13 @@ struct ir_opcode_t {
     token_t  info;
 };
 
+struct ir_function_t {
+    b32 valid;
+    string_t symbol;
+    
+    list_t<ir_opcode_t> code;
+    list_t<u8> data;
+};
 
 struct ir_t {
     b32 is_valid;
@@ -44,4 +70,4 @@ struct scope_t {
     u64 stack_size;
 };
 
-ir_t compile_program(compiler_t *compiler, scope_entry_t *entry_function);
+ir_t compile_program(compiler_t *compiler);

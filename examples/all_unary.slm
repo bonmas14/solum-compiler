@@ -1,4 +1,3 @@
-
 mult: struct = {
     a: s32;
     b: s32;
@@ -6,13 +5,3 @@ mult: struct = {
 
 basic_std_type: s32; 
 struct_type:    mult; 
-
-func_ptr1 : Func;
-
-// definition
-Func : () -> s32 = prototype;
-
-func_ptr2: Func;
-
-
-valid_proto: Func = { }

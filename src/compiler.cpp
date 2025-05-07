@@ -74,12 +74,6 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
 	compiler.nodes   = preserve_allocator_from_stack(create_arena_allocator(sizeof(ast_node_t) * INIT_NODES_SIZE));
     compiler.strings = preserve_allocator_from_stack(create_arena_allocator(4096));
 
-    compiler.files.hash_func    = get_string_hash;
-    compiler.files.compare_func = compare_string_keys;
-
-    compiler.scope.hash_func    = get_string_hash;
-    compiler.scope.compare_func = compare_string_keys;
-
     compiler.codegen  = codegen_create(alloc);
     compiler.valid = true;
 
@@ -95,19 +89,12 @@ void compile(compiler_t *compiler) {
         return;
     }
 
-    ir_t result = {};
+    ir_t result = compile_program(compiler);
 
-    for (u64 i = 0; i < compiler->scope.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
+    // result will return final IR
+    // everything should be compiled 
+    // or there is an error
 
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
-
-        if (string_compare(pair.key, STRING("main"))) {
-            result = compile_program(compiler, &pair.value);
-            break;
-        }
-    }
 
     if (result.is_valid) {
         log_info(STRING("Compiled successfully!!!!!"));

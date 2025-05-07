@@ -1097,10 +1097,6 @@ ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
 
     if (token.type == '{') {
         data = parse_block(state, AST_BLOCK_IMPERATIVE);
-    } else if (token.type == TOK_PROTOTYPE) {
-        node.type = AST_UNARY_PROTO_DEF;
-        advance_token(state->scanner, state->strings);
-        return node;
     } else {
         data = parse_assignment_expression(state);
     }
