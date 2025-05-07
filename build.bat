@@ -4,6 +4,7 @@ set "exe_name=slm"
 set "cc=clang-cl"
 set "lld=lld-link"
 
+set "log_path=log\"
 set "bin_path=bin\"
 set "src_path=src\"
 set "obj_main_path=obj\"
@@ -30,6 +31,10 @@ if not exist %bin_path% (
     mkdir %bin_path%
 )
 
+if not exist %log_path% (
+    mkdir %log_path%
+)
+
 if not exist %obj_path% (
     mkdir %obj_path%
 )
@@ -38,7 +43,7 @@ echo Compiling...
 
 for %%f in ("%src_path%*.cpp") do (
     echo File: %%f
-    start "Compile %%f" /B %cc% %complie% /Fo"%obj_path%" "%%f"
+    start "Compile %%f" /B %cc% %complie% /Fo"%obj_path%" "%%f" > %log_path%\log_%%~nxf.txt 2>&1
 )
 
 :wait 
@@ -47,6 +52,15 @@ if %errorlevel% == 0 (
     timeout /t 0 > nul
     goto wait
 )
+
+echo:
+echo log output:
+
+:: Logging out everything so we dont have race conditions on stdout
+for %%f in ("%src_path%*.cpp") do (
+    cat %log_path%\log_%%~nxf.txt
+)
+
 
 echo:
 echo Linking...
