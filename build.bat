@@ -38,7 +38,14 @@ echo Compiling...
 
 for %%f in ("%src_path%*.cpp") do (
     echo File: %%f
-    %cc% %complie% /Fo"%obj_path%" "%%f"
+    start "Compile %%f" /B %cc% %complie% /Fo"%obj_path%" "%%f"
+)
+
+:wait 
+tasklist | find "%cc%.exe" > nul
+if %errorlevel% == 0 (
+    timeout /t 0 > nul
+    goto wait
 )
 
 echo:
