@@ -34,11 +34,12 @@ enum {
 
 struct analyzer_state_t {
     compiler_t *compiler;
-    stack_t<hashmap_t<string_t, scope_entry_t>*> *current_search_stack;
+    list_t<hashmap_t<string_t, scope_entry_t>*> scopes;
 
-    // stack_t<string_t> *expr_deps;
-    stack_t<string_t> *local_type_deps;
-    hashmap_t<string_t, stack_t<string_t>> *type_deps;
+    stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack;
+
+    stack_t<string_t> local_type_deps;
+    hashmap_t<string_t, stack_t<string_t>> type_deps;
 };
 
 b32 analyze_function(analyzer_state_t   *state, scope_entry_t *entry, b32 *should_wait);
@@ -104,11 +105,11 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
 }
 
 scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
-    for (u64 i = 0; i < state->current_search_stack->index; i++) {
-        if (!hashmap_contains(state->current_search_stack->data[i], key))
+    for (u64 i = 0; i < state->current_search_stack.index; i++) {
+        if (!hashmap_contains(state->current_search_stack.data[i], key))
             continue;
 
-        scope_entry_t e = *hashmap_get(state->current_search_stack->data[i], key);
+        scope_entry_t e = *hashmap_get(state->current_search_stack.data[i], key);
         return e;
     }
 
@@ -117,27 +118,27 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
 }
 
 b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t *entry, string_t key) {
-    stack_t<string_t> *deps = hashmap_get(state->type_deps, key);
+    stack_t<string_t> *deps = hashmap_get(&state->type_deps, key);
 
         // @cleanup @speed @todo: doesnt work for pointers...
-    for (u64 i = 0; i < state->local_type_deps->index; i++) {
-        if (string_compare(key, state->local_type_deps->data[i])) {
+    for (u64 i = 0; i < state->local_type_deps.index; i++) {
+        if (string_compare(key, state->local_type_deps.data[i])) {
             if (!report_error)
                 return false;
 
             log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
 
             allocator_t * talloc = get_temporary_allocator();
-            scope_entry_t e      = get_entry_to_report(state, state->local_type_deps->data[i]);
+            scope_entry_t e      = get_entry_to_report(state, state->local_type_deps.data[i]);
 
-            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_type_deps->data[i], STRING("'"), talloc), talloc), e.node->token);
+            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_type_deps.data[i], STRING("'"), talloc), talloc), e.node->token);
             return false;
         }
 
         if (deps == NULL) continue;
 
         for (u64 j = 0; j < deps->index; j++) {
-            if (string_compare(state->local_type_deps->data[i], deps->data[j])) {
+            if (string_compare(state->local_type_deps.data[i], deps->data[j])) {
                 if (!report_error)
                     return false;
 
@@ -158,11 +159,11 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
     UNUSED(output);
 
-    for (u64 i = 0; i < state->current_search_stack->index; i++) {
-        if (!hashmap_contains(state->current_search_stack->data[i], key))
+    for (u64 i = 0; i < state->current_search_stack.index; i++) {
+        if (!hashmap_contains(state->current_search_stack.data[i], key))
             continue;
 
-        scope_entry_t *entry = hashmap_get(state->current_search_stack->data[i], key);
+        scope_entry_t *entry = hashmap_get(state->current_search_stack.data[i], key);
 
         if (output) {
             *output = entry;
@@ -181,8 +182,6 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 
     return GET_NOT_FIND;
 }
-
-// -----------------
 
 void set_std_info(token_t token, type_info_t *info) {
     switch (token.type) {
@@ -210,31 +209,7 @@ void set_std_info(token_t token, type_info_t *info) {
     }
 }
 
-void set_std_info(token_t token, scope_entry_t *entry) {
-    switch (token.type) {
-        case TOK_S8:  entry->info.type = TYPE_s8;  entry->info.size = 1; break;
-        case TOK_S16: entry->info.type = TYPE_s16; entry->info.size = 2; break;
-        case TOK_S32: entry->info.type = TYPE_s32; entry->info.size = 4; break;
-        case TOK_S64: entry->info.type = TYPE_s64; entry->info.size = 8; break;
-
-        case TOK_U8:  entry->info.type = TYPE_u8;  entry->info.size = 1; break;
-        case TOK_U16: entry->info.type = TYPE_u16; entry->info.size = 2; break;
-        case TOK_U32: entry->info.type = TYPE_u32; entry->info.size = 4; break;
-        case TOK_U64: entry->info.type = TYPE_u64; entry->info.size = 8; break;
-
-        case TOK_BOOL8:  entry->info.type = TYPE_b8;  entry->info.size = 1; break;
-        case TOK_BOOL32: entry->info.type = TYPE_b32; entry->info.size = 4; break;
-
-        case TOK_F32: entry->info.type = TYPE_f32; entry->info.size = 4; break;
-        case TOK_F64: entry->info.type = TYPE_f64; entry->info.size = 8; break;
-
-        case TOK_VOID: entry->info.type = TYPE_void; entry->info.size = 0; break;
-
-        default:
-            assert(false);
-            break;
-    }
-}
+// -----------------
 
 enum {
     CONST_TYPE_FLOAT = 0x10,
@@ -393,7 +368,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry, b32 *
         }
 
         // somehow this is doesnt work...
-        stack_push(state->current_search_stack, &entry->scope);
+        stack_push(&state->current_search_stack, &entry->scope);
 
         ast_node_t *stmt = expr->list_start;
 
@@ -424,7 +399,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry, b32 *
             stmt = stmt->list_next;
         }
 
-        stack_pop(state->current_search_stack);
+        stack_pop(&state->current_search_stack);
     } else if (entry->type == ENTRY_VAR) {
         if (expr != NULL) {
             entry->uninit = true;
@@ -447,7 +422,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->current_search_stack), key, name, &entry)) {
+    if (!aquire_entry(stack_peek(&state->current_search_stack), key, name, &entry)) {
         return false;
     }
 
@@ -491,7 +466,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                 }
             case AST_STD_TYPE:
                 entry->type = ENTRY_VAR;
-                set_std_info(type->token, entry);
+                set_std_info(type->token, &entry->info);
                 break;
 
             case AST_MUL_AUTO:
@@ -514,8 +489,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     } else {
         string_t type_name = type->token.data.string;
 
-        if (!is_pointer && state->local_type_deps->index > 0) {
-            stack_push(hashmap_get(state->type_deps, stack_peek(state->local_type_deps)), type_name);
+        if (!is_pointer && state->local_type_deps.index > 0) {
+            stack_push(hashmap_get(&state->type_deps, stack_peek(&state->local_type_deps)), type_name);
         }
 
         scope_entry_t *output_type = NULL; 
@@ -573,12 +548,12 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
     entry->expr = func->right;
 
     string_t key = entry->node->token.data.string;
-    stack_push(state->current_search_stack, &entry->func_params);
-    stack_push(state->local_type_deps, key);
+    stack_push(&state->current_search_stack, &entry->func_params);
+    stack_push(&state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
-        hashmap_add(state->type_deps, key, &type_deps);
+        hashmap_add(&state->type_deps, key, &type_deps);
     }
 
     b32 result = true;
@@ -647,8 +622,8 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         } else {
             string_t type_name = curr->token.data.string;
 
-            if (!is_pointer && state->local_type_deps->index > 0) {
-                stack_push(hashmap_get(state->type_deps, stack_peek(state->local_type_deps)), type_name);
+            if (!is_pointer && state->local_type_deps.index > 0) {
+                stack_push(hashmap_get(&state->type_deps, stack_peek(&state->local_type_deps)), type_name);
             }
 
             scope_entry_t *output_type = NULL; 
@@ -697,8 +672,8 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         next_type = next_type->list_next;
     }
 
-    stack_pop(state->local_type_deps);
-    stack_pop(state->current_search_stack);
+    stack_pop(&state->local_type_deps);
+    stack_pop(&state->current_search_stack);
 
     if (!*should_wait) {
         entry->node->analyzed = true;
@@ -735,7 +710,7 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     string_t       key   = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->current_search_stack), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(&state->current_search_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1052,7 +1027,7 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->current_search_stack), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(&state->current_search_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1065,18 +1040,18 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->current_search_stack, &entry->scope);
-    stack_push(state->local_type_deps, key);
+    stack_push(&state->current_search_stack, &entry->scope);
+    stack_push(&state->local_type_deps, key);
     
     {
         stack_t<string_t> type_deps = {};
-        hashmap_add(state->type_deps, key, &type_deps);
+        hashmap_add(&state->type_deps, key, &type_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->local_type_deps);
-    stack_pop(state->current_search_stack);
+    stack_pop(&state->local_type_deps);
+    stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1092,7 +1067,7 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->current_search_stack), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(&state->current_search_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1105,18 +1080,18 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->current_search_stack, &entry->scope);
-    stack_push(state->local_type_deps, key);
+    stack_push(&state->current_search_stack, &entry->scope);
+    stack_push(&state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
-        hashmap_add(state->type_deps, key, &type_deps);
+        hashmap_add(&state->type_deps, key, &type_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(state->local_type_deps);
-    stack_pop(state->current_search_stack);
+    stack_pop(&state->local_type_deps);
+    stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1132,7 +1107,7 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     string_t key = node->token.data.string;
     scope_entry_t *entry = NULL;
 
-    if (!aquire_entry(stack_peek(state->current_search_stack), key, node, &entry)) {
+    if (!aquire_entry(stack_peek(&state->current_search_stack), key, node, &entry)) {
         return false;
     }
 
@@ -1145,12 +1120,12 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     b32 result = false;
     b32 should_wait = false;
 
-    stack_push(state->current_search_stack, &entry->scope);
-    stack_push(state->local_type_deps, key);
+    stack_push(&state->current_search_stack, &entry->scope);
+    stack_push(&state->local_type_deps, key);
 
     {
         stack_t<string_t> type_deps = {};
-        hashmap_add(state->type_deps, key, &type_deps);
+        hashmap_add(&state->type_deps, key, &type_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
@@ -1161,11 +1136,11 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         if (!pair->occupied) continue;
         if (pair->deleted)   continue;
 
-        set_std_info(node->right->token, &pair->value);
+        set_std_info(node->right->token, &pair->value.info);
     }
 
-    stack_pop(state->local_type_deps);
-    stack_pop(state->current_search_stack);
+    stack_pop(&state->local_type_deps);
+    stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
         node->analyzed = true;
@@ -1579,11 +1554,7 @@ void print_all_definitions(compiler_t *compiler) {
     fprintf(stderr, "-----------------------------\n");
 }
 
-b32 analyze(compiler_t *compiler) {
-    assert(compiler != NULL);
-
-    b32 result       = true;
-    b32 not_finished = true;
+analyzer_state_t init_state(compiler_t *compiler) {
 
     stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack = {};
     stack_t<string_t> local_type_deps = {};
@@ -1591,23 +1562,47 @@ b32 analyze(compiler_t *compiler) {
 
     hashmap_t<string_t, stack_t<string_t>> type_deps = {};
     hashmap_create(&type_deps, 128, NULL, NULL);
-    stack_push(&current_search_stack, &compiler->scope);
 
-    // @todo @fix, change so we wont have infinite loop on undefined declarations
+    analyzer_state_t state = {};
+
+    state.compiler = compiler;
+    state.current_search_stack = current_search_stack;
+    state.local_type_deps = local_type_deps;
+    state.type_deps = type_deps;
+
+    return state;
+}
+
+void clear_state(analyzer_state_t *state) {
+    hashmap_delete(&state->type_deps); // @todo: delete all the entries inside
+
+    assert(state->current_search_stack.index == 0);
+
+    stack_delete(&state->current_search_stack);
+}
+
+b32 analyze(compiler_t *compiler) {
+    assert(compiler != NULL);
+
+    b32 result       = true;
+    b32 not_finished = true;
+
+    analyzer_state_t state = init_state(compiler);
+
+    stack_push(&state.current_search_stack, &compiler->scope);
+
     u64 max_iterations = 10;
 
-    // we analyze and typecheck and prepare to compile this
-    u64 curr_index = 0;
+
     while (max_iterations-- > 0 && not_finished) {
         not_finished = false;
 
 #ifdef DEBUG
         log_push_color(GREEN_COLOR);
         log_update_color();
-        fprintf(stderr, "step: %zu\n", curr_index);
+        fprintf(stderr, "step: %zu\n", 10 - max_iterations);
         log_pop_color();
 #endif
-        curr_index++;
 
         for (u64 i = 0; i < compiler->files.capacity; i++) {
             kv_pair_t<string_t, source_file_t> pair = compiler->files.entries[i];
@@ -1615,12 +1610,6 @@ b32 analyze(compiler_t *compiler) {
             if (!pair.occupied) continue;
             if (pair.deleted)   continue;
 
-            analyzer_state_t state = {};
-            state.compiler = compiler;
-            state.current_search_stack   = &current_search_stack;
-            
-            state.local_type_deps = &local_type_deps;
-            state.type_deps = &type_deps;
 
             // we just need to try to compile, if we cant resolve something we add it, but just
             for (u64 j = 0; j < pair.value.parsed_roots.count; j++) {
@@ -1654,9 +1643,8 @@ b32 analyze(compiler_t *compiler) {
         log_info(STRING("Everything is okay, compiling."));
     }
 
-    hashmap_delete(&type_deps);
-    stack_delete(&current_search_stack);
-
+    stack_pop(&state.current_search_stack);
+    clear_state(&state);
     print_all_definitions(compiler);
 
     return result;
