@@ -9,7 +9,6 @@
 #include "talloc.h"
 #include "strings.h"
 
-
 enum {
     GET_NOT_FIND,
     GET_NOT_ANALYZED,
@@ -20,31 +19,31 @@ enum {
 enum {
     STMT_ERR,
     STMT_OK,
-    
+
     STMT_RETURN,
     STMT_BREAK,
     STMT_CONTINUE,
 };
 
-// @todo @fix ... in parser check if all nodes in separated expression are just identifiers (AST_PRIMARY).
-// caching the tokens or just changing them all to use temp alloc
-// so in multiple definitions we getting multiple errors that are for one entry_type
-// but it happens like this:
-//    a, a : s32 = 123;
+enum {
+    STATE_GLOBAL_ANALYSIS,
+    STATE_CODE_ANALYSIS,
+};
 
 struct analyzer_state_t {
+    u64 state;
     compiler_t *compiler;
     list_t<hashmap_t<string_t, scope_entry_t>*> scopes;
 
     stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack;
 
-    stack_t<string_t> local_type_deps;
-    hashmap_t<string_t, stack_t<string_t>> type_deps;
+    stack_t<string_t> internal_deps;
+    hashmap_t<string_t, stack_t<string_t>> symbol_deps;
 };
 
 b32 analyze_function(analyzer_state_t   *state, scope_entry_t *entry, b32 *should_wait);
-u32 analyze_statement(analyzer_state_t  *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait);
-b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
+u32 analyze_statement(analyzer_state_t  *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node);
+b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait);
 
 // ------------ helpers
 
@@ -118,27 +117,27 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
 }
 
 b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t *entry, string_t key) {
-    stack_t<string_t> *deps = hashmap_get(&state->type_deps, key);
+    stack_t<string_t> *deps = hashmap_get(&state->symbol_deps, key);
 
         // @cleanup @speed @todo: doesnt work for pointers...
-    for (u64 i = 0; i < state->local_type_deps.index; i++) {
-        if (string_compare(key, state->local_type_deps.data[i])) {
+    for (u64 i = 0; i < state->internal_deps.index; i++) {
+        if (string_compare(key, state->internal_deps.data[i])) {
             if (!report_error)
                 return false;
 
             log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
 
             allocator_t * talloc = get_temporary_allocator();
-            scope_entry_t e      = get_entry_to_report(state, state->local_type_deps.data[i]);
+            scope_entry_t e      = get_entry_to_report(state, state->internal_deps.data[i]);
 
-            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->local_type_deps.data[i], STRING("'"), talloc), talloc), e.node->token);
+            log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->internal_deps.data[i], STRING("'"), talloc), talloc), e.node->token);
             return false;
         }
 
         if (deps == NULL) continue;
 
         for (u64 j = 0; j < deps->index; j++) {
-            if (string_compare(state->local_type_deps.data[i], deps->data[j])) {
+            if (string_compare(state->internal_deps.data[i], deps->data[j])) {
                 if (!report_error)
                     return false;
 
@@ -159,20 +158,33 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
     UNUSED(output);
 
-    for (u64 i = 0; i < state->current_search_stack.index; i++) {
-        if (!hashmap_contains(state->current_search_stack.data[i], key))
+    bool was_uninit = false;
+
+    for (s64 i = (state->current_search_stack.index - 1); i >= 0; i--) {
+        hashmap_t<string_t, scope_entry_t> *search_scope = state->current_search_stack.data[i];
+        
+        if (!hashmap_contains(search_scope, key))
             continue;
 
-        scope_entry_t *entry = hashmap_get(state->current_search_stack.data[i], key);
+        scope_entry_t *entry = hashmap_get(search_scope, key);
 
-        if (output) {
-            *output = entry;
-        }
+        *output = entry;
 
-        if (!check_dependencies(state, report_deps_error, entry, key)) {
-            return GET_DEPS_ERROR;
+        if (entry->type == ENTRY_VAR && state->state == STATE_CODE_ANALYSIS) {
+            if (!check_dependencies(state, report_deps_error, entry, key)) {
+                return GET_DEPS_ERROR;
+            }
+        } else if (entry->type != ENTRY_VAR) {
+            if (!check_dependencies(state, report_deps_error, entry, key)) {
+                return GET_DEPS_ERROR;
+            }
         }
         
+        if (entry->uninit) {
+            was_uninit = true;
+            continue;
+        }
+
         if (!entry->node->analyzed) {
             return GET_NOT_ANALYZED;
         }
@@ -180,7 +192,11 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
         return GET_SUCCESS;
     }
 
-    return GET_NOT_FIND;
+    if (was_uninit) {
+        return GET_SUCCESS;
+    } else {
+        return GET_NOT_FIND;
+    }
 }
 
 void set_std_info(token_t token, type_info_t *info) {
@@ -218,7 +234,7 @@ enum {
     CONST_TYPE_INT   = 0x80,
 };
 
-b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
+b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
     b32 result = true;
 
     if (expr->type == AST_PRIMARY) switch (expr->token.type) {
@@ -232,6 +248,7 @@ b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expression
         case TOKEN_IDENT: {
                 string_t var_name = expr->token.data.string;
 
+                stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), var_name);
                 scope_entry_t *output = NULL; 
                 switch (get_if_exists(state, true, var_name, &output)) {
                     case GET_NOT_FIND:
@@ -323,14 +340,32 @@ b32 analyze_expression(analyzer_state_t *state, u64 expected_count_of_expression
 
         case AST_BIN_SWAP:
             log_error_token(STRING("AST_BIN_SWAP DOESNT WORK RN"), expr->token);
+            // @todo: 
+            // this should be big variant of assignment code,
+            // that will also copy variables on right to temporary storage, 
+            // so this code will work too:
+            // ----
+            // a, b : s32, s32 = 1, 5;
+            //
+            // // a = 1
+            // // b = 5
+            //
+            // a, b = b, a;
+            //
+            // // a = 5
+            // // b = 1
+            //
+            // ----
             break;
         case AST_SEPARATION: {
             ast_node_t *next = expr->list_start;
 
-            if (expr->child_count != expected_count_of_expressions) {
-                log_error_token(STRING("Not expected count of elements"), expr->token);
-                result = false;
-                break;
+            if (expected_count_of_expressions >= 0) {
+                if (expr->child_count != (u64)expected_count_of_expressions) {
+                    log_error_token(STRING("Not expected count of elements"), expr->token);
+                    result = false;
+                    break;
+                }
             }
 
             // element count should match other size or amount of return argumets
@@ -370,40 +405,16 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry, b32 *
         // somehow this is doesnt work...
         stack_push(&state->current_search_stack, &entry->scope);
 
-        ast_node_t *stmt = expr->list_start;
-
-        for (u64 i = 0; i < expr->child_count; i++) {
-            switch (analyze_statement(state, entry->return_typenames.count, false, stmt, should_wait)) {
-                case STMT_BREAK:
-                case STMT_CONTINUE:
-                    log_error_token(STRING("Cant use break or continue outside of loop."), stmt->token);
-                    return false;
-
-                case STMT_ERR:
-                    return false;
-
-                case STMT_RETURN:
-                    if (i != (expr->child_count - 1)) {
-                        log_warning_token(STRING("There are statemets after return."), stmt->token);
-                    }
-                    break;
-
-                case STMT_OK:
-                    break;
-            }
-
-            if (*should_wait) {
-                break;
-            }
-
-            stmt = stmt->list_next;
-        }
-
+        // @todo, add all input variables
+        b32 result = analyze_statement(state, entry->return_typenames.count, false, expr);
         stack_pop(&state->current_search_stack);
+
+        return result;
     } else if (entry->type == ENTRY_VAR) {
         if (expr != NULL) {
             entry->uninit = true;
 
+            // is hardcoding to 1, good?
             if (!analyze_expression(state, 1, &entry->node->token.data.string, expr, should_wait)) {
                 return false;
             }
@@ -489,8 +500,8 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     } else {
         string_t type_name = type->token.data.string;
 
-        if (!is_pointer && state->local_type_deps.index > 0) {
-            stack_push(hashmap_get(&state->type_deps, stack_peek(&state->local_type_deps)), type_name);
+        if (!is_pointer && state->internal_deps.index > 0) {
+            stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), type_name);
         }
 
         scope_entry_t *output_type = NULL; 
@@ -531,7 +542,12 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         }
     }
 
-    b32 result = analyze_definition_expr(state, entry, should_wait);
+    b32 result = true;
+
+    // @cleanup: ugly
+    if (state->state == STATE_CODE_ANALYSIS) {
+        result = analyze_definition_expr(state, entry, should_wait);
+    }
 
     if (!*should_wait) {
         entry->node->analyzed = true;
@@ -549,11 +565,11 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
     string_t key = entry->node->token.data.string;
     stack_push(&state->current_search_stack, &entry->func_params);
-    stack_push(&state->local_type_deps, key);
+    stack_push(&state->internal_deps, key);
 
     {
-        stack_t<string_t> type_deps = {};
-        hashmap_add(&state->type_deps, key, &type_deps);
+        stack_t<string_t> symbol_deps = {};
+        hashmap_add(&state->symbol_deps, key, &symbol_deps);
     }
 
     b32 result = true;
@@ -622,8 +638,8 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         } else {
             string_t type_name = curr->token.data.string;
 
-            if (!is_pointer && state->local_type_deps.index > 0) {
-                stack_push(hashmap_get(&state->type_deps, stack_peek(&state->local_type_deps)), type_name);
+            if (!is_pointer && state->internal_deps.index > 0) {
+                stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), type_name);
             }
 
             scope_entry_t *output_type = NULL; 
@@ -672,7 +688,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         next_type = next_type->list_next;
     }
 
-    stack_pop(&state->local_type_deps);
+    stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
     if (!*should_wait) {
@@ -1041,16 +1057,16 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     b32 should_wait = false;
 
     stack_push(&state->current_search_stack, &entry->scope);
-    stack_push(&state->local_type_deps, key);
+    stack_push(&state->internal_deps, key);
     
     {
-        stack_t<string_t> type_deps = {};
-        hashmap_add(&state->type_deps, key, &type_deps);
+        stack_t<string_t> symbol_deps = {};
+        hashmap_add(&state->symbol_deps, key, &symbol_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(&state->local_type_deps);
+    stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
@@ -1081,16 +1097,16 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
     b32 should_wait = false;
 
     stack_push(&state->current_search_stack, &entry->scope);
-    stack_push(&state->local_type_deps, key);
+    stack_push(&state->internal_deps, key);
 
     {
-        stack_t<string_t> type_deps = {};
-        hashmap_add(&state->type_deps, key, &type_deps);
+        stack_t<string_t> symbol_deps = {};
+        hashmap_add(&state->symbol_deps, key, &symbol_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
 
-    stack_pop(&state->local_type_deps);
+    stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
@@ -1121,11 +1137,11 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
     b32 should_wait = false;
 
     stack_push(&state->current_search_stack, &entry->scope);
-    stack_push(&state->local_type_deps, key);
+    stack_push(&state->internal_deps, key);
 
     {
-        stack_t<string_t> type_deps = {};
-        hashmap_add(&state->type_deps, key, &type_deps);
+        stack_t<string_t> symbol_deps = {};
+        hashmap_add(&state->symbol_deps, key, &symbol_deps);
     }
 
     result = analyze_and_add_type_members(state, &should_wait, entry); 
@@ -1139,7 +1155,7 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         set_std_info(node->right->token, &pair->value.info);
     }
 
-    stack_pop(&state->local_type_deps);
+    stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
     if (!should_wait) {
@@ -1274,16 +1290,53 @@ b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
 // --------------------
 
 
-u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_loop, ast_node_t *node, b32 *should_wait) {
+
+u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_loop, ast_node_t *node) {
     temp_reset();
 
     assert(!node->analyzed);
+
     u32 result = STMT_ERR;
+    b32 should_wait = false;
 
     switch (node->type) {
-        case AST_BLOCK_IMPERATIVE:
-            log_error_token(STRING("Blocks are not supported currently..."), node->token);
-            result = STMT_ERR;
+        case AST_BLOCK_IMPERATIVE: 
+            {
+                result = STMT_OK;
+                // @todo: here are all the trailing scopes go...
+                // and here we will resolve our vairables
+                ast_node_t *stmt = node->list_start;
+
+                for (u64 i = 0; i < node->child_count; i++) {
+                    switch (analyze_statement(state, expect_return_amount, false, stmt)) {
+                        case STMT_BREAK:
+                        case STMT_CONTINUE:
+                            if (in_loop) {
+                                break;
+                            }
+
+                            log_error_token(STRING("Cant use break or continue outside of loop."), stmt->token);
+                            result = STMT_ERR;
+                            break;
+
+                        case STMT_ERR:
+                            result = STMT_ERR;
+                            break;
+
+                        case STMT_RETURN:
+                            // @todo: more sophisticated logic of warnings
+                            if (i != (node->child_count - 1)) {
+                                log_warning_token(STRING("There are statemets after return."), stmt->token);
+                            }
+                            break;
+
+                        case STMT_OK:
+                            break;
+                    }
+
+                    stmt = stmt->list_next;
+                }
+            }
             break;
         case AST_UNNAMED_MODULE:
             log_error_token(STRING("cant load files from functions."), node->token);
@@ -1299,24 +1352,25 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
 
 
         case AST_IF_STMT: {
-            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, &should_wait)) {
                 result = STMT_ERR;
                 break;
             }
-            result = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
+            // @todo: we need new scope anyway...
+            result = analyze_statement(state, expect_return_amount, in_loop, node->right);
             if (result != STMT_ERR) {
                 result = STMT_OK;
             }
         } break;
 
         case AST_IF_ELSE_STMT: {
-            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, &should_wait)) {
                 result = STMT_ERR;
                 break;
             }
 
-            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
-            b32 rr = analyze_statement(state, expect_return_amount, in_loop, node->right, should_wait);
+            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->right);
+            b32 rr = analyze_statement(state, expect_return_amount, in_loop, node->right);
 
             if (lr == rr && lr == STMT_RETURN) {
                 result = STMT_RETURN;
@@ -1328,16 +1382,16 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
         } break;
 
         case AST_WHILE_STMT: {
-            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, &should_wait)) {
                 result = STMT_ERR;
                 break;
             }
 
-            result = analyze_statement(state, expect_return_amount, true, node->right, should_wait);
+            result = analyze_statement(state, expect_return_amount, true, node->right);
         } break;
 
         case AST_RET_STMT: {
-            if (!analyze_expression(state, expect_return_amount, NULL, node->left, should_wait)) {
+            if (!analyze_expression(state, expect_return_amount, NULL, node->left, &should_wait)) {
                 result = STMT_ERR;
                 break;
             }
@@ -1354,27 +1408,34 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
             break;
 
         case AST_UNARY_VAR_DEF:
-            result = analyze_unary_var_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
+            // @todo: allow the analysis of variables
+            result = analyze_unary_var_def(state, node, &should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_BIN_UNKN_DEF: 
-            result = analyze_unkn_def(state, node, should_wait)? STMT_OK : STMT_ERR;
+            result = analyze_unkn_def(state, node, &should_wait)? STMT_OK : STMT_ERR;
             break;
 
         case AST_BIN_MULT_DEF: 
-            result = analyze_bin_var_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
+            result = analyze_bin_var_def(state, node, &should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_TERN_MULT_DEF:
-            result = analyze_tern_def(state, node, should_wait) ? STMT_OK : STMT_ERR;
+            result = analyze_tern_def(state, node, &should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         default: {
-            result = analyze_expression(state, expect_return_amount, NULL, node, should_wait) ? STMT_OK : STMT_ERR;
+            result = analyze_expression(state, -1, NULL, node, &should_wait) ? STMT_OK : STMT_ERR;
         } break;
     }
 
-    if (!should_wait) node->analyzed = true;
+    node->analyzed = true;
+
+    if (should_wait) {
+        log_error_token(STRING("Unordered instructions in imperative block."), node->token);
+        return false;
+    }
+
     return result;
 }
 
@@ -1385,8 +1446,7 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
     b32 result, should_wait = false;
 
     switch (node->type) {
-        case AST_UNNAMED_MODULE:
-            assert(false);
+        case AST_UNNAMED_MODULE: assert(false);
 
         case AST_STRUCT_DEF: 
             result = analyze_struct(state, node);
@@ -1555,26 +1615,26 @@ void print_all_definitions(compiler_t *compiler) {
 }
 
 analyzer_state_t init_state(compiler_t *compiler) {
-
     stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack = {};
-    stack_t<string_t> local_type_deps = {};
-    stack_create(&local_type_deps, 16);
+    stack_t<string_t> internal_deps = {};
+    stack_create(&internal_deps, 16);
 
-    hashmap_t<string_t, stack_t<string_t>> type_deps = {};
-    hashmap_create(&type_deps, 128, NULL, NULL);
+    hashmap_t<string_t, stack_t<string_t>> symbol_deps = {};
+    hashmap_create(&symbol_deps, 128, NULL, NULL);
 
     analyzer_state_t state = {};
 
     state.compiler = compiler;
     state.current_search_stack = current_search_stack;
-    state.local_type_deps = local_type_deps;
-    state.type_deps = type_deps;
+    state.internal_deps = internal_deps;
+    state.symbol_deps = symbol_deps;
 
     return state;
 }
 
 void clear_state(analyzer_state_t *state) {
-    hashmap_delete(&state->type_deps); // @todo: delete all the entries inside
+    // @todo: delete all the entries inside
+    hashmap_delete(&state->symbol_deps);
 
     assert(state->current_search_stack.index == 0);
 
@@ -1589,10 +1649,11 @@ b32 analyze(compiler_t *compiler) {
 
     analyzer_state_t state = init_state(compiler);
 
+    state.state = STATE_GLOBAL_ANALYSIS;
+
     stack_push(&state.current_search_stack, &compiler->scope);
 
     u64 max_iterations = 10;
-
 
     while (max_iterations-- > 0 && not_finished) {
         not_finished = false;
@@ -1609,7 +1670,6 @@ b32 analyze(compiler_t *compiler) {
 
             if (!pair.occupied) continue;
             if (pair.deleted)   continue;
-
 
             // we just need to try to compile, if we cant resolve something we add it, but just
             for (u64 j = 0; j < pair.value.parsed_roots.count; j++) {
@@ -1630,6 +1690,39 @@ b32 analyze(compiler_t *compiler) {
                 not_finished = false;
                 break;
             }
+        }
+    }
+
+    hashmap_clear(&state.symbol_deps); // @fix @todo: we get here memory leak!!
+    state.internal_deps.index = 0;
+
+    state.state = STATE_CODE_ANALYSIS;
+
+    // analyzing function bodies now!
+    for (u64 i = 0; i < compiler->scope.capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
+
+        if (!pair.occupied) continue;
+        if (pair.deleted)   continue;
+
+        b32 should_wait = false;
+
+        string_t key = pair.value.node->token.data.string;
+        stack_push(&state.internal_deps, key);
+
+        {
+            stack_t<string_t> symbol_deps = {};
+            hashmap_add(&state.symbol_deps, key, &symbol_deps);
+        }
+
+        if (!analyze_definition_expr(&state, &pair.value, &should_wait)) {
+            result = false;
+        }
+
+        stack_pop(&state.internal_deps);
+
+        if (should_wait) {
+            log_error_token(STRING("Probably circular dep."), pair.value.node->token);
         }
     }
 

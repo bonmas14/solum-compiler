@@ -36,5 +36,4 @@ void list_tests(void) {
 
     assert(list.count == 103);
     list_delete(&list);
-    log_info(STRING("LIST: OK"));
 }

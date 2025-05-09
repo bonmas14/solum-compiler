@@ -3,11 +3,16 @@
 #include "ir.h"
 
 ir_function_t compile_function(compiler_t *compiler, scope_entry_t entry) {
-    // 
+    UNUSED(compiler);
+    UNUSED(entry);
+
+    return {};
 }
 
 ir_t compile_program(compiler_t *compiler) {
-    assert(compiler       != NULL);
+    UNUSED(compiler);
+
+    assert(compiler != NULL);
 
     ir_t ir = {};
 
@@ -16,7 +21,6 @@ ir_t compile_program(compiler_t *compiler) {
 
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
-
     }
 
     return ir;

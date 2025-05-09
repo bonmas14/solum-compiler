@@ -18,6 +18,4 @@ void stack_tests(void) {
     assert(stack_pop(&stack) == 1);
 
     stack_delete(&stack);
-
-    log_info(STRING("STACK: OK"));
 }

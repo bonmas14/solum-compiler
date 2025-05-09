@@ -1,16 +1,9 @@
+// use: "examples";
 
-a : s32 = 1;
-
+b : s32 = 32;
 main : (arg : s32) -> s32 = {
-    a : s32 = a + 3;
-    b : s32 = a + 24;
-
+    a : s32 = 32 + b;
     c : s32 = a + b;
 
     return c;
-}
-
-A : struct = {
-    a : s32;
-    // p : (A) -> A;
 }

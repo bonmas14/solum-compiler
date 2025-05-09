@@ -585,6 +585,7 @@ token_t peek_next_token(scanner_t *state, allocator_t * alloc) {
 b32 consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_report, allocator_t *alloc) {
     scanner_t peek_state = *state;
     token_t local_token = {};
+    local_token.from = state;
 
     if (token == NULL) {
         token  = &local_token;
@@ -776,7 +777,7 @@ void print_info(token_t token) {
     log_push_color(255, 255, 255);
 
     log_update_color();
-    fprintf(stderr, "%.*s:%zu,%zu:\n", (int)token.from->filename.size, (char*)token.from->filename.data, token.l0 + 1LL, token.c0 + 1LL);
+    fprintf(stderr, "%.*s:%zu:%zu:\n", (int)token.from->filename.size, (char*)token.from->filename.data, token.l0 + 1LL, token.c0 + 1LL);
     log_pop_color();
 }
 

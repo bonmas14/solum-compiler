@@ -96,6 +96,4 @@ void temp_tests(void) {
     u8* data2 = (u8*)temp_allocate(len);
     assert(data1 == data2);
     temp_reset();
-
-    log_info(STRING("TALLOC: OK"));
 }

@@ -117,6 +117,4 @@ void arena_tests(void) {
     assert(arena->next->index == 2048);
 
     arena_delete(arena);
-    
-    log_info(STRING("ARENA: OK"));
 }

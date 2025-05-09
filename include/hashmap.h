@@ -55,6 +55,9 @@ hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map);
 template<typename KeyType, typename DataType>
 b32 hashmap_delete(hashmap_t<KeyType, DataType> *map);
 
+template<typename KeyType, typename DataType>
+void hashmap_clear(hashmap_t<KeyType, DataType> *map);
+
 // ----------- Control 
 
 template<typename KeyType, typename DataType>
@@ -139,6 +142,14 @@ template<typename KeyType, typename DataType>
 b32 hashmap_delete(hashmap_t<KeyType, DataType> *map) {
     FREE(map->entries);
     return true;
+}
+
+template<typename KeyType, typename DataType>
+void hashmap_clear(hashmap_t<KeyType, DataType> *map) {
+    if (map->entries == 0) return;
+
+    map->load = 0;
+    mem_set((u8*)map->entries, 0, map->capacity * sizeof(kv_pair_t<KeyType, DataType>));
 }
 
 

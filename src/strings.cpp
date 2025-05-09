@@ -373,7 +373,5 @@ void string_tests(void) {
 
     assert(string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
-    log_info(STRING("STRINGS: OK"));
-
     temp_reset();
 }

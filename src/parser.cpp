@@ -18,7 +18,7 @@ struct parser_state_t {
 
 ast_node_t parse_type(parser_state_t *state);
 
-ast_node_t parse_swap_expression(parser_state_t *state);
+ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr);
 ast_node_t parse_assingment_expression(parser_state_t *state);
 ast_node_t parse_separated_expressions(parser_state_t *state);
 ast_node_t parse_cast_expression(parser_state_t *state);
@@ -652,9 +652,8 @@ ast_node_t parse_assignment_expression(parser_state_t *state) {
     return result;
 }
 
-// @todo, default, between these funcs
-ast_node_t parse_separated_expressions(parser_state_t *state) {
-    ast_node_t node = parse_cast_expression(state);
+ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
+    ast_node_t node = parse_primary(state);
     if (node.type == AST_EMPTY) return node;
 
     token_t current = peek_token(state->scanner, state->strings);
@@ -673,7 +672,7 @@ ast_node_t parse_separated_expressions(parser_state_t *state) {
     advance_token(state->scanner, state->strings);
 
     while (current.type == ',' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
-        ast_node_t node = parse_assignment_expression(state);
+        ast_node_t node = parse_primary(state);
 
         if (node.type == AST_EMPTY) {
             log_error_token(STRING("Separated expression was closed on ','."), current);
@@ -695,10 +694,59 @@ ast_node_t parse_separated_expressions(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_swap_expression(parser_state_t *state) {
-    ast_node_t node = parse_separated_expressions(state);
+// @todo, default, between these funcs
+ast_node_t parse_separated_expressions(parser_state_t *state) {
+    ast_node_t node = parse_cast_expression(state);
     if (node.type == AST_EMPTY) return node;
 
+    token_t current = peek_token(state->scanner, state->strings);
+
+    ast_node_t result = {};
+    allocator_t *talloc = get_temporary_allocator();
+
+    result.type  = AST_SEPARATION;
+    result.token = current;
+    add_list_node(state, &result, &node);
+
+    if (current.type != ',') {
+        return result;
+    }
+
+    advance_token(state->scanner, state->strings);
+
+    while (current.type == ',' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
+        ast_node_t node = parse_cast_expression(state);
+
+        if (node.type == AST_EMPTY) {
+            log_error_token(STRING("Separated expression was closed on ','."), current);
+            break;
+        }
+
+        // @todo check_value for errors
+        add_list_node(state, &result, &node);
+
+        current = peek_token(state->scanner, talloc);
+
+        if (current.type != ',') {
+            break;
+        }
+
+        advance_token(state->scanner, talloc);
+    }
+
+    return result;
+}
+
+ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
+    ast_node_t node;
+
+    if (expr == NULL) {
+        ast_node_t node = parse_separated_primary_expressions(state);
+        if (node.type == AST_EMPTY) return node;
+    } else {
+        node = *expr;
+    }
+    
     ast_node_t result = {};
     result.token = peek_token(state->scanner, get_temporary_allocator());
 
@@ -1238,7 +1286,7 @@ ast_node_t parse_statement(parser_state_t *state) {
             } break;
         }
     } else if (name.type == TOKEN_IDENT && next.type == ',') {
-        ast_node_t expr = parse_separated_expressions(state);
+        ast_node_t expr = parse_separated_primary_expressions(state);
         assert(expr.type != AST_EMPTY);
 
         next = peek_token(state->scanner, get_temporary_allocator());
@@ -1247,7 +1295,7 @@ ast_node_t parse_statement(parser_state_t *state) {
             advance_token(state->scanner, state->strings);
             node = parse_multiple_var_declaration(state, &expr);
         } else {
-            node = expr;
+            node = parse_swap_expression(state, &expr);
         }
 
     } else switch (name.type) {
@@ -1368,7 +1416,7 @@ ast_node_t parse_statement(parser_state_t *state) {
         } break;
 
         default: {
-            node = parse_swap_expression(state);
+            node = parse_assignment_expression(state);
         } break;
     }
 
@@ -1503,6 +1551,10 @@ ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
         log_error_token(STRING("Expected closing of a block."), stop);
         return result;
     }
+
+    result.token = start;
+    result.token.c1 = stop.c1;
+    result.token.l1 = stop.l1;
 
     return result;
 }
