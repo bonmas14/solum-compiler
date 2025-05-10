@@ -1812,7 +1812,7 @@ b32 analyze(compiler_t *compiler) {
 
     stack_pop(&state.current_search_stack);
     clear_state(&state);
-    // print_all_definitions(compiler);
+    print_all_definitions(compiler);
 
     return result;
 }

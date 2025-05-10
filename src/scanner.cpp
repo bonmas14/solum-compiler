@@ -101,7 +101,8 @@ static inline u8 char_digit_to_int(u8 in) {
 static inline b32 char_is_letter(u8 in) {
     return (in >= 'A' && in <= 'Z')
         || (in >= 'a' && in <= 'z') 
-        || (in == '_');
+        || (in == '_')
+        || ((in & 0x80) != 0);
 }
 
 static inline b32 char_is_number_or_letter(u8 in) {

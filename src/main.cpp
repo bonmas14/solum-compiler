@@ -1,3 +1,4 @@
+#include <locale.h>
 #include "stddefines.h"
 
 #include "allocator.h"
@@ -38,6 +39,8 @@ void init(void) {
 }
 
 int main(int argc, char **argv) {
+    setlocale(LC_ALL, ".utf-8");
+
     UNUSED(argc);
     init();
 
