@@ -53,6 +53,9 @@ hashmap_t<string_t, scope_entry_t> create_scope(void) {
 }
 
 b32 check_if_unique(scope_entry_t *entry, ast_node_t *new_node) {
+    assert(entry != NULL);
+    assert(new_node != NULL);
+
     if (entry->node == NULL) return true;
 
     if (mem_compare((u8*)entry->node, (u8*)new_node, sizeof(ast_node_t)))
@@ -76,7 +79,11 @@ void add_blank_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, sc
 }
 
 b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_node_t *node, scope_entry_t **output) {
-    UNUSED(output);
+    assert(scope != NULL);
+    assert(node != NULL);
+    assert(output != NULL);
+
+    UNUSED(output); // so compiler dont yell
 
     if (hashmap_contains(scope, key)) {
         scope_entry_t *entry = hashmap_get(scope, key);
@@ -104,6 +111,8 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
 }
 
 scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
+    assert(state != NULL);
+
     for (u64 i = 0; i < state->current_search_stack.index; i++) {
         if (!hashmap_contains(state->current_search_stack.data[i], key))
             continue;
@@ -117,6 +126,9 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
 }
 
 b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t *entry, string_t key) {
+    assert(state != NULL);
+    assert(entry != NULL);
+
     stack_t<string_t> *deps = hashmap_get(&state->symbol_deps, key);
 
         // @cleanup @speed @todo: doesnt work for pointers...
@@ -156,6 +168,9 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 }
 
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
+    assert(state != NULL);
+    assert(output != NULL);
+
     UNUSED(output);
 
     bool was_uninit = false;
@@ -200,6 +215,8 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 }
 
 void set_std_info(token_t token, type_info_t *info) {
+    assert(info != NULL);
+
     switch (token.type) {
         case TOK_S8:  info->type = TYPE_s8;  info->size = 1; break;
         case TOK_S16: info->type = TYPE_s16; info->size = 2; break;
@@ -235,6 +252,10 @@ enum {
 };
 
 b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr, b32 *should_wait) {
+    assert(state != NULL);
+    assert(expr != NULL);
+    assert(should_wait != NULL);
+
     b32 result = true;
 
     if (expr->type == AST_PRIMARY) switch (expr->token.type) {
@@ -355,6 +376,8 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             // // a = 5
             // // b = 1
             //
+            // or something like this
+            // a, b = 12, 4 + 54;
             // ----
             break;
         case AST_SEPARATION: {
@@ -394,7 +417,19 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
 }
 
 b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
+    assert(state       != NULL);
+    assert(entry       != NULL);
+    assert(should_wait != NULL);
+
     ast_node_t *expr = entry->expr;
+
+    if (expr == NULL) {
+        return entry->type != ENTRY_FUNC;
+    }
+
+    if (expr->analyzed) {
+        return true;
+    }
 
     if (entry->type == ENTRY_FUNC) {
         if (expr->type != AST_BLOCK_IMPERATIVE) {
@@ -402,33 +437,45 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry, b32 *
             return false;
         }
 
-        // somehow this is doesnt work...
         stack_push(&state->current_search_stack, &entry->scope);
 
-        // @todo, add all input variables
+        for (u64 i = 0; i < entry->func_params.capacity; i++) {
+            kv_pair_t<string_t, scope_entry_t> *pair = entry->func_params.entries + i;
+
+            if (!pair->occupied) continue;
+            if (pair->deleted)   continue;
+
+            hashmap_add(&entry->scope, pair->key, &pair->value);
+        }
+
         b32 result = analyze_statement(state, entry->return_typenames.count, false, expr);
         stack_pop(&state->current_search_stack);
+        expr->analyzed = true;
 
         return result;
     } else if (entry->type == ENTRY_VAR) {
-        if (expr != NULL) {
-            entry->uninit = true;
+        entry->uninit = true;
 
-            // is hardcoding to 1, good?
-            if (!analyze_expression(state, 1, &entry->node->token.data.string, expr, should_wait)) {
-                return false;
-            }
-
-            // @todo scopes in functions
-            // here we add our variable to current scope...
-            entry->uninit = false;
+        // is hardcoding to 1, good?
+        if (!analyze_expression(state, 1, &entry->node->token.data.string, expr, should_wait)) {
+            return false;
         }
+
+        // @todo scopes in functions
+        // here we add our variable to current scope...
+        entry->uninit = false;
     }
 
+    expr->analyzed = true;
     return true;
 }
 
 b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
+    assert(state != NULL);
+    assert(name != NULL);
+    assert(type != NULL);
+    assert(should_wait != NULL);
+
     string_t key = name->token.data.string;
 
     scope_entry_t *entry = NULL;
@@ -557,6 +604,10 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 }
 
 b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
+    assert(state != NULL);
+    assert(entry != NULL);
+    assert(should_wait != NULL);
+
     ast_node_t *func = entry->node;
     ast_node_t *type_node  = func->left;
     assert(type_node->type  == AST_FUNC_TYPE);
@@ -804,7 +855,6 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(node  != NULL);
     assert(should_wait != NULL);
 
-
     if (!analyze_definition(state, true, node, node->left, node->right, should_wait)) {
         return false;
     }
@@ -990,6 +1040,10 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 }
 
 b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scope_entry_t *entry) {
+    assert(state != NULL);
+    assert(should_wait != NULL);
+    assert(entry != NULL);
+
     ast_node_t * block = entry->node->left;
     ast_node_t * next  = block->list_start;
 
@@ -1037,7 +1091,10 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
 }
 
 b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
+    assert(state != NULL);
+    assert(node != NULL);
     assert(node->type == AST_STRUCT_DEF);
+
     if (node->analyzed) return true; 
 
     string_t key = node->token.data.string;
@@ -1077,7 +1134,10 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
 }
 
 b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
+    assert(state != NULL);
+    assert(node != NULL);
     assert(node->type == AST_UNION_DEF);
+
     if (node->analyzed) return true; 
 
     string_t key = node->token.data.string;
@@ -1117,6 +1177,8 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
 }
 
 b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
+    assert(state != NULL);
+    assert(node != NULL);
     assert(node->type == AST_ENUM_DEF);
     if (node->analyzed) return true; 
 
@@ -1190,6 +1252,8 @@ b32 is_file_exists(string_t name) {
 }
 
 b32 load_and_process_file(compiler_t *compiler, string_t filename) {
+    assert(compiler != NULL);
+
     source_file_t file = create_source_file(compiler, NULL);
 
     string_t source;
@@ -1215,6 +1279,8 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
 }
 
 b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
+    assert(compiler != NULL);
+    assert(valid_file != NULL);
 
     // @cleanup
 #ifdef DEBUG
@@ -1243,6 +1309,8 @@ b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
 }
 
 b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
+    assert(compiler != NULL);
+    assert(node != NULL);
     allocator_t *talloc = get_temporary_allocator();
 
     // ./<file>.slm
@@ -1292,6 +1360,9 @@ b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
 
 
 u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_loop, ast_node_t *node) {
+    assert(state != NULL);
+    assert(node != NULL);
+
     temp_reset();
 
     assert(!node->analyzed);
@@ -1369,7 +1440,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 break;
             }
 
-            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->right);
+            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->center);
             b32 rr = analyze_statement(state, expect_return_amount, in_loop, node->right);
 
             if (lr == rr && lr == STMT_RETURN) {
@@ -1551,6 +1622,7 @@ void print_var_info(type_info_t info) {
 }
 
 void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, u64 depth) {
+    assert(compiler != NULL);
     allocator_t *talloc = get_temporary_allocator();
 
     assert(depth <= 8); // cause we have some hardcoded offset down there...
@@ -1598,6 +1670,7 @@ void print_entry(compiler_t *compiler, kv_pair_t<string_t, scope_entry_t> pair, 
 }
 
 void print_all_definitions(compiler_t *compiler) {
+    assert(compiler != NULL);
     log_update_color();
 
     fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
@@ -1615,6 +1688,8 @@ void print_all_definitions(compiler_t *compiler) {
 }
 
 analyzer_state_t init_state(compiler_t *compiler) {
+    assert(compiler != NULL);
+
     stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack = {};
     stack_t<string_t> internal_deps = {};
     stack_create(&internal_deps, 16);
@@ -1698,12 +1773,11 @@ b32 analyze(compiler_t *compiler) {
 
     state.state = STATE_CODE_ANALYSIS;
 
-    // analyzing function bodies now!
     for (u64 i = 0; i < compiler->scope.capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
 
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
+        if (!pair.occupied)      continue;
+        if (pair.deleted)        continue;
 
         b32 should_wait = false;
 
@@ -1738,7 +1812,7 @@ b32 analyze(compiler_t *compiler) {
 
     stack_pop(&state.current_search_stack);
     clear_state(&state);
-    print_all_definitions(compiler);
+    // print_all_definitions(compiler);
 
     return result;
 }

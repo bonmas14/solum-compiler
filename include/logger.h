@@ -2,13 +2,13 @@
 #define LOGGER_H
 
 #include "stddefines.h"
+#include "platform.h"
 
 #define INFO_COLOR     96, 224, 255
 #define WARNING_COLOR 226, 175,  63 
 #define ERROR_COLOR   255,  64,  64
 
 #define LEFT_PAD_STANDART_OFFSET (4)
-
 
 void add_left_pad(FILE * file, u64 amount);
 
@@ -22,8 +22,6 @@ void log_info(string_t text);
 void log_warning(string_t text);
 void log_error(string_t text);
 
-void debug_break(void);
-
 #define check_value(value) {\
     if ((b32)(value) == false) {\
         u8 buffer[1024];\
@@ -31,7 +29,6 @@ void debug_break(void);
         log_error((string_t) { .size = c_string_length((char*)buffer), .data = (u8*)buffer });\
     }\
 }
-
 
 #ifdef DEBUG
 #define assert(result) {\

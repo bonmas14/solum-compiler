@@ -5,6 +5,7 @@
 #include "strings.h"
 
 #include "compiler.h"
+#include "profiler.h"
 
 allocator_t * default_allocator;
 allocator_t __allocator;
@@ -30,6 +31,7 @@ void debug_tests(void) {
 #endif
 
 void init(void) {
+    debug_init();
     debug_tests();
     default_allocator = preserve_allocator_from_stack(create_arena_allocator(PG(10)));
     log_push_color(255, 255, 255);
@@ -38,6 +40,9 @@ void init(void) {
 int main(int argc, char **argv) {
     UNUSED(argc);
     init();
+
+    profiler_begin();
+    profiler_block_start(STRING("Compile time"));
 
     if (argc < 1) { 
         assert(argc > 0); 
@@ -58,9 +63,17 @@ int main(int argc, char **argv) {
 
     string_t filename = string_copy(STRING(argv[1]), default_allocator);
 
+    profiler_block_start(STRING("Load and process"));
     if (load_and_process_file(&state, filename)) {
+        profiler_block_end();
         compile(&state);
     }
+
+    log_update_color();
+    profiler_block_end();
+
+    profiler_end();
+    visualize_profiler_state();
 
     log_color_reset();
     return 0;

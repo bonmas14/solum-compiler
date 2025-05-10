@@ -16,20 +16,19 @@ struct parser_state_t {
     allocator_t *nodes;
 };
 
-ast_node_t parse_type(parser_state_t *state);
+static ast_node_t parse_type(parser_state_t *state);
 
-ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr);
-ast_node_t parse_assingment_expression(parser_state_t *state);
-ast_node_t parse_separated_expressions(parser_state_t *state);
-ast_node_t parse_cast_expression(parser_state_t *state);
+static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr);
+static ast_node_t parse_separated_expressions(parser_state_t *state);
+static ast_node_t parse_cast_expression(parser_state_t *state);
 
-ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name);
-ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name);
-ast_node_t parse_union_declaration(parser_state_t *state, token_t *name);
-ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name);
-ast_node_t parse_block(parser_state_t* state, ast_types_t type);
+static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name);
+static ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name);
+static ast_node_t parse_union_declaration(parser_state_t *state, token_t *name);
+static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name);
+static ast_node_t parse_block(parser_state_t* state, ast_types_t type);
 
-void panic_skip(parser_state_t *state) {
+static void panic_skip(parser_state_t *state) {
     allocator_t *talloc = get_temporary_allocator();
     token_t token = peek_token(state->scanner, talloc);
 
@@ -52,7 +51,7 @@ void panic_skip(parser_state_t *state) {
     }
 }
 
-void panic_skip_until_token(u32 value, parser_state_t *state) {
+static void panic_skip_until_token(u32 value, parser_state_t *state) {
     allocator_t *talloc = get_temporary_allocator();
     token_t token = peek_token(state->scanner, talloc);
 
@@ -62,7 +61,7 @@ void panic_skip_until_token(u32 value, parser_state_t *state) {
     }
 }
 
-void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
@@ -77,7 +76,7 @@ void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     }
 }
 
-void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
@@ -92,7 +91,7 @@ void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     }
 }
 
-void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
@@ -107,7 +106,7 @@ void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) 
     }
 }
 
-void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
@@ -138,7 +137,7 @@ void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
 
 /* parsing */
 
-ast_node_t parse_primary(parser_state_t *state) {
+static ast_node_t parse_primary(parser_state_t *state) {
     ast_node_t result = {};
 
     allocator_t *talloc = get_temporary_allocator();
@@ -184,7 +183,7 @@ ast_node_t parse_primary(parser_state_t *state) {
 }
 
 // @todo rewrite
-ast_node_t parse_function_call(parser_state_t *state) {
+static ast_node_t parse_function_call(parser_state_t *state) {
     ast_node_t node = parse_primary(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -247,7 +246,7 @@ ast_node_t parse_function_call(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_unary(parser_state_t *state) {
+static ast_node_t parse_unary(parser_state_t *state) {
     ast_node_t result = {};
     result.token = peek_token(state->scanner, get_temporary_allocator());
 
@@ -293,7 +292,7 @@ ast_node_t parse_unary(parser_state_t *state) {
 }
 
 // @todo rewrite
-ast_node_t parse_shift(parser_state_t *state) {
+static ast_node_t parse_shift(parser_state_t *state) {
     ast_node_t node = parse_unary(state);
 
     if (node.type == AST_EMPTY) return node; 
@@ -329,7 +328,7 @@ ast_node_t parse_shift(parser_state_t *state) {
 }
 
 // @todo rewrite
-ast_node_t parse_and(parser_state_t *state) {
+static ast_node_t parse_and(parser_state_t *state) {
     ast_node_t node = parse_shift(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -357,7 +356,7 @@ ast_node_t parse_and(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_or(parser_state_t *state) {
+static ast_node_t parse_or(parser_state_t *state) {
     ast_node_t node = parse_and(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -386,7 +385,7 @@ ast_node_t parse_or(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_xor(parser_state_t *state) {
+static ast_node_t parse_xor(parser_state_t *state) {
     ast_node_t node = parse_or(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -416,7 +415,7 @@ ast_node_t parse_xor(parser_state_t *state) {
 }
 
 // @todo: different names later!!!
-ast_node_t parse_mul(parser_state_t *state) {
+static ast_node_t parse_mul(parser_state_t *state) {
     ast_node_t node = parse_xor(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -453,7 +452,7 @@ ast_node_t parse_mul(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_add(parser_state_t *state) { 
+static ast_node_t parse_add(parser_state_t *state) { 
     ast_node_t node = parse_mul(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -488,7 +487,7 @@ ast_node_t parse_add(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_compare_expression(parser_state_t *state) {
+static ast_node_t parse_compare_expression(parser_state_t *state) {
     ast_node_t node = parse_add(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -537,7 +536,7 @@ ast_node_t parse_compare_expression(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_logic_and_expression(parser_state_t *state) {
+static ast_node_t parse_logic_and_expression(parser_state_t *state) {
     ast_node_t node = parse_compare_expression(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -566,7 +565,7 @@ ast_node_t parse_logic_and_expression(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_logic_or_expression(parser_state_t *state) {
+static ast_node_t parse_logic_or_expression(parser_state_t *state) {
     ast_node_t node = parse_logic_and_expression(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -595,7 +594,7 @@ ast_node_t parse_logic_or_expression(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_cast_expression(parser_state_t *state) {
+static ast_node_t parse_cast_expression(parser_state_t *state) {
     token_t    cast_token = {};
     ast_node_t result     = {};
 
@@ -623,7 +622,7 @@ ast_node_t parse_cast_expression(parser_state_t *state) {
     return parse_logic_or_expression(state);
 }
 
-ast_node_t parse_assignment_expression(parser_state_t *state) {
+static ast_node_t parse_assignment_expression(parser_state_t *state) {
     ast_node_t node = parse_cast_expression(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -652,7 +651,7 @@ ast_node_t parse_assignment_expression(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
+static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
     ast_node_t node = parse_primary(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -695,7 +694,7 @@ ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
 }
 
 // @todo, default, between these funcs
-ast_node_t parse_separated_expressions(parser_state_t *state) {
+static ast_node_t parse_separated_expressions(parser_state_t *state) {
     ast_node_t node = parse_cast_expression(state);
     if (node.type == AST_EMPTY) return node;
 
@@ -737,7 +736,7 @@ ast_node_t parse_separated_expressions(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
+static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
     ast_node_t node;
 
     if (expr == NULL) {
@@ -773,8 +772,7 @@ ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
     return result;
 }
 
-
-ast_node_t parse_primary_type(parser_state_t *state) {
+static ast_node_t parse_primary_type(parser_state_t *state) {
     ast_node_t result = {};
 
     result.token = advance_token(state->scanner, state->strings);
@@ -815,7 +813,7 @@ ast_node_t parse_primary_type(parser_state_t *state) {
 }
 
 
-ast_node_t parse_type(parser_state_t *state) {
+static ast_node_t parse_type(parser_state_t *state) {
     ast_node_t result = {};
 
     token_t token = peek_token(state->scanner, get_temporary_allocator());
@@ -865,7 +863,7 @@ ast_node_t parse_type(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_param_declaration(parser_state_t *state) {
+static ast_node_t parse_param_declaration(parser_state_t *state) {
     ast_node_t node = {};
 
     token_t name, next;
@@ -897,7 +895,7 @@ ast_node_t parse_param_declaration(parser_state_t *state) {
     return node;
 }
 
-ast_node_t parse_parameter_list(parser_state_t *state) {
+static ast_node_t parse_parameter_list(parser_state_t *state) {
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -926,7 +924,7 @@ ast_node_t parse_parameter_list(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_return_list(parser_state_t *state) {
+static ast_node_t parse_return_list(parser_state_t *state) {
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -965,7 +963,7 @@ ast_node_t parse_return_list(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_function_type(parser_state_t *state) {
+static ast_node_t parse_function_type(parser_state_t *state) {
     token_t token = {};
 
     if (!consume_token('(', state->scanner, &token, false, state->strings)) {
@@ -997,7 +995,7 @@ ast_node_t parse_function_type(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_multiple_types(parser_state_t *state) {
+static ast_node_t parse_multiple_types(parser_state_t *state) {
     ast_node_t node = parse_type(state);
 
     token_t current = peek_token(state->scanner, state->strings);
@@ -1034,7 +1032,7 @@ ast_node_t parse_multiple_types(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_declaration_type(parser_state_t *state) {
+static ast_node_t parse_declaration_type(parser_state_t *state) {
     ast_node_t node = {};
 
     token_t token = peek_token(state->scanner, get_temporary_allocator());
@@ -1053,7 +1051,7 @@ ast_node_t parse_declaration_type(parser_state_t *state) {
     }
 }
 
-ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *names) {
+static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *names) {
     ast_node_t node = {}, type = {};
 
     node.type  = AST_TERN_MULT_DEF;
@@ -1110,7 +1108,7 @@ ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *nam
     return node;
 }
 
-ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
+static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
     ast_node_t node = {};
 
     node.type  = AST_BIN_UNKN_DEF;
@@ -1160,7 +1158,7 @@ ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
     return node;
 }
 
-ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
+static ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
     // @todo better checking_value 
     consume_token(TOK_UNION, state->scanner, NULL, false, get_temporary_allocator());
     consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
@@ -1177,7 +1175,7 @@ ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
     return result;
 }
 
-ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name) {
+static ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name) {
     // @todo better checking_value 
     consume_token(TOK_STRUCT, state->scanner, NULL, false, get_temporary_allocator());
     consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
@@ -1194,7 +1192,7 @@ ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name) {
     return result;
 }
 
-ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
+static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     ast_node_t result = {};
 
     allocator_t *talloc = get_temporary_allocator();
@@ -1239,7 +1237,7 @@ ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     return result;
 }
 
-ast_node_t parse_statement(parser_state_t *state) {
+static ast_node_t parse_statement(parser_state_t *state) {
     ast_node_t node = {};
 
     node.type = AST_ERROR;
@@ -1434,7 +1432,7 @@ ast_node_t parse_statement(parser_state_t *state) {
     return node;
 }
 
-ast_node_t parse_imperative_block(parser_state_t *state) {
+static ast_node_t parse_imperative_block(parser_state_t *state) {
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -1463,7 +1461,7 @@ ast_node_t parse_const_decl(parser_state_t *state) {
 }
 */
 
-ast_node_t parse_enum_decl(parser_state_t *state) {
+static ast_node_t parse_enum_decl(parser_state_t *state) {
     ast_node_t result = {};
 
     result.type = AST_ENUM_DECL;
@@ -1494,7 +1492,7 @@ ast_node_t parse_enum_decl(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_enum_block(parser_state_t *state) {
+static ast_node_t parse_enum_block(parser_state_t *state) {
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -1528,7 +1526,7 @@ ast_node_t parse_enum_block(parser_state_t *state) {
     return result;
 }
 
-ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
+static ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
     ast_node_t result = {};
     token_t start, stop;
 

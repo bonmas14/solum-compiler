@@ -19,4 +19,5 @@ codegen_t *codegen_create(allocator_t *allocator) {
 }
 
 void generate_code(compiler_t *compiler) {
+    UNUSED(compiler);
 }

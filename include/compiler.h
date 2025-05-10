@@ -10,7 +10,7 @@
 #include "analyzer.h"
 
 #define STRING_ALLOCATOR_INIT_SIZE 4096
-#define INIT_NODES_SIZE 1024
+#define INIT_NODES_SIZE 2048
 
 struct scanner_t;
 struct codegen_t;

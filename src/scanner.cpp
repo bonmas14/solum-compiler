@@ -401,7 +401,7 @@ static b32 process_word(scanner_t *state, token_t *token, allocator_t * alloc) {
     return true;
 }
 
-void eat_all_spaces(scanner_t *state) {
+static void eat_all_spaces(scanner_t *state) {
     u8 ch = peek_char(state);
 
     while (ch != 0 && (ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t')) {
@@ -649,7 +649,6 @@ b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *outpu
 
     output->size = file_size;
     fclose(file);
-
     return true;
 }
 

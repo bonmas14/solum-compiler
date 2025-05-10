@@ -15,7 +15,6 @@
 
 #include "strings.h"
 
-
 #ifdef _WIN32
 #define MODULES_PATH "SOLUM_MODULES"
 
