@@ -69,6 +69,8 @@ enum token_type_t {
     TOK_ENUM,
 
     TOK_VOID,
+    TOK_TRUE,
+    TOK_FALSE,
 
     TOK_U8,
     TOK_U16,
@@ -114,7 +116,7 @@ enum token_type_t {
 u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "struct", "union", "enum",
 
-    "void",
+    "void", "true", "false",
 
     "u8", "u16", "u32", "u64",
     "s8", "s16", "s32", "s64", 
@@ -135,8 +137,6 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
     "module", "use"
 };
 #endif
-
-b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *output);
 
 b32  scanner_open(string_t *filename, string_t *string, scanner_t *state);
 void scanner_close(scanner_t *state);

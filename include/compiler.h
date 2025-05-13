@@ -36,6 +36,6 @@ struct compiler_t {
 
 source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc);
 compiler_t create_compiler_instance(allocator_t *alloc);
-void compile(compiler_t *compiler);
+void compile(string_t filename);
 
 #endif

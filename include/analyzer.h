@@ -11,7 +11,6 @@ struct ast_node_t;
 #define MAX_COUNT_OF_RETS 1 
 
 enum types_t {
-    TYPE_ERROR,
     TYPE_UNKN,
 
     TYPE_u8,

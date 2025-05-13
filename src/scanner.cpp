@@ -616,43 +616,6 @@ b32 consume_token(u32 token_type, scanner_t *state, token_t *token, b32 dont_rep
     return true;
 }
 
-b32 read_file_into_string(string_t filename, allocator_t *alloc, string_t *output) {
-    if (alloc == NULL) alloc = default_allocator;
-
-    assert(alloc != NULL);
-    assert(output != NULL);
-    assert(filename.data != NULL);
-    assert(filename.size > 0);
-
-    FILE *file = fopen(string_temp_to_c_string(filename), "rb");
-
-    if (file == NULL) {
-        log_error(STRING("Scanner: Could not open file."));
-        log_error(filename); 
-        return false;
-    }
-
-    fseek(file, 0L, SEEK_END);
-    u64 file_size = ftell(file);
-    rewind(file);
-
-    if (file_size == 0) return false;
-
-    output->data = (u8*)mem_alloc(default_allocator, file_size);
-
-    u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
-
-    if (bytes_read < file_size) {
-        log_error(STRING("Scanner: Could not read file."));
-        log_error(filename); 
-        return false;
-    }
-
-    output->size = file_size;
-    fclose(file);
-    return true;
-}
-
 void scan_lines(scanner_t *state) {
     line_tuple_t line = {};
 
@@ -785,7 +748,7 @@ void log_info_token(string_t text, token_t token) {
     log_push_color(255, 255, 255);
     log_info(text);
     print_info(token);
-    print_lines_of_code(token, 3, 3, 0);
+    print_lines_of_code(token, 1, 1, 0);
     log_write(STRING("\n"));
     log_pop_color();
 }
@@ -796,7 +759,7 @@ void log_warning_token(string_t text, token_t token) {
     print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(token, 3, 3, 0);
+    print_lines_of_code(token, 1, 1, 0);
     log_write(STRING("\n"));
 
     log_pop_color();
@@ -809,7 +772,7 @@ void log_error_token(string_t text, token_t token) {
     print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(token, 3, 3, 0);
+    print_lines_of_code(token, 1, 1, 0);
     log_write(STRING("\n"));
 
     log_pop_color();

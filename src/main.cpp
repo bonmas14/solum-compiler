@@ -45,7 +45,6 @@ int main(int argc, char **argv) {
     init();
 
     profiler_begin();
-    profiler_block_start(STRING("Compile time"));
 
     if (argc < 1) { 
         assert(argc > 0); 
@@ -58,23 +57,13 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    compiler_t state = create_compiler_instance(NULL);
+    string_t file = string_copy(STRING(argv[1]), default_allocator);
 
-    if (!state.valid) {
-        return 100;
-    }
-
-    string_t filename = string_copy(STRING(argv[1]), default_allocator);
-
-    profiler_block_start(STRING("Load and process"));
-    if (load_and_process_file(&state, filename)) {
-        profiler_block_end();
-        compile(&state);
-    }
-
-    log_update_color();
+    profiler_block_start(STRING("Compile Action"));
+    compile(file);
     profiler_block_end();
 
+    log_update_color();
     profiler_end();
     visualize_profiler_state();
 

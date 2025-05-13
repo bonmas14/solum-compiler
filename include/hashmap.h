@@ -11,7 +11,7 @@
 #define FREE(x)       free(x) 
 #endif
 
-#define STANDART_MAP_SIZE 32
+#define STANDART_MAP_SIZE 16
 #define MAX_HASHMAP_LOAD 0.75
 
 #define COMPUTE_HASH(name) b32 name(u64 size, void * key)

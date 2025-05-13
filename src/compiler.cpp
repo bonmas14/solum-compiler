@@ -14,6 +14,7 @@
 #include "ir.h"
 
 #include "strings.h"
+#include "profiler.h"
 
 #ifdef _WIN32
 #define MODULES_PATH "SOLUM_MODULES"
@@ -79,21 +80,40 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
     return compiler;
 }
 
-void compile(compiler_t *compiler) {
-    if (!analyzer_preload_all_files(compiler)) {
+void compile(string_t filename) {
+    compiler_t state = create_compiler_instance(NULL);
+
+    if (!state.valid) {
+        log_error(STRING("Initialization of compiler is failed"));
         return;
     }
 
-    if (!analyze(compiler)) {
+    profiler_block_start(STRING("Load and process"));
+    if (!load_and_process_file(&state, filename)) {
+        profiler_block_end();
         return;
     }
+    profiler_block_end();
 
-    ir_t result = compile_program(compiler);
+    profiler_block_start(STRING("Preload all files"));
+    if (!analyzer_preload_all_files(&state)) {
+        profiler_block_end();
+        return;
+    }
+    profiler_block_end();
+
+    profiler_block_start(STRING("Analyze"));
+    if (!analyze(&state)) {
+        profiler_block_end();
+        return;
+    }
+    profiler_block_end();
+
+    ir_t result = compile_program(&state);
 
     // result will return final IR
     // everything should be compiled 
     // or there is an error
-
 
     if (result.is_valid) {
         log_info(STRING("Compiled successfully!!!!!"));
@@ -102,5 +122,6 @@ void compile(compiler_t *compiler) {
     }
 
     // codegen from IR here
+    return;
 }
 

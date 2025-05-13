@@ -151,6 +151,8 @@ static ast_node_t parse_primary(parser_state_t *state) {
         case TOKEN_CONST_STRING:
         case TOKEN_IDENT:
         case TOK_DEFAULT:
+        case TOK_TRUE:
+        case TOK_FALSE:
             result.token = advance_token(state->scanner, state->strings);
             break;
 

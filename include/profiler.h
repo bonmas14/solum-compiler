@@ -1,4 +1,5 @@
 #include "stddefines.h"
+#include "strings.h"
 
 #define profiler_func_start() profiler_block_start(STRING(__func__));
 #define profiler_func_end() profiler_block_end()
