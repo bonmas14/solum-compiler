@@ -16,15 +16,26 @@ main: () -> s32 = {
     state.array = ^array;
 
     while true {
-        step(@state);
-        draw(@state);
+        step(^state);
+        draw(^state);
     }
 
     return 0;
 }
 
-step: (state : ^State) = {
+count_neighbours: (state : ^State) = {
+}
 
+step: (state : ^State) = {
+    i : s64 = 0; 
+
+    while i < state.w * state.h {
+        x, y : s64 = i % state.w, i / state.w;
+
+        cell : u8 = state.array[i];
+
+        i = i + 1;
+    }
 }
 
 draw: (state: ^State) = {

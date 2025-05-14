@@ -271,8 +271,8 @@ b32 rebuild_map(hashmap_t<KeyType, DataType> *map) {
     }
 
     for (u64 i = 0; i < old_map.capacity; i++) {
-        if (!map->entries[i].occupied) continue;
-        if (map->entries[i].deleted)   continue;
+        if (!old_map.entries[i].occupied) continue;
+        if (old_map.entries[i].deleted)   continue;
 
         hashmap_add(map, old_map.entries[i].key, &old_map.entries[i].value);
     }

@@ -44,8 +44,6 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     init();
 
-    profiler_begin();
-
     if (argc < 1) { 
         assert(argc > 0); 
         return -1; 
@@ -57,14 +55,27 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    string_t file = string_copy(STRING(argv[1]), default_allocator);
-
+#ifdef DEBUG
+    profiler_begin();
     profiler_block_start(STRING("Compile Action"));
-    compile(file);
-    profiler_block_end();
+#endif
 
+    f64 start = debug_get_time();
+    {
+        string_t file = string_copy(STRING(argv[1]), default_allocator);
+
+        compile(file);
+    }
+
+    f64 end = debug_get_time();
     log_update_color();
+    fprintf(stderr, "time: %lf\n", end - start);
+#ifdef DEBUG
+    profiler_block_end();
     profiler_end();
+#endif
+
+
     visualize_profiler_state();
 
     log_color_reset();
