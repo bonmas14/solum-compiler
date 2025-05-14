@@ -5,7 +5,11 @@ State: struct = {
     array: ^u8;
 }
 
+cout : HANDLE;
+
 main: () -> s32 = {
+    cout = win_get_std_handle(-10);
+
     array: [100, 100]u8;
 
     state : State;
@@ -23,21 +27,82 @@ main: () -> s32 = {
     return 0;
 }
 
-count_neighbours: (state : ^State) = {
-}
-
 step: (state : ^State) = {
     i : s64 = 0; 
 
+    cx, cy : s64;
+
+    // cleaning state
     while i < state.w * state.h {
         x, y : s64 = i % state.w, i / state.w;
+        cell : ^u8 = state.array + x + y * state.w;
+        @cell = @cell & 0x80;
+    }
 
-        cell : u8 = state.array[i];
+    // calculating neignbours
+    while i < state.w * state.h {
+        x, y : s64 = i % state.w, i / state.w;
+        cell : ^u8 = state.array + x + y * state.w;
 
+        cx, cy = x - 1, y - 1;
+        
+        count_neighbours(state, cell, x - 1, y - 1);
+        count_neighbours(state, cell, x,     y - 1);
+        count_neighbours(state, cell, x + 1, y - 1);
+
+        count_neighbours(state, cell, x - 1, y);
+        count_neighbours(state, cell, x + 1, y);
+
+        count_neighbours(state, cell, x - 1, y + 1);
+        count_neighbours(state, cell, x,     y + 1);
+        count_neighbours(state, cell, x + 1, y + 1);
+
+        i = i + 1;
+    }
+
+    // calculating new state
+    while i < state.w * state.h {
+        x, y: s64 = i % state.w, i / state.w;
+        cell: ^u8 = state.array + x + y * state.w;
+        alive, n: b8, u8 = @cell & 0x80 >> 7, @cell & 0x7F;
+
+        if alive && (n > 3 || n < 2) {
+            @cell = 0x00;
+        } if alive || n == 3 {
+            @cell = 0x80;
+        }
+        
         i = i + 1;
     }
 }
 
-draw: (state: ^State) = {
-    
+count_neighbours: (state: ^State, cell: ^u8, x: s64, y: s64) = {
+   if (x > 0 && x < state.w) && (y > 0 && y < state.h) {
+        cell = @cell + @(cell - x + y * state.w) & 0x80 >> 7;
+       @(cell - x + y * state.w) = @cell & 0x80 >> 7;
+   }
 }
+
+draw: (state: ^State) = {
+    i : s64 = 0; 
+    array : [101, 100] u8;
+
+    while i < state.w * state.h {
+        x, y : s64 = i % state.w, i / state.w;
+
+        cell : u8 = state.array[i] | 0x80;
+        
+        if cell {
+            array[x + y * (state.w + 1)] = 0x23; // '#'
+        } else {
+            array[x + y * (state.w + 1)] = 0x2E; // '.'
+        }
+
+        if x == state.w - 1 {
+            array[state.w + y * (state.w + 1)] = 0x0A; // '\n'
+        }
+    }
+
+    win_write_console(cout, array, 101 * 100, 0, 0);
+}
+

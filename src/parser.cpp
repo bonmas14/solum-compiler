@@ -1382,8 +1382,12 @@ static ast_node_t parse_statement(parser_state_t *state) {
 
             ast_node_t expr = parse_assignment_expression(state);
             check_value(expr.type != AST_EMPTY);
-            if (!consume_token(TOK_THEN, state->scanner, NULL, false, get_temporary_allocator())) {
-                node.type = AST_ERROR;
+
+            if (peek_token(state->scanner, get_temporary_allocator()).type != '{') {
+                if (!consume_token(TOK_THEN, state->scanner, NULL, false, get_temporary_allocator())) {
+                    node.type = AST_ERROR;
+                    break;
+                }
             }
             
             ast_node_t stmt = parse_statement(state);

@@ -315,6 +315,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                 switch (get_if_exists(state, true, var_name, &output)) {
                     case GET_NOT_FIND:
                         log_error_token(STRING("Couldn't find identifier"), expr->token);
+                        result = false;
                         // @todo, break at all
                         break;
 
@@ -1483,6 +1484,8 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 // @todo: here are all the trailing scopes go...
                 // and here we will resolve our vairables
                 ast_node_t *stmt = node->list_start;
+                hashmap_t<string_t, scope_entry_t> block_local_scope = {};
+                stack_push(&state->current_search_stack, &block_local_scope);
 
                 for (u64 i = 0; i < node->child_count; i++) {
                     switch (analyze_statement(state, expect_return_amount, false, stmt)) {
@@ -1513,6 +1516,9 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
 
                     stmt = stmt->list_next;
                 }
+
+                stack_pop(&state->current_search_stack);
+                hashmap_delete(&block_local_scope);
             }
             break;
         case AST_UNNAMED_MODULE:
