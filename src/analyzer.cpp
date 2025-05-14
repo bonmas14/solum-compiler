@@ -301,7 +301,6 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         case TOKEN_CONST_FP:
         case TOKEN_CONST_INT:
         case TOKEN_CONST_STRING:
-        case TOK_DEFAULT:
         case TOK_TRUE:
         case TOK_FALSE:
             expr->analyzed = true;
@@ -412,6 +411,19 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             break;
 
         case AST_BIN_ASSIGN:
+
+            // @todo... we should analyze left one, so we sure that we dont do
+            // a + 12231 = 12;
+            
+            if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->left)) {
+                result = false;
+            }
+
+            if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->right)) {
+                result = false;
+            }
+
+            break;
         case AST_BIN_GR:
         case AST_BIN_LS:
         case AST_BIN_GEQ:
@@ -439,27 +451,22 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             }
             break;
 
-        case AST_BIN_SWAP:
-            log_error_token(STRING("AST_BIN_SWAP DOESNT WORK RN"), expr->token);
-            // @todo: 
-            // this should be big variant of assignment code,
-            // that will also copy variables on right to temporary storage, 
-            // so this code will work too:
-            // ----
-            // a, b : s32, s32 = 1, 5;
-            //
-            // // a = 1
-            // // b = 5
-            //
-            // a, b = b, a;
-            //
-            // // a = 5
-            // // b = 1
-            //
-            // or something like this
-            // a, b = 12, 4 + 54;
-            // ----
-            break;
+        case AST_BIN_SWAP: {
+                s64 swap_count = expr->left->child_count;
+
+                if (expr->left->child_count != expr->right->child_count) {
+                    log_error_token(STRING("Different amount of parts on different sides of swap expression:"), expr->token);
+                    result = false;
+                }
+
+                if (!analyze_expression(state, swap_count, depend_on, expr->left)) {
+                    result = false;
+                }
+
+                if (!analyze_expression(state, swap_count, depend_on, expr->right)) {
+                    result = false;
+                }
+            } break;
         case AST_SEPARATION: {
             ast_node_t *next = expr->list_start;
 

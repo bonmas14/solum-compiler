@@ -150,7 +150,6 @@ static ast_node_t parse_primary(parser_state_t *state) {
         case TOKEN_CONST_INT:
         case TOKEN_CONST_STRING:
         case TOKEN_IDENT:
-        case TOK_DEFAULT:
         case TOK_TRUE:
         case TOK_FALSE:
             result.token = advance_token(state->scanner, state->strings);
@@ -221,7 +220,6 @@ static ast_node_t parse_function_call(parser_state_t *state) {
             case TOKEN_CONST_FP:
             case TOKEN_CONST_INT:
             case TOKEN_CONST_STRING:
-            case TOK_DEFAULT:
                 result.type = AST_ERROR;
                 break;
         }
@@ -738,10 +736,10 @@ static ast_node_t parse_separated_expressions(parser_state_t *state) {
 }
 
 static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
-    ast_node_t node;
+    ast_node_t node = {};
 
     if (expr == NULL) {
-        ast_node_t node = parse_separated_primary_expressions(state);
+        node = parse_separated_expressions(state);
         if (node.type == AST_EMPTY) return node;
     } else {
         node = *expr;
@@ -1345,7 +1343,6 @@ static ast_node_t parse_statement(parser_state_t *state) {
         } else {
             node = parse_swap_expression(state, &expr);
         }
-
     } else switch (name.type) {
         case  '{': {
             ignore_semicolon = true;
@@ -1380,7 +1377,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_IF_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_assignment_expression(state);
+            ast_node_t expr = parse_cast_expression(state);
             check_value(expr.type != AST_EMPTY);
 
             if (peek_token(state->scanner, get_temporary_allocator()).type != '{') {
@@ -1428,7 +1425,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_WHILE_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_assignment_expression(state);
+            ast_node_t expr = parse_cast_expression(state);
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
@@ -1441,7 +1438,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_WHILE_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_assignment_expression(state);
+            ast_node_t expr = parse_cast_expression(state);
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
@@ -1468,7 +1465,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
         } break;
 
         default: {
-            node = parse_assignment_expression(state);
+            node = parse_swap_expression(state, NULL);
         } break;
     }
 

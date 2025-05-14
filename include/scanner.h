@@ -87,7 +87,6 @@ enum token_type_t {
 
     TOK_BOOL8,
     TOK_BOOL32,
-    TOK_DEFAULT,
 
     TOK_CAST,
 
@@ -105,7 +104,6 @@ enum token_type_t {
     TOK_IT,
     TOK_AS,
 
-    TOK_MODULE,
     TOK_USE,
 
     _KW_STOP,
@@ -126,8 +124,6 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "b8", "b32", 
 
-    "default",
-
     "cast",
 
     "if", "then", "else", "while", "for", "return",
@@ -136,7 +132,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "external", "it", "as",
 
-    "module", "use"
+    "use"
 };
 #endif
 
