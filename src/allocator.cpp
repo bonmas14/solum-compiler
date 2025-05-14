@@ -1,4 +1,5 @@
 #include "allocator.h"
+#include "logger.h"
 
 #define ALLOCATOR_GLOBAL_BUFF_SIZE 128
 

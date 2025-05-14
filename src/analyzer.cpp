@@ -400,6 +400,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             }
             break;
         case AST_FUNC_CALL:
+            // @todo, analyze amount of arguments and parameters
             if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->left)) {
                 result = false;
             }
@@ -502,6 +503,21 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     }
 
     if (entry->type == ENTRY_FUNC) {
+        // @todo finish EXT_FUNC_INFO
+        if (expr->type == AST_EXT_FUNC_INFO || expr->type == AST_NAMED_EXT_FUNC_INFO) {
+
+            // left is lib name
+            // right is export name
+            string_t t = string_temp_concat(STRING("External function from: "), expr->left->token.data.string);
+            if (expr->type == AST_NAMED_EXT_FUNC_INFO) {
+                t = string_temp_concat(t, STRING(":"));
+                t = string_temp_concat(t, expr->right->token.data.string);
+            }
+
+            log_warning(t);
+            return true;
+        }
+
         if (expr->type != AST_BLOCK_IMPERATIVE) {
             log_error_token(STRING("cant do functions with expression body."), expr->token);
             return false;
@@ -519,6 +535,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
         }
 
         b32 result = analyze_statement(state, entry->return_typenames.count, false, expr);
+
         stack_pop(&state->current_search_stack);
         expr->analyzed = true;
 
@@ -558,16 +575,34 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     entry->expr = expr;
     entry->info.pointer_depth = 0;
 
-    b32 is_pointer = false;
-
+    b32 is_indirect = false;
 
     // @todo:
     // the problem is that if we have arrays, we should be able to create array of pointers or pointer to array of pointers...
     //
-    while (type->type == AST_PTR_TYPE) {
+
+    if (type->type == AST_ARR_TYPE) {
+        b32 result = analyze_expression(state, -1, NULL, type->left);
+
+        if (!result) {
+            log_error_token(STRING("Bad array initializer"), type->left->token);
+            return false;
+        }
+
+        // we need to set size... here @todo
+        entry->info.is_array = true;
+        type = type->right;
+    }
+
+    while (type->type == AST_PTR_TYPE || type->type == AST_ARR_TYPE) {
+        if (type->type != AST_PTR_TYPE) {
+            log_error_token(STRING("Cant create pointer to an array type."), type->token);
+            return false;
+        } 
+
         entry->info.pointer_depth++;
         type = type->left;
-        is_pointer = true;
+        is_indirect = true;
     }
 
     if (type->type != AST_UNKN_TYPE) {
@@ -590,7 +625,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             } break;
 
             case AST_VOID_TYPE:
-                if (!is_pointer) {
+                if (!is_indirect) {
                     log_error_token(STRING("Cant make variable with void type..."), type->token);
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
@@ -609,14 +644,11 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
+            case AST_ARR_TYPE:
             case AST_PTR_TYPE:
                 assert(false);
                 return false;
 
-            case AST_ARR_TYPE:
-                // here we basically need to check if its an array of what...
-
-                // analyze_expression(state, -1, NULL, expr);
             default:
                 log_error_token(STRING("unexpected type of ast node..."), entry->node->token);
                 entry->type = ENTRY_ERROR;
@@ -626,20 +658,20 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     } else {
         string_t type_name = type->token.data.string;
 
-        if (!is_pointer && state->internal_deps.index > 0) {
+        if (!is_indirect && state->internal_deps.index > 0) {
             stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), type_name);
         }
 
         scope_entry_t *output_type = NULL; 
 
-        switch (get_if_exists(state, !is_pointer, type_name, &output_type)) {
+        switch (get_if_exists(state, !is_indirect, type_name, &output_type)) {
             case GET_NOT_FIND:
             case GET_NOT_ANALYZED:
                 *should_wait = true;
                 break;
 
             case GET_DEPS_ERROR:
-                if (!is_pointer) {
+                if (!is_indirect) {
                     return false;
                 }
             case GET_SUCCESS: 
@@ -728,18 +760,37 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         }
 
         type_info_t info = {};
-        b32 is_pointer = false;
+        b32 is_indirect = false;
 
-        while (curr->type == AST_PTR_TYPE) {
+        if (curr->type == AST_ARR_TYPE) {
+            b32 result = analyze_expression(state, -1, NULL, curr->left);
+
+            if (!result) {
+                log_error_token(STRING("Bad array initializer"), curr->left->token);
+                return false;
+            }
+
+            // we need to set size... here @todo
+            info.is_array = true;
+            curr = curr->right;
+        }
+
+        while (curr->type == AST_PTR_TYPE || curr->type == AST_ARR_TYPE) {
+            if (curr->type != AST_PTR_TYPE) {
+                log_error_token(STRING("Cant create pointer to an array type."), curr->token);
+                result = false;
+                break;
+            } 
+
             info.pointer_depth++;
             curr = curr->left;
-            is_pointer = true;
+            is_indirect = true;
         }
 
         if (curr->type != AST_UNKN_TYPE) {
             switch (curr->type) {
                 case AST_VOID_TYPE: // fallthrough
-                    if (!is_pointer) {
+                    if (!is_indirect) {
                         log_error_token(STRING("Cant return void."), curr->token);
                         entry->type = ENTRY_ERROR;
                         result = false;
@@ -749,15 +800,11 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                     set_std_info(curr->token, &info);
                     break;
 
-                case AST_ARR_TYPE:
-                    log_error(STRING("we dont support arrays right now"));
-                    entry->type = ENTRY_ERROR;
-                    result = false;
-                    break;
 
                 case AST_MUL_AUTO:
                 case AST_AUTO_TYPE:
                 case AST_PTR_TYPE: 
+                case AST_ARR_TYPE:
                     assert(false);
 
                 default:
@@ -768,20 +815,20 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         } else {
             string_t type_name = curr->token.data.string;
 
-            if (!is_pointer && state->internal_deps.index > 0) {
+            if (!is_indirect && state->internal_deps.index > 0) {
                 stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), type_name);
             }
 
             scope_entry_t *output_type = NULL; 
 
-            switch (get_if_exists(state, !is_pointer, type_name, &output_type)) {
+            switch (get_if_exists(state, !is_indirect, type_name, &output_type)) {
                 case GET_NOT_FIND:
                 case GET_NOT_ANALYZED:
                     *should_wait = true;
                     break;
 
                 case GET_DEPS_ERROR:
-                    if (!is_pointer) {
+                    if (!is_indirect) {
                         return false;
                     }
                 case GET_SUCCESS: 
@@ -863,6 +910,8 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     entry->node = node;
     entry->type = ENTRY_VAR;
 
+    log_error_token(STRING("TODO: enums"), node->token);
+    check_value(false);
     // node->left // expression
     
     node->analyzed = true;
@@ -1816,6 +1865,7 @@ b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
     }
 
     if (not_finished) {
+        log_error(STRING("Probably undefined symbols..."));
         return false;
     }
 

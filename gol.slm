@@ -1,17 +1,19 @@
+use: "win";
+
 State: struct = {
     w, h:  u64;
     array: ^u8;
 }
 
 main: () -> s32 = {
-    a: ^[100, 100]u8;
+    array: [100, 100]u8;
 
     state : State;
 
     state.w = 100;
     state.h = 100;
 
-    state.array = @a;
+    state.array = ^array;
 
     while true {
         step(@state);
@@ -26,5 +28,5 @@ step: (state : ^State) = {
 }
 
 draw: (state: ^State) = {
-
+    
 }

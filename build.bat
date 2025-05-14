@@ -1,5 +1,4 @@
 @echo off
-
 set "exe_name=slm"
 set "cc=clang-cl"
 set "lld=lld-link"
@@ -10,7 +9,7 @@ set "src_path=src\"
 set "obj_main_path=obj\"
 
 set "global_defines=/D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE"
-set "compile_config=/nologo /c /std:c++14 -m64 /utf-8 /Gr /TP /Z7 /W4 /WX- /diagnostics:column /fp:precise /Iinclude %global_defines%"
+set "compile_config=/nologo /c /std:c++14 /utf-8 /Gr /TP /Z7 /W4 /WX- /diagnostics:column /fp:precise /Iinclude %global_defines%"
 
 if "%1"=="Release" (
     set "name=%bin_path%%exe_name%-r"

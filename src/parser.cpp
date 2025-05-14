@@ -180,7 +180,6 @@ static ast_node_t parse_primary(parser_state_t *state) {
             break;
     }
 
-
     return result;
 }
 
@@ -1110,6 +1109,53 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
     return node;
 }
 
+static ast_node_t parse_external_symbol_import(parser_state_t *state) {
+    ast_node_t result = {};
+    if (!consume_token(TOK_EXTERNAL, state->scanner, &result.token, false, state->strings)) {
+        result.type = AST_ERROR;
+        panic_skip(state);
+        return result;
+    }
+
+    result.type = AST_EXT_FUNC_INFO;
+
+    ast_node_t node = parse_primary(state);
+
+    if (node.type == AST_ERROR) {
+        log_error_token(STRING("bad library import name."), result.token);
+        result.type = AST_ERROR;
+        return result;
+    } else if (node.token.type != TOKEN_CONST_STRING) {
+        log_error_token(STRING("Library import name should be a string."), node.token);
+        result.type = AST_ERROR;
+    }
+
+    add_left_node(state, &result, &node);
+
+    if (!consume_token(TOK_AS, state->scanner, &result.token, true, state->strings)) {
+        return result;
+    }
+
+    result.type = AST_NAMED_EXT_FUNC_INFO;
+
+    node = parse_primary(state);
+
+    if (node.type == AST_ERROR) {
+        log_error_token(STRING("bad import symbol name."), result.token);
+        result.type = AST_ERROR;
+        return result;
+    } else if (node.token.type != TOKEN_CONST_STRING) {
+        log_error_token(STRING("Import symbol name should be a string"), node.token);
+        result.type = AST_ERROR;
+    }
+
+    // @todo, check if it is valid syntax
+
+    add_right_node(state, &result, &node);
+
+    return result;
+}
+
 static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
     ast_node_t node = {};
 
@@ -1145,6 +1191,8 @@ static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *
 
     if (token.type == '{') {
         data = parse_block(state, AST_BLOCK_IMPERATIVE);
+    } else if (type.type == AST_FUNC_TYPE && token.type == TOK_EXTERNAL) {
+        data = parse_external_symbol_import(state);
     } else {
         data = parse_assignment_expression(state);
     }

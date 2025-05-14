@@ -2,7 +2,6 @@
 #define ALLOCATOR_H
 
 #include "stddefines.h"
-#include "logger.h"
 
 enum alloc_message_t {
     ALLOC_ALLOCATE,

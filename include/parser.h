@@ -87,6 +87,8 @@ enum ast_types_t {
     // VALUE NAME , L TYPE , R EXPR / BLOCK (DATA, CODE) / default / keyword
 
     AST_PARAM_DEF, 
+    AST_EXT_FUNC_INFO,
+    AST_NAMED_EXT_FUNC_INFO,
 
     AST_UNARY_VAR_DEF,
     AST_BIN_UNKN_DEF,

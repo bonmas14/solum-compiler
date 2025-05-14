@@ -1,0 +1,52 @@
+HANDLE: struct = {
+    _: ^void;
+};
+
+/* @todo: enums
+Win_Std_Handles: enum(s32) = {
+    STD_INPUT_HANDLE  = -10,
+    STD_OUTPUT_HANDLE = -11,
+    STD_ERROR_HANDLE  = -12,
+};
+*/
+
+win_get_last_error: (
+) -> s32 = external "kernel32.lib" as "GetLastError";
+
+win_get_std_handle: (
+    nStdHandle: s32
+) -> HANDLE = external "kernel32.lib" as "GetStdHandle";
+
+// ---
+win_alloc_console: (
+) -> b32 = external "kernel32.lib" as "AllocConsole";
+
+// ---
+win_free_console: (
+) -> b32 = external "kernel32.lib" as "FreeConsole";
+
+// ---
+ATTACH_PARENT_PROCESS : s32 = -1;
+
+win_attach_console: (
+        dwProcessId: s32
+) -> b32 = external "kernel32.lib" as "AttachConsole";
+
+// ---
+win_write_console: (
+    hConsoleOutput:          HANDLE,
+    lpBuffer:               ^void,
+    nNumberOfCharsToWrite:   s32,
+    lpNumberOfCharsWritten: ^s32,
+    lpReserved:             ^void
+) -> b32 = external "kernel32.lib" as "WriteConsole";
+
+// ---
+win_read_console: (
+    hConsoleInput:        HANDLE,
+    lpBuffer:            ^void,
+    nNumberOfCharsToRead: s32,
+    lpNumberOfCharsRead: ^s32,
+    pInputControl:       ^void
+) -> b32 = external "kernel32.lib" as "ReadConsole";
+

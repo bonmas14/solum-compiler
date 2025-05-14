@@ -34,6 +34,8 @@ enum types_t {
 
 struct type_info_t {
     u32 type;
+    b32 is_array;
+    b32 array_size;
     u32 size;
     u32 pointer_depth;
     string_t type_name;
@@ -56,10 +58,6 @@ struct scope_entry_t {
     list_t<type_info_t> return_typenames;
 
     // ENTRY_VAR
-    
-    // b32 array_type;
-    // u32 array_count;
-
     type_info_t info;
 };
 
