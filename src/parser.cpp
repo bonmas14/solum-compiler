@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "arena.h"
 #include "talloc.h"
+#include "strings.h"
 
 // @todo for parser:
 // rewrite expression parser, because it is too complex and plain
@@ -18,9 +19,7 @@ struct parser_state_t {
 
 static ast_node_t parse_type(parser_state_t *state);
 
-static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr);
 static ast_node_t parse_separated_expressions(parser_state_t *state);
-static ast_node_t parse_cast_expression(parser_state_t *state);
 
 static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name);
 static ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name);
@@ -61,11 +60,15 @@ static void panic_skip_until_token(u32 value, parser_state_t *state) {
     }
 }
 
+
 static void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
-    check_value(node->type != AST_ERROR);
+    if (node->type == AST_ERROR) {
+        log_error_token(STRING("Bad expression: "), root->token);
+        return;
+    }
 
     root->left = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->left != NULL);
@@ -80,7 +83,10 @@ static void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *
     assert(root != NULL);
     assert(node != NULL);
 
-    check_value(node->type != AST_ERROR);
+    if (node->type == AST_ERROR) {
+        log_error_token(STRING("Bad expression: "), root->token);
+        return;
+    }
 
     root->right = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->right != NULL);
@@ -95,7 +101,10 @@ static void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t 
     assert(root != NULL);
     assert(node != NULL);
 
-    check_value(node->type != AST_ERROR);
+    if (node->type == AST_ERROR) {
+        log_error_token(STRING("Bad expression: "), root->token);
+        return;
+    }
 
     root->center = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
     assert(root->center != NULL);
@@ -110,7 +119,10 @@ static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     assert(root != NULL);
     assert(node != NULL);
 
-    check_value(node->type != AST_ERROR);
+    if (node->type == AST_ERROR) {
+        log_error_token(STRING("Bad expression: "), root->token);
+        return;
+    }
 
     if (root->list_start == NULL) {
         root->list_start = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
@@ -136,16 +148,173 @@ static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
 }
 
 /* parsing */
+struct bind_power_t {
+    s16 left, right;
+};
 
-static ast_node_t parse_primary(parser_state_t *state) {
+static bind_power_t get_prefix_bind_power(token_t token) {
+    switch (token.type) {
+        case TOK_CAST: return {0, 3}; // @cast is special expression
+
+        case '@': 
+        case '^':
+        case '-': 
+        case '!': return {0, 23};
+
+        default:
+            log_error_token(STRING("Bad prefix operator: "), token);
+            break;
+    }
+    return {-1, -1};
+}
+
+static bind_power_t get_infix_bind_power(token_t token) {
+    switch (token.type) {
+        case '=':   return {2, 1};
+
+        case TOKEN_LOGIC_OR:
+                    return {5, 6};
+
+        case TOKEN_LOGIC_AND:
+                    return {7, 8};
+        
+        case TOKEN_GR: 
+        case TOKEN_LS:
+        case TOKEN_GEQ:
+        case TOKEN_LEQ:
+        case TOKEN_EQ:
+        case TOKEN_NEQ: 
+                  return {9, 10};
+
+        case '+':
+        case '-': return {11, 12};
+
+        case '*':
+        case '/':
+        case '%': return {13, 14};
+
+        case '^': return {15, 16};
+        case '|': return {17, 18};
+        case '&': return {19, 20};
+        case TOKEN_LSHIFT: 
+        case TOKEN_RSHIFT: 
+                  return {21, 22};
+
+        // prefixes are here
+        // postfixes are here
+        case '.': return {28, 27};
+
+        default:
+            break;
+    }
+    return { -1, -1 };
+}
+
+static bind_power_t get_postfix_bind_power(token_t token) {
+    switch (token.type) {
+        case '[': return {25, 0};
+        case '(': return {25, 0};
+
+        default:
+            break;
+    }
+    return {-1, -1};
+}
+
+static u32 get_ast_type_based_on_token(token_t token) {
+    switch (token.type) {
+        case TOKEN_CONST_FP:
+        case TOKEN_CONST_INT:
+        case TOKEN_CONST_STRING:
+        case TOKEN_IDENT:
+        case TOK_TRUE:
+        case TOK_FALSE:
+            return AST_PRIMARY;
+
+        default:
+            log_error_token(STRING("Unknown primary type: "), token);
+            return AST_ERROR;
+    }
+
+    return AST_ERROR;
+}
+
+static u32 get_ast_type_based_on_prefix_token(token_t token) {
+    switch (token.type) {
+        case '@': return AST_UNARY_DEREF;  break;
+        case '^': return AST_UNARY_REF;    break;
+        case '-': return AST_UNARY_NEGATE; break;
+        case '!': return AST_UNARY_NOT;    break;
+
+        case TOK_CAST: return AST_BIN_CAST; break;
+
+        default:
+            log_error_token(STRING("Unknown prefix operator type: "), token);
+            return AST_ERROR;
+    }
+
+    return AST_ERROR;
+}
+
+static u32 get_ast_type_based_on_infix_token(token_t token) {
+    switch (token.type) {
+        case '=': return AST_BIN_ASSIGN;
+
+        case '+': return AST_BIN_ADD;
+        case '-': return AST_BIN_SUB;
+
+        case '*': return AST_BIN_MUL;
+        case '/': return AST_BIN_DIV;
+        case '%': return AST_BIN_MOD;
+
+        case '.': return AST_MEMBER_ACCESS;
+
+        case TOKEN_GR:  return AST_BIN_GR;
+        case TOKEN_LS:  return AST_BIN_LS;
+        case TOKEN_GEQ: return AST_BIN_GEQ;
+        case TOKEN_LEQ: return AST_BIN_LEQ;
+        case TOKEN_EQ:  return AST_BIN_EQ;
+        case TOKEN_NEQ: return AST_BIN_NEQ;
+
+        case TOKEN_LOGIC_AND: return AST_BIN_LOG_AND;
+        case TOKEN_LOGIC_OR:  return AST_BIN_LOG_OR;
+
+        case '&': return AST_BIN_BIT_AND;
+        case '^': return AST_BIN_BIT_XOR;
+        case '|': return AST_BIN_BIT_OR;
+        case TOKEN_LSHIFT: return AST_BIN_BIT_LSHIFT;
+        case TOKEN_RSHIFT: return AST_BIN_BIT_RSHIFT;
+
+        default:
+            log_error_token(STRING("Unknown infix operator type: "), token);
+            return AST_ERROR;
+    }
+
+    return AST_ERROR;
+}
+
+static u32 get_ast_type_based_on_postfix_token(token_t token) {
+    switch (token.type) {
+        case '[': return AST_ARRAY_ACCESS; break;
+        case '(': return AST_FUNC_CALL; break;
+
+        default:
+            log_error_token(STRING("Unknown postfix operator type: "), token);
+            return AST_ERROR;
+    }
+
+    return AST_ERROR;
+}
+
+static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0) {
+    assert(state != NULL);
+    allocator_t *talloc = get_temporary_allocator();
     ast_node_t result = {};
 
-    allocator_t *talloc = get_temporary_allocator();
+    token_t left = peek_token(state->scanner, talloc);
+    result.token = left;
 
-    result.type  = AST_PRIMARY;
-    result.token = peek_token(state->scanner, talloc);
-
-    switch (result.token.type) {
+    switch (left.type) {
         case TOKEN_CONST_FP:
         case TOKEN_CONST_INT:
         case TOKEN_CONST_STRING:
@@ -153,505 +322,125 @@ static ast_node_t parse_primary(parser_state_t *state) {
         case TOK_TRUE:
         case TOK_FALSE:
             result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_OPEN_BRACE: {
-            advance_token(state->scanner, talloc);
-            token_t next = peek_token(state->scanner, talloc);
-
-            // @todo change this to something less ugly
-            if (next.type == TOKEN_CLOSE_BRACE) {
-                result.type = AST_EMPTY;
-                advance_token(state->scanner, talloc);
-                break;
-            }
-
-            result = parse_cast_expression(state); 
-            
-            token_t error_token = {};
-            if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, &error_token, false, talloc)) {
-                result.type = AST_ERROR;
-            }
-        } break;
-
-        default:
-            result.type = AST_EMPTY;
-            break;
-    }
-
-    return result;
-}
-
-// @todo rewrite
-static ast_node_t parse_function_call(parser_state_t *state) {
-    ast_node_t node = parse_primary(state);
-    if (node.type == AST_EMPTY) return node;
-
-    allocator_t *talloc = get_temporary_allocator();
-
-    ast_node_t result = {};
-    token_t next = peek_token(state->scanner, get_temporary_allocator());
-
-    if (next.type == '(') {
-        result.type  = AST_FUNC_CALL;
-        result.token = advance_token(state->scanner, state->strings);
-
-        add_left_node(state, &result, &node);
-        node = parse_separated_expressions(state);
-
-        check_value(node.type != AST_ERROR); // @todo: better messages
-        add_right_node(state, &result, &node);
-            
-        consume_token(')', state->scanner, NULL, true, talloc);
-    } else if (next.type == '.') {
-        result.type  = AST_MEMBER_ACCESS;
-        result.token = advance_token(state->scanner, state->strings);
-
-        add_left_node(state, &result, &node);
-        node = parse_function_call(state);
-            
-        check_value(node.type != AST_EMPTY);
-        check_value(node.type != AST_ERROR);
-
-        switch (node.token.type) {
-            case TOKEN_IDENT:
-                break;
-
-            case TOKEN_CONST_FP:
-            case TOKEN_CONST_INT:
-            case TOKEN_CONST_STRING:
-                result.type = AST_ERROR;
-                break;
-        }
-
-        add_right_node(state, &result, &node);
-    } else if (next.type == '[') {
-        result.type  = AST_ARRAY_ACCESS;
-        result.token = advance_token(state->scanner, state->strings);
-
-        add_left_node(state, &result, &node);
-
-        node = parse_separated_expressions(state);
-            
-        consume_token(']', state->scanner, NULL, false, talloc);
-        check_value(node.type != AST_EMPTY);
-        check_value(node.type != AST_ERROR);
-
-        add_right_node(state, &result, &node);
-    } else {
-        result = node;
-    }
-
-    return result;
-}
-
-static ast_node_t parse_unary(parser_state_t *state) {
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case '@':
-            result.type = AST_UNARY_DEREF;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case '^':
-            result.type = AST_UNARY_REF;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
+            result.type  = get_ast_type_based_on_token(left);
+            break; // Atom
 
         case '-':
-            result.type = AST_UNARY_NEGATE;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
+        case '!':
+        case '@':
+        case '^':
+            {
+                result.token    = advance_token(state->scanner, state->strings);
+                result.type     = get_ast_type_based_on_prefix_token(left);
+                bind_power_t bp = get_prefix_bind_power(left);
+                ast_node_t lhs  = parse_expression(state, bp.right);
+                add_left_node(state, &result, &lhs);
+            } break; // prefix operations
 
-        case '!': 
-            result.type = AST_UNARY_NOT;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
+        case '(':
+            {
+                result.token = advance_token(state->scanner, state->strings);
+                result = parse_expression(state, 0);
+                if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, NULL, false, talloc)) {
+                    result.type = AST_ERROR;
+                }
+            } break;
 
-        case TOKEN_ERROR: 
-            result.type = AST_ERROR;
-            advance_token(state->scanner, get_temporary_allocator());
+        case TOK_CAST:
+            {
+                result.token = advance_token(state->scanner, state->strings);
+                if (!consume_token('(', state->scanner, NULL, false, get_temporary_allocator())) {
+                    break;
+                }
+
+                ast_node_t lhs = parse_type(state); // @todo, make pratt type parser?
+
+                if (!consume_token(')', state->scanner, NULL, false, get_temporary_allocator())) {
+                    break;
+                }
+
+                result.type = get_ast_type_based_on_prefix_token(left);
+                bind_power_t bp = get_prefix_bind_power(left);
+                ast_node_t rhs = parse_expression(state, bp.right);
+
+                add_left_node(state,  &result, &lhs);
+                add_right_node(state, &result, &rhs);
+            } break;
+
+        default:
+            result.type  = AST_EMPTY;
             return result;
-
-        default:
-            return parse_function_call(state);
     }
 
-    ast_node_t child = parse_unary(state); // @todo check_value for errors
+    while (true) {
+        token_t op = peek_token(state->scanner, state->strings);
 
-    if (child.type == AST_EMPTY || child.type == AST_ERROR) {
-        check_value(false); // @todo better logging and parsing
-    }
-
-    add_left_node(state, &result, &child);
-
-    return result;
-}
-
-// @todo rewrite
-static ast_node_t parse_shift(parser_state_t *state) {
-    ast_node_t node = parse_unary(state);
-
-    if (node.type == AST_EMPTY) return node; 
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case TOKEN_LSHIFT: 
-            result.type  = AST_BIN_BIT_LSHIFT; 
-            result.token = advance_token(state->scanner, state->strings);
+        if (op.type == TOKEN_EOF) 
             break;
 
-        case TOKEN_RSHIFT: 
-            result.type  = AST_BIN_BIT_RSHIFT; 
-            result.token = advance_token(state->scanner, state->strings);
-            break;
+        bind_power_t power; 
 
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
+        power = get_postfix_bind_power(op);
 
-        default:
-            return node;
-    }
+        if (power.left >= 0 && power.right >= 0) {
+            if (power.left < min_bind_power)
+                break;
 
-    add_left_node(state, &result, &node);
-    node = parse_shift(state); 
-    // @todo error check_value
-    add_right_node(state, &result, &node);
-    return result;
-}
+            advance_token(state->scanner, talloc);
 
-// @todo rewrite
-static ast_node_t parse_and(parser_state_t *state) {
-    ast_node_t node = parse_shift(state);
-    if (node.type == AST_EMPTY) return node;
+            ast_node_t lhs = result;
+            ast_node_t rhs = parse_separated_expressions(state);
+            // ast_node_t rhs = parse_expression(state, 0);
 
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
+            result.token = {};
+            result.token = op;
+            result.type  = get_ast_type_based_on_postfix_token(op);
 
-    switch (result.token.type) {
-        case '&':
-            result.type  = AST_BIN_BIT_AND;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
+            if (op.type == '[') {
+                if (!consume_token(']', state->scanner, NULL, false, talloc)) {
+                    result.type = AST_ERROR;
+                }
+            } else if (op.type == '(') {
+                if (!consume_token(TOKEN_CLOSE_BRACE, state->scanner, NULL, false, talloc)) {
+                    result.type = AST_ERROR;
+                }
+            } else {
+                assert(false);
+            }
 
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-        default: 
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_and(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_or(parser_state_t *state) {
-    ast_node_t node = parse_and(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case '|':
-            result.type  = AST_BIN_BIT_OR;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default:
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_or(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_xor(parser_state_t *state) {
-    ast_node_t node = parse_or(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case '^': 
-            result.type  = AST_BIN_BIT_XOR;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            result.type = AST_ERROR;
-            return result;
-
-        default: 
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_xor(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-// @todo: different names later!!!
-static ast_node_t parse_mul(parser_state_t *state) {
-    ast_node_t node = parse_xor(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case '*': 
-            result.type  = AST_BIN_MUL;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case '/':
-            result.type = AST_BIN_DIV;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case '%': 
-            result.type = AST_BIN_MOD;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-            
-        case TOKEN_ERROR: 
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default: 
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_mul(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_add(parser_state_t *state) { 
-    ast_node_t node = parse_mul(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case '+': 
-            result.type = AST_BIN_ADD;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case '-': 
-            result.type = AST_BIN_SUB;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-            
-
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default:
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_add(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_compare_expression(parser_state_t *state) {
-    ast_node_t node = parse_add(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case TOKEN_GR: 
-            result.type = AST_BIN_GR;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_LS:
-            result.type = AST_BIN_LS;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_GEQ:
-            result.type = AST_BIN_GEQ;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_LEQ:
-            result.type = AST_BIN_LEQ;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_EQ:
-            result.type = AST_BIN_EQ;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_NEQ: 
-            result.type = AST_BIN_NEQ;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default:
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_compare_expression(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_logic_and_expression(parser_state_t *state) {
-    ast_node_t node = parse_compare_expression(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case TOKEN_LOGIC_AND:
-            result.type = AST_BIN_LOG_AND;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_ERROR: 
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default:
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_logic_and_expression(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_logic_or_expression(parser_state_t *state) {
-    ast_node_t node = parse_logic_and_expression(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    switch (result.token.type) {
-        case TOKEN_LOGIC_OR:
-            result.type = AST_BIN_LOG_OR;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-
-        case TOKEN_ERROR: 
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-
-        default: 
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_logic_or_expression(state);
-    add_right_node(state, &result, &node);
-
-    return result;
-}
-
-static ast_node_t parse_cast_expression(parser_state_t *state) {
-    token_t    cast_token = {};
-    ast_node_t result     = {};
-
-    if (consume_token(TOK_CAST, state->scanner, &cast_token, true, state->strings)) {
-        consume_token('(', state->scanner, NULL, false, get_temporary_allocator());
-        ast_node_t type = parse_type(state);
-        consume_token(')', state->scanner, NULL, false, get_temporary_allocator());
-
-        ast_node_t expr = parse_logic_or_expression(state);
-
-        result.type  = AST_BIN_CAST;
-        result.token = cast_token;
-
-        if (expr.type == AST_EMPTY) {
-            result.type = AST_ERROR;
-            log_error_token(STRING("Error while parsing cast. No expression found."), result.token);
-            return result;
+            add_left_node(state,  &result, &lhs);
+            add_right_node(state, &result, &rhs);
+            continue;
         }
 
-        add_left_node(state, &result, &type);
-        add_right_node(state, &result, &expr);
-        return result;
+        power = get_infix_bind_power(op);
+
+        if (power.left >= 0 && power.right >= 0) {
+            if (power.left < min_bind_power)
+                break;
+
+            advance_token(state->scanner, talloc);
+
+            ast_node_t lhs = result;
+            ast_node_t rhs = parse_expression(state, power.right);
+
+            result = {};
+            result.token = op;
+            result.type  = get_ast_type_based_on_infix_token(op);
+
+            add_left_node(state,  &result, &lhs);
+            add_right_node(state, &result, &rhs);
+            continue;
+        }
+
+        break;
     }
-
-    return parse_logic_or_expression(state);
-}
-
-static ast_node_t parse_assignment_expression(parser_state_t *state) {
-    ast_node_t node = parse_cast_expression(state);
-    if (node.type == AST_EMPTY) return node;
-
-    ast_node_t result = {};
-    result.token = peek_token(state->scanner, get_temporary_allocator());
-
-    // here we will do += -= *= /=  and so on
-    switch (result.token.type) {
-        case '=':
-            result.type = AST_BIN_ASSIGN;
-            result.token = advance_token(state->scanner, state->strings);
-            break;
-        case TOKEN_ERROR:
-            advance_token(state->scanner, get_temporary_allocator());
-            node.type = AST_ERROR;
-            return node;
-        default:
-            return node;
-    }
-
-    add_left_node(state, &result, &node);
-    node = parse_assignment_expression(state);
-    // @todo checks here
-    add_right_node(state, &result, &node);
 
     return result;
 }
 
 static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
-    ast_node_t node = parse_primary(state);
+    ast_node_t node = parse_expression(state, 100);
     if (node.type == AST_EMPTY) return node;
 
     token_t current = peek_token(state->scanner, state->strings);
@@ -670,7 +459,7 @@ static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
     advance_token(state->scanner, state->strings);
 
     while (current.type == ',' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
-        ast_node_t node = parse_primary(state);
+        ast_node_t node = parse_expression(state, 100);
 
         if (node.type == AST_EMPTY) {
             log_error_token(STRING("Separated expression was closed on ','."), current);
@@ -694,7 +483,10 @@ static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
 
 // @todo, default, between these funcs
 static ast_node_t parse_separated_expressions(parser_state_t *state) {
-    ast_node_t node = parse_cast_expression(state);
+    token_t parsing_level = {};
+    parsing_level.type = '=';
+
+    ast_node_t node = parse_expression(state, get_infix_bind_power(parsing_level).left);
     if (node.type == AST_EMPTY) return node;
 
     token_t current = peek_token(state->scanner, state->strings);
@@ -713,7 +505,7 @@ static ast_node_t parse_separated_expressions(parser_state_t *state) {
     advance_token(state->scanner, state->strings);
 
     while (current.type == ',' && current.type != TOKEN_EOF && current.type != TOKEN_ERROR) {
-        ast_node_t node = parse_cast_expression(state);
+        ast_node_t node = parse_expression(state, get_infix_bind_power(parsing_level).left);
 
         if (node.type == AST_EMPTY) {
             log_error_token(STRING("Separated expression was closed on ','."), current);
@@ -770,7 +562,6 @@ static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr)
 
     return result;
 }
-
 static ast_node_t parse_primary_type(parser_state_t *state) {
     ast_node_t result = {};
 
@@ -1117,7 +908,7 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
 
     result.type = AST_EXT_FUNC_INFO;
 
-    ast_node_t node = parse_primary(state);
+    ast_node_t node = parse_expression(state, 100);
 
     if (node.type == AST_ERROR) {
         log_error_token(STRING("bad library import name."), result.token);
@@ -1136,7 +927,7 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
 
     result.type = AST_NAMED_EXT_FUNC_INFO;
 
-    node = parse_primary(state);
+    node = parse_expression(state, 100);
 
     if (node.type == AST_ERROR) {
         log_error_token(STRING("bad import symbol name."), result.token);
@@ -1192,7 +983,7 @@ static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *
     } else if (type.type == AST_FUNC_TYPE && token.type == TOK_EXTERNAL) {
         data = parse_external_symbol_import(state);
     } else {
-        data = parse_assignment_expression(state);
+        data = parse_expression(state, 0);
     }
 
     if (data.type == AST_ERROR || data.type == AST_EMPTY) {
@@ -1377,7 +1168,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_IF_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_cast_expression(state);
+            ast_node_t expr = parse_expression(state, 0);
             check_value(expr.type != AST_EMPTY);
 
             if (peek_token(state->scanner, get_temporary_allocator()).type != '{') {
@@ -1425,7 +1216,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_WHILE_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_cast_expression(state);
+            ast_node_t expr = parse_expression(state, 0);
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
@@ -1438,7 +1229,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
             node.type  = AST_WHILE_STMT;
             node.token = advance_token(state->scanner, state->strings);
 
-            ast_node_t expr = parse_cast_expression(state);
+            ast_node_t expr = parse_expression(state, 0);
             check_value(expr.type != AST_EMPTY);
 
             ast_node_t stmt = parse_block(state, AST_BLOCK_IMPERATIVE);
@@ -1537,7 +1328,7 @@ static ast_node_t parse_enum_decl(parser_state_t *state) {
         return result;
     }
 
-    ast_node_t left = parse_cast_expression(state);
+    ast_node_t left = parse_expression(state, 0);
     add_left_node(state, &result, &left);
 
     return result;
@@ -1606,6 +1397,58 @@ static ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
     result.token.l1 = stop.l1;
 
     return result;
+}
+
+string_t get_expression_string(ast_node_t *node) {
+    allocator_t *talloc = get_temporary_allocator();
+
+    string_t t = {};
+
+    t = string_copy(STRING("("), talloc);
+
+    u64 size = 0;
+
+    if (node->token.l0 != node->token.l1) {
+        size = 1;
+    } else {
+        size = node->token.c1 - node->token.c0;
+    }
+
+    line_tuple_t line = *list_get(&node->token.from->lines, node->token.l0);
+    u8 *p = node->token.from->file.data + line.start + node->token.c0;
+    t = string_concat(t, { size, p }, talloc);
+
+    if (node->left) {
+        t = string_concat(t, STRING(" "), talloc);
+        t = string_concat(t, get_expression_string(node->left), talloc);
+    }
+
+    if (node->center) {
+        t = string_concat(t, STRING(" "), talloc);
+        t = string_concat(t, get_expression_string(node->center), talloc);
+    }
+
+    if (node->right) {
+        t = string_concat(t, STRING(" "), talloc);
+        t = string_concat(t, get_expression_string(node->right), talloc);
+    }
+
+    if (node->list_start) {
+        t = string_concat(t, STRING(" ["), talloc);
+
+        ast_node_t *next = node->list_start;
+        for (u64 i = 0; i < node->child_count; i++) {
+            t = string_concat(t, STRING(" "), talloc);
+            t = string_concat(t, get_expression_string(next), talloc);
+
+            next = next->list_next;
+        }
+
+        t = string_concat(t, STRING("]"), talloc);
+    }
+
+    t = string_concat(t, STRING(")"), talloc);
+    return t;
 }
 
 b32 parse_file(compiler_t *compiler, string_t filename) {

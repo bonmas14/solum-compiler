@@ -43,7 +43,6 @@ struct analyzer_state_t {
 
 b32 analyze_function(analyzer_state_t   *state, scope_entry_t *entry, b32 *should_wait);
 u32 analyze_statement(analyzer_state_t  *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node);
-b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr);
 
 // ------------ helpers
 
@@ -291,6 +290,11 @@ enum {
     CONST_TYPE_INT   = 0x80,
 };
 
+struct output_info_t {
+    b32 valid; 
+    type_info_t info;
+};
+
 b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr) {
     assert(state != NULL);
     assert(expr != NULL);
@@ -513,7 +517,6 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     if (entry->type == ENTRY_FUNC) {
         // @todo finish EXT_FUNC_INFO
         if (expr->type == AST_EXT_FUNC_INFO || expr->type == AST_NAMED_EXT_FUNC_INFO) {
-
             // left is lib name
             // right is export name
             string_t t = string_temp_concat(STRING("External function from: "), expr->left->token.data.string);
@@ -522,7 +525,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
                 t = string_temp_concat(t, expr->right->token.data.string);
             }
 
-            log_warning(t);
+            // log_warning(t);
             return true;
         }
 
@@ -1242,6 +1245,7 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
 
     entry->node = node;
     entry->type = ENTRY_TYPE;
+    entry->def_type = DEF_TYPE_STRUCT;
     if (!entry->scope.entries) {
         entry->scope = create_scope();
     }
@@ -1285,6 +1289,7 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
 
     entry->node  = node;
     entry->type  = ENTRY_TYPE;
+    entry->def_type = DEF_TYPE_UNION;
     if (!entry->scope.entries) {
         entry->scope = create_scope();
     }
@@ -1325,8 +1330,10 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         return false;
     }
 
-    entry->node  = node;
-    entry->type  = ENTRY_TYPE;
+    entry->node     = node;
+    entry->type     = ENTRY_TYPE;
+    entry->def_type = DEF_TYPE_ENUM;
+
     if (!entry->scope.entries) {
         entry->scope = create_scope();
     }
@@ -1525,6 +1532,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 }
 
                 stack_pop(&state->current_search_stack);
+
                 hashmap_delete(&block_local_scope);
             }
             break;

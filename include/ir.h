@@ -28,12 +28,19 @@ enum ir_codes_t {
     IR_POP,
     IR_CLONE,
 
-    IR_GLOBAL, // push value from .data [s32]
+    IR_LOAD8,        // Load 8-bit value from address on stack
+    IR_LOAD16,       // Load 16-bit value
+    IR_LOAD32,       // Load 32-bit value
+    IR_LOAD64,       // Load 64-bit value
+    IR_STORE8,       // Store 8-bit value to address
+    IR_STORE16,      // Store 16-bit value
+    IR_STORE32,      // Store 32-bit value
+    IR_STORE64,      // Store 64-bit value
 
+    IR_GLOBAL, // push value from .data [s32]
 
     IR_ALLOC, // [u64] allocate on stack
     IR_FREE,  // [u64] free from stack
-
 
     IR_RET,
 

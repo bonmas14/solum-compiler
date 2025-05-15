@@ -30,8 +30,8 @@ ir_t compile_program(compiler_t *compiler) {
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
 
-        string_t t = string_temp_concat(STRING("Symbol: "), pair.value.node->token.data.string);
-        log_info(t);
+        // string_t t = string_temp_concat(STRING("Symbol: "), pair.value.node->token.data.string);
+        // log_info(t);
     }
 
     return ir;

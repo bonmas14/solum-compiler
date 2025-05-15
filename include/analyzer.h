@@ -12,6 +12,8 @@ struct ast_node_t;
 
 enum types_t {
     TYPE_UNKN,
+    TYPE_UNKN_FUNC,
+    TYPE_UNKN_TYPE,
 
     TYPE_u8,
     TYPE_u16,
@@ -41,6 +43,12 @@ struct type_info_t {
     string_t type_name;
 };
 
+enum def_type_t {
+    DEF_TYPE_ENUM,
+    DEF_TYPE_STRUCT,
+    DEF_TYPE_UNION
+};
+
 struct scope_entry_t {
     u32 type;
     b32 uninit;
@@ -49,8 +57,7 @@ struct scope_entry_t {
     ast_node_t *expr;
 
     // ENTRY_TYPE
-    u32 def_type; // types_t
-    
+    u32 def_type;
     hashmap_t<string_t, scope_entry_t> scope; 
 
     // ENTRY_FUNC
@@ -60,6 +67,13 @@ struct scope_entry_t {
     // ENTRY_VAR
     type_info_t info;
 };
+
+/*
+struct code_block_t {
+    hashmap_t<string_t, scope_entry_t> vars;
+    code_block_t *child;
+};
+*/
 
 enum entry_type_t {
     ENTRY_ERROR = 0,
