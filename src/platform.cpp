@@ -109,7 +109,7 @@ void debug_init(void) {
     return;
 }
 
-u64 debug_get_time(void) {
+f64 debug_get_time(void) {
     return 0;
 }
 
@@ -118,7 +118,7 @@ void debug_break(void) {
     __builtin_trap();
 }
 
-void platform_file_exists(string_t name) {
+b32 platform_file_exists(string_t name) {
     FILE *file = fopen(string_to_c_string(name, get_temporary_allocator()), "rb");
 
     if (file == NULL) return false;
