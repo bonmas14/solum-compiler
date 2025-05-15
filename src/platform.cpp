@@ -104,13 +104,28 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
 
 #else
 #include <stdio.h>
+#include <time.h>
+
+static time_t start_time = 0;
 
 void debug_init(void) {
-    return;
+    timespec t;
+    if (clock_gettime(CLOCK_MONOTONIC, &t)) {
+        log_error(STRING("Cant access timer..."));
+        return;
+    }
+    start_time = t.tv_sec;
 }
 
 f64 debug_get_time(void) {
-    return 0;
+    timespec t;
+    if (clock_gettime(CLOCK_MONOTONIC, &t)) {
+        log_error(STRING("Cant access timer..."));
+        return 0;
+    }
+
+    time_t s = t.tv_sec - start_time;
+    return (f64)s + (f64)t.tv_nsec / 1000000000.0;
 }
 
 void debug_break(void) {
