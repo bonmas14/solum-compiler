@@ -30,7 +30,7 @@ struct compiler_t {
     codegen_t   *codegen;
     string_t     modules_path;
 
-    hashmap_t<string_t, scope_entry_t> scope;
+    list_t<hashmap_t<string_t, scope_entry_t>> scopes;
     hashmap_t<string_t, source_file_t> files;
 };
 

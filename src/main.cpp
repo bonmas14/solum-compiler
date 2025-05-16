@@ -51,33 +51,30 @@ int main(int argc, char **argv) {
 
     if (argc <= 1) {
         log_info(STRING("usage: prog [FILE]"));
-        log_color_reset();
+        log_reset_color();
         return 0;
     }
+
+    f64 start = debug_get_time();
 
 #ifdef DEBUG
     profiler_begin();
     profiler_block_start(STRING("Compile Action"));
 #endif
 
-    f64 start = debug_get_time();
-    {
-        string_t file = string_copy(STRING(argv[1]), default_allocator);
+    compile(string_copy(STRING(argv[1]), default_allocator));
 
-        compile(file);
-    }
-
-    f64 end = debug_get_time();
-    log_update_color();
-    fprintf(stderr, "time: %lf\n", end - start);
 #ifdef DEBUG
     profiler_block_end();
     profiler_end();
 #endif
 
+    f64 end = debug_get_time();
+    log_update_color();
+    fprintf(stderr, "time: %lf\n", end - start);
 
     visualize_profiler_state();
 
-    log_color_reset();
+    log_reset_color();
     return 0;
 }

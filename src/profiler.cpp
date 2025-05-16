@@ -25,7 +25,6 @@ struct {
     b32 running;
     u64 current_depth;
     hashmap_t<string_t, profile_block_t> blocks;
-
     stack_t<profiler_entry_t> start_time;
 } profiler;
 
@@ -33,10 +32,17 @@ void profiler_begin(void) {
     assert(!profiler.running);
 
     if (profiler.blocks.entries != NULL) {
-        hashmap_clear(&profiler.blocks);
+        hashmap_delete(&profiler.blocks);
+        profiler.blocks = {};
     }
 
-    profiler.start_time.index = 0;
+    if (profiler.start_time.data != NULL) {
+        profiler.start_time.index = 0;
+    } else {
+        stack_create(&profiler.start_time, 1024);
+    }
+
+    hashmap_create(&profiler.blocks, 1024, NULL, NULL);
     profiler.running = true;
 }
 

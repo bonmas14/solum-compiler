@@ -54,13 +54,16 @@ struct scope_entry_t {
     b32 uninit;
 
     ast_node_t *node;
-    ast_node_t *expr;
+    ast_node_t *stmt; // used in multiple definitions...
+    ast_node_t *expr; // can be null
 
-    // ENTRY_TYPE
+    // ENTRY_TYPE || ENTRY_HANDLE
     u32 def_type;
-    hashmap_t<string_t, scope_entry_t> scope; 
+    hashmap_t<string_t, scope_entry_t> scope;  // info of the struct memebers
 
     // ENTRY_FUNC
+    b32 is_external;
+    string_t ext_from, ext_name;
     hashmap_t<string_t, scope_entry_t> func_params;
     list_t<type_info_t> return_typenames;
 
@@ -68,19 +71,11 @@ struct scope_entry_t {
     type_info_t info;
 };
 
-/*
-struct code_block_t {
-    hashmap_t<string_t, scope_entry_t> vars;
-    code_block_t *child;
-};
-*/
-
 enum entry_type_t {
     ENTRY_ERROR = 0,
     ENTRY_VAR,
     ENTRY_TYPE,
     ENTRY_FUNC,
-    // ENTRY_NAMESPACE,
 };
 
 b32 analyzer_preload_all_files(compiler_t *compiler);

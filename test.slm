@@ -1,10 +1,10 @@
-use: "examples";
+a, b, c, d : s32;
 
-b : s32 = 32;
-
+/*
 main : (arg : s32) -> s32 = {
     a : s32 = arg + 32 + b;
     c : s32 = a + b;
 
     return c;
 }
+*/

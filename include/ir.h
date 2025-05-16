@@ -1,9 +1,11 @@
+#ifndef IR_H
+#define IR_H
+
 #include "stddefines.h"
 #include "list.h"
 #include "stack.h"
 #include "hashmap.h"
 #include "scanner.h"
-
 
 // 
 // #   #  ###  ##### #####
@@ -21,60 +23,97 @@
 enum ir_codes_t {
     IR_NOP = 0x0,
 
+    // Push operations
+    IR_PUSH_s,     // Push signed 64-bit integer
+    IR_PUSH_u,     // Push unsigned 64-bit integer
+    IR_PUSH_F32,   // Push 32-bit float
+    IR_PUSH_F64,   // Push 64-bit float
 
-    IR_PUSH_s, // [s64]
-    IR_PUSH_u, // [u64]
+    // Stack manipulation
+    IR_POP,        // Pop top of stack
+    IR_CLONE,      // Duplicate top element
+    IR_SWAP,       // Swap top two elements
 
-    IR_POP,
-    IR_CLONE,
+    // Memory operations
+    IR_GLOBAL,     // Push global variable address
+    IR_ALLOC,      // Allocate stack memory (size in bytes)
+    IR_FREE,       // Free stack memory
+    IR_LOAD,       // Load from address (dereference pointer)
+    IR_STORE,      // Store to address
+    IR_LEA,        // Load effective address (push address of variable)
 
-    IR_LOAD8,        // Load 8-bit value from address on stack
-    IR_LOAD16,       // Load 16-bit value
-    IR_LOAD32,       // Load 32-bit value
-    IR_LOAD64,       // Load 64-bit value
-    IR_STORE8,       // Store 8-bit value to address
-    IR_STORE16,      // Store 16-bit value
-    IR_STORE32,      // Store 32-bit value
-    IR_STORE64,      // Store 64-bit value
+    IR_ADD,
+    IR_SUB,
+    IR_MUL,
+    IR_DIV,
+    IR_MOD,
+    IR_NEG,
 
-    IR_GLOBAL, // push value from .data [s32]
+    // Bitwise operations
+    IR_BIT_AND,    
+    IR_BIT_OR,     
+    IR_BIT_XOR,    
+    IR_BIT_NOT,    
+    IR_SHIFT_LEFT, 
+    IR_SHIFT_RIGHT,
 
-    IR_ALLOC, // [u64] allocate on stack
-    IR_FREE,  // [u64] free from stack
+    // Integer comparisons (push 1/0)
+    IR_CMP_EQ,     
+    IR_CMP_NEQ,    
+    IR_CMP_LT,     
+    IR_CMP_GT,     
+    IR_CMP_LTE,    
+    IR_CMP_GTE,    
 
-    IR_RET,
+    // Logical operations
+    IR_LOG_AND,    
+    IR_LOG_OR,     
+    IR_LOG_NOT,    
 
-    IR_BRK, // break   (int3 eq)
-    IR_INV, // invalid (ud2  eq)
+    // Control flow
+    IR_JUMP,       // Unconditional jump (offset operand)
+    IR_JUMP_IF,    // Jump if top != 0
+    IR_JUMP_IF_NOT,// Jump if top == 0
+    IR_RET,        // Return from function
+
+    // Function calls
+    IR_CALL,       // Call function (address on stack)
+    IR_CALL_EXTERN,// Call external symbol (string operand)
+
+    // System
+    IR_BRK,        // Breakpoint
+    IR_INV,        // Invalid instruction
 };
 
 struct ir_opcode_t {
-    u64 operation;
-    token_t  info;
+    u64 operation;      // ir_codes_t value
+    token_t info;       // Source token for debugging
+    u64 operand;        // Immediate value/label offset
 };
 
 struct ir_function_t {
-    b32 valid;
+    b32 is_valid;
     string_t symbol;
     
     list_t<ir_opcode_t> code;
-    list_t<u8> data;
 };
 
 struct ir_t {
     b32 is_valid;
 
-    list_t<ir_opcode_t> code;
-    list_t<ir_opcode_t> data;
+    list_t<ir_function_t> functions;
+    list_t<u8>            data;
     u64                 uninit_size;
     hashmap_t<string_t, u64> strings;
     hashmap_t<string_t, u64> ext_symbols;
 };
 
-struct scope_t {
+struct ir_scope_t {
     hashmap_t<string_t, u64> variables;
     hashmap_t<string_t, u64> constants;
     u64 stack_size;
 };
 
 ir_t compile_program(compiler_t *compiler);
+
+#endif

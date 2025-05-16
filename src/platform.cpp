@@ -25,7 +25,7 @@ f64 debug_get_time(void) {
 }
 
 void debug_break(void) {
-    log_color_reset();
+    log_reset_color();
     DebugBreak();
 }
 
@@ -129,7 +129,7 @@ f64 debug_get_time(void) {
 }
 
 void debug_break(void) {
-    log_color_reset();
+    log_reset_color();
     __builtin_trap();
 }
 

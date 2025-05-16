@@ -91,7 +91,6 @@ enum token_type_t {
     TOK_CAST,
 
     TOK_IF,
-    TOK_THEN,
     TOK_ELSE,
     TOK_WHILE,
     TOK_FOR,
@@ -126,7 +125,7 @@ u8 keywords [_KW_STOP - _KW_START - 1][KEYWORDS_MAX_SIZE] = {
 
     "cast",
 
-    "if", "then", "else", "while", "for", "return",
+    "if", "else", "while", "for", "return",
 
     "break", "continue",
 
@@ -151,4 +150,9 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
 void log_info_token(string_t text, token_t token);
 void log_warning_token(string_t text, token_t token);
 void log_error_token(string_t text, token_t token);
+
+void log_info_token(const char *text, token_t token);
+void log_warning_token(const char *text, token_t token);
+void log_error_token(const char *text, token_t token);
+
 #endif // SCANNER_H

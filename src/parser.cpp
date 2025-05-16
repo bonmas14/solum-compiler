@@ -66,7 +66,7 @@ static void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
-        log_error_token(STRING("Bad expression: "), root->token);
+        log_error_token("Bad expression: ", root->token);
         return;
     }
 
@@ -84,7 +84,7 @@ static void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
-        log_error_token(STRING("Bad expression: "), root->token);
+        log_error_token("Bad expression: ", root->token);
         return;
     }
 
@@ -102,7 +102,7 @@ static void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t 
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
-        log_error_token(STRING("Bad expression: "), root->token);
+        log_error_token("Bad expression: ", root->token);
         return;
     }
 
@@ -120,7 +120,7 @@ static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
-        log_error_token(STRING("Bad expression: "), root->token);
+        log_error_token("Bad expression: ", root->token);
         return;
     }
 
@@ -162,7 +162,7 @@ static bind_power_t get_prefix_bind_power(token_t token) {
         case '!': return {0, 23};
 
         default:
-            log_error_token(STRING("Bad prefix operator: "), token);
+            log_error_token("Bad prefix operator: ", token);
             break;
     }
     return {-1, -1};
@@ -232,7 +232,7 @@ static u32 get_ast_type_based_on_token(token_t token) {
             return AST_PRIMARY;
 
         default:
-            log_error_token(STRING("Unknown primary type: "), token);
+            log_error_token("Unknown primary type: ", token);
             return AST_ERROR;
     }
 
@@ -249,7 +249,7 @@ static u32 get_ast_type_based_on_prefix_token(token_t token) {
         case TOK_CAST: return AST_BIN_CAST; break;
 
         default:
-            log_error_token(STRING("Unknown prefix operator type: "), token);
+            log_error_token("Unknown prefix operator type: ", token);
             return AST_ERROR;
     }
 
@@ -286,7 +286,7 @@ static u32 get_ast_type_based_on_infix_token(token_t token) {
         case TOKEN_RSHIFT: return AST_BIN_BIT_RSHIFT;
 
         default:
-            log_error_token(STRING("Unknown infix operator type: "), token);
+            log_error_token("Unknown infix operator type: ", token);
             return AST_ERROR;
     }
 
@@ -299,7 +299,7 @@ static u32 get_ast_type_based_on_postfix_token(token_t token) {
         case '(': return AST_FUNC_CALL; break;
 
         default:
-            log_error_token(STRING("Unknown postfix operator type: "), token);
+            log_error_token("Unknown postfix operator type: ", token);
             return AST_ERROR;
     }
 
@@ -462,7 +462,7 @@ static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
         ast_node_t node = parse_expression(state, 100);
 
         if (node.type == AST_EMPTY) {
-            log_error_token(STRING("Separated expression was closed on ','."), current);
+            log_error_token("Separated expression was closed on ','.", current);
             break;
         }
 
@@ -508,7 +508,7 @@ static ast_node_t parse_separated_expressions(parser_state_t *state) {
         ast_node_t node = parse_expression(state, get_infix_bind_power(parsing_level).left);
 
         if (node.type == AST_EMPTY) {
-            log_error_token(STRING("Separated expression was closed on ','."), current);
+            log_error_token("Separated expression was closed on ','.", current);
             break;
         }
 
@@ -595,7 +595,7 @@ static ast_node_t parse_primary_type(parser_state_t *state) {
 
         default:
             result.type = AST_ERROR;
-            log_error_token(STRING("Couldn't use this token as type."), result.token);
+            log_error_token("Couldn't use this token as type.", result.token);
             break;
     }
 
@@ -706,7 +706,7 @@ static ast_node_t parse_parameter_list(parser_state_t *state) {
             advance_token(state->scanner, talloc);
             current = peek_token(state->scanner, talloc);
         } else if (current.type != ')') {
-            log_error_token(STRING("wrong token in parameter list"), current);
+            log_error_token("wrong token in parameter list", current);
             break;
         }
     }
@@ -745,7 +745,7 @@ static ast_node_t parse_return_list(parser_state_t *state) {
             advance_token(state->scanner, talloc);
             current = peek_token(state->scanner, talloc);
         } else if (current.type != '=') {
-            log_error_token(STRING("wrong token in return list"), current);
+            log_error_token("wrong token in return list", current);
             break;
         }
     }
@@ -777,7 +777,7 @@ static ast_node_t parse_function_type(parser_state_t *state) {
 
     if (returns.type == AST_ERROR) {
         result.type = AST_ERROR;
-        log_warning_token(STRING("couldn't parse return list in function."), result.token);
+        log_warning_token("couldn't parse return list in function.", result.token);
     }
 
     add_right_node(state, &result, &returns);
@@ -864,7 +864,7 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
 
     if (type.type == AST_FUNC_TYPE) {
         node.type = AST_ERROR;
-        log_error_token(STRING("You can't define multiple funcitons in same statement."), type.token);
+        log_error_token("You can't define multiple funcitons in same statement.", type.token);
         panic_skip(state);
         return node;
     }
@@ -879,7 +879,7 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
         return node;
     } else if (token.type != '=') {
         node.type = AST_ERROR;
-        log_error_token(STRING("expected assignment or semicolon after expression."), type.token);
+        log_error_token("expected assignment or semicolon after expression.", type.token);
         panic_skip(state);
         return node;
     }
@@ -911,11 +911,11 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
     ast_node_t node = parse_expression(state, 100);
 
     if (node.type == AST_ERROR) {
-        log_error_token(STRING("bad library import name."), result.token);
+        log_error_token("bad library import name.", result.token);
         result.type = AST_ERROR;
         return result;
     } else if (node.token.type != TOKEN_CONST_STRING) {
-        log_error_token(STRING("Library import name should be a string."), node.token);
+        log_error_token("Library import name should be a string.", node.token);
         result.type = AST_ERROR;
     }
 
@@ -930,11 +930,11 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
     node = parse_expression(state, 100);
 
     if (node.type == AST_ERROR) {
-        log_error_token(STRING("bad import symbol name."), result.token);
+        log_error_token("bad import symbol name.", result.token);
         result.type = AST_ERROR;
         return result;
     } else if (node.token.type != TOKEN_CONST_STRING) {
-        log_error_token(STRING("Import symbol name should be a string"), node.token);
+        log_error_token("Import symbol name should be a string", node.token);
         result.type = AST_ERROR;
     }
 
@@ -1047,7 +1047,7 @@ static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
             case TOK_F64:
             case TOK_BOOL8:
             case TOK_BOOL32:
-                log_error_token(STRING("cant use float and bool types in enum definition"), type.token);
+                log_error_token("cant use float and bool types in enum definition", type.token);
                 result.type = AST_ERROR;
                 return result;
 
@@ -1055,7 +1055,7 @@ static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
                 break;
         }
     } else {
-        log_error_token(STRING("cant use not integer types in enum definition"), type.token);
+        log_error_token("cant use not integer types in enum definition", type.token);
         result.type = AST_ERROR;
         return result;
     }
@@ -1172,10 +1172,8 @@ static ast_node_t parse_statement(parser_state_t *state) {
             check_value(expr.type != AST_EMPTY);
 
             if (peek_token(state->scanner, get_temporary_allocator()).type != '{') {
-                if (!consume_token(TOK_THEN, state->scanner, NULL, false, get_temporary_allocator())) {
-                    node.type = AST_ERROR;
-                    break;
-                }
+                node.type = AST_ERROR;
+                break;
             }
             
             ast_node_t stmt = parse_statement(state);
@@ -1200,14 +1198,14 @@ static ast_node_t parse_statement(parser_state_t *state) {
         } break;
 
         case TOK_ELSE: {
-            log_error_token(STRING("Else statement without if statement before..."), name);
+            log_error_token("Else statement without if statement before...", name);
             node.type = AST_ERROR;
             break;
         } break;
 
         case TOK_FOR: 
         { 
-            log_error_token(STRING("@todo for stmt"), name);
+            log_error_token("@todo for stmt", name);
             node.type  = AST_ERROR;
             node.token = advance_token(state->scanner, state->strings);
             break;
@@ -1313,7 +1311,7 @@ static ast_node_t parse_enum_decl(parser_state_t *state) {
     allocator_t *talloc = get_temporary_allocator();
 
     if (!consume_token(TOKEN_IDENT, state->scanner, &name, true, state->strings)) {
-        log_error_token(STRING("Declaration should start from identifier"), peek_token(state->scanner, talloc));
+        log_error_token("Declaration should start from identifier", peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
         return result;
@@ -1322,7 +1320,7 @@ static ast_node_t parse_enum_decl(parser_state_t *state) {
     result.token = name;
 
     if (!consume_token('=', state->scanner, NULL, true, get_temporary_allocator())) {
-        log_error_token(STRING("Declaration should have expression"), peek_token(state->scanner, talloc));
+        log_error_token("Declaration should have expression", peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
         return result;
@@ -1374,7 +1372,7 @@ static ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
 
     if (!consume_token('{', state->scanner, &start, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
-        log_error_token(STRING("Expected opening of a block."), start);
+        log_error_token("Expected opening of a block.", start);
         return result;
     }
 
@@ -1388,7 +1386,7 @@ static ast_node_t parse_block(parser_state_t *state, ast_types_t type) {
 
     if (!consume_token('}', state->scanner, &stop, false, get_temporary_allocator())) {
         result.type = AST_ERROR;
-        log_error_token(STRING("Expected closing of a block."), stop);
+        log_error_token("Expected closing of a block.", stop);
         return result;
     }
 
@@ -1455,7 +1453,7 @@ b32 parse_file(compiler_t *compiler, string_t filename) {
     source_file_t *file = hashmap_get(&compiler->files, filename);
 
     if (file == NULL) {
-        log_error(STRING("no such file in table."));
+        log_error("no such file in table.");
         return false;
     }
 

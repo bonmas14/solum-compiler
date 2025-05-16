@@ -34,7 +34,7 @@ void log_update_color(void) {
     fprintf(stderr, "\x1b[38;2;%u;%u;%um", r, g, b);
 }
 
-void log_color_reset(void) {
+void log_reset_color(void) {
     update_requested = true;
 
     fprintf(stderr, "\x1b[0m");
@@ -68,6 +68,22 @@ void log_error(string_t text) {
     log_update_color();
     fprintf(stderr, "ERROR: %s\n", string_to_c_string(text, get_temporary_allocator()));
     log_pop_color();
+}
+
+void log_write(const char *text) {
+    log_write(STRING(text));
+}
+
+void log_info(const char *text) {
+    log_info(STRING(text));
+}
+
+void log_warning(const char *text) {
+    log_warning(STRING(text));
+}
+
+void log_error(const char *text) {
+    log_error(STRING(text));
 }
 
 /*

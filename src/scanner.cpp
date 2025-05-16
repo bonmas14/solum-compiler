@@ -701,9 +701,12 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
                     fprintf(stderr, "%4llu | %.*s", i + 1, (int)len, start);
                     log_pop_color();
                 } else if (i == token.l0) {
+                    log_pop_color();
                     log_update_color();
                     fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start);
                     len -= token.c0;
+                    log_push_color(ERROR_COLOR); 
+                    log_update_color();
                     fprintf(stderr, "%.*s", (int)len, start + token.c0);
                     log_pop_color();
                 } else if (i == token.l1) {
@@ -777,4 +780,16 @@ void log_error_token(string_t text, token_t token) {
 
     log_pop_color();
     log_pop_color();
+}
+
+void log_info_token(const char *text, token_t token) {
+    log_info_token(STRING(text), token);
+}
+
+void log_warning_token(const char *text, token_t token) {
+    log_warning_token(STRING(text), token);
+}
+
+void log_error_token(const char *text, token_t token) {
+    log_error_token(STRING(text), token);
 }

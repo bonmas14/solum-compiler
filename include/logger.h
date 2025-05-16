@@ -15,12 +15,17 @@ void add_left_pad(FILE * file, u64 amount);
 void log_push_color(u8 r, u8 g, u8 b);
 void log_pop_color(void);
 void log_update_color(void);
-void log_color_reset(void);
+void log_reset_color(void);
 
 void log_write(string_t text);
 void log_info(string_t text);
 void log_warning(string_t text);
 void log_error(string_t text);
+
+void log_write(const char *text);
+void log_info(const char *text);
+void log_warning(const char *text);
+void log_error(const char *text);
 
 #define check_value(value) {\
     if ((b32)(value) == false) {\

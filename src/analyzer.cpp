@@ -42,8 +42,7 @@ struct analyzer_state_t {
 };
 
 b32 analyze_function(analyzer_state_t   *state, scope_entry_t *entry, b32 *should_wait);
-u32 analyze_statement(analyzer_state_t  *state, u64 expected_return_amount, b32 in_loop, ast_node_t *node);
-
+u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 scope_index, b32 in_loop, ast_node_t *node);
 // ------------ helpers
 
 hashmap_t<string_t, scope_entry_t> create_scope(void) {
@@ -137,7 +136,7 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
             if (!report_error)
                 return false;
 
-            log_error_token(STRING("Identifier can not be resolved because it's definition is recursive."), entry->node->token);
+            log_error_token("Identifier can not be resolved because it's definition is recursive.", entry->node->token);
 
             allocator_t * talloc = get_temporary_allocator();
             scope_entry_t e      = get_entry_to_report(state, state->internal_deps.data[i]);
@@ -153,7 +152,7 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
                 if (!report_error)
                     return false;
 
-                log_error_token(STRING("Identifier can not be resolved because type definition is recursive."), entry->node->token);
+                log_error_token("Identifier can not be resolved because type definition is recursive.", entry->node->token);
 
                 allocator_t * talloc = get_temporary_allocator();
                 scope_entry_t e      = get_entry_to_report(state, deps->data[j]);
@@ -224,14 +223,14 @@ b32 add_var_type_into_search(analyzer_state_t *state, scope_entry_t *output) {
     switch (get_if_exists(state, true, type_name, &type)) {
         case GET_NOT_FIND:
         case GET_NOT_ANALYZED:
-            log_error_token(STRING("Couldn't find type name."), output->node->token);
+            log_error_token("Couldn't find type name.", output->node->token);
             return false;
 
         case GET_DEPS_ERROR: assert(false); return false;
 
         case GET_SUCCESS: switch (type->type) {
             case ENTRY_VAR:
-                log_error_token(STRING("Type was a variable name."), output->node->token);
+                log_error_token("Type was a variable name.", output->node->token);
                 return false;
 
             case ENTRY_FUNC:
@@ -317,7 +316,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                 scope_entry_t *output = NULL; 
                 switch (get_if_exists(state, true, var_name, &output)) {
                     case GET_NOT_FIND:
-                        log_error_token(STRING("Couldn't find identifier"), expr->token);
+                        log_error_token("Couldn't find identifier", expr->token);
                         result = false;
                         // @todo, break at all
                         break;
@@ -328,7 +327,6 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                         break;
 
                     case GET_DEPS_ERROR:
-                        assert(false);
                         result = false;
                         break;
 
@@ -342,7 +340,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                                 break;
                             }
 
-                            log_warning_token(STRING("Usage of uninitialized variable"), expr->token);
+                            log_warning_token("Usage of uninitialized variable", expr->token);
                             break;
 
                         case ENTRY_FUNC:
@@ -350,7 +348,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
 
                         case ENTRY_TYPE:
                             // @todo, @fix: who knows if we can...
-                            log_error_token(STRING("Cant use Type in expression"), expr->token);
+                            log_error_token("Cant use Type in expression", expr->token);
                             result = false;
                             break;
 
@@ -360,7 +358,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                             break;
 
                         default:
-                            log_error(STRING("Unexpected entry..."));
+                            log_error("Unexpected entry...");
                             result = false;
                             break;
                     } break;
@@ -404,15 +402,21 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             }
             break;
         case AST_FUNC_CALL:
+            {
+            u64 index = state->current_search_stack.index;
+
             // @todo, analyze amount of arguments and parameters
             if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->left)) {
                 result = false;
             }
 
+            // analyze arguments
             if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->right)) {
                 result = false;
             }
-            break;
+
+            state->current_search_stack.index = index;
+            } break;
 
         case AST_BIN_ASSIGN:
 
@@ -459,7 +463,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                 s64 swap_count = expr->left->child_count;
 
                 if (expr->left->child_count != expr->right->child_count) {
-                    log_error_token(STRING("Different amount of parts on different sides of swap expression:"), expr->token);
+                    log_error_token("Different amount of parts on different sides of swap expression:", expr->token);
                     result = false;
                 }
 
@@ -476,7 +480,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
 
             if (expected_count_of_expressions >= 0) {
                 if (expr->child_count != (u64)expected_count_of_expressions) {
-                    log_error_token(STRING("Not expected count of elements"), expr->token);
+                    log_error_token("Not expected count of elements", expr->token);
                     result = false;
                     break;
                 }
@@ -515,38 +519,27 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     }
 
     if (entry->type == ENTRY_FUNC) {
-        // @todo finish EXT_FUNC_INFO
-        if (expr->type == AST_EXT_FUNC_INFO || expr->type == AST_NAMED_EXT_FUNC_INFO) {
-            // left is lib name
-            // right is export name
-            string_t t = string_temp_concat(STRING("External function from: "), expr->left->token.data.string);
-            if (expr->type == AST_NAMED_EXT_FUNC_INFO) {
-                t = string_temp_concat(t, STRING(":"));
-                t = string_temp_concat(t, expr->right->token.data.string);
-            }
+        switch (expr->type) {
+            case AST_NAMED_EXT_FUNC_INFO:
+                entry->ext_name = string_copy(expr->right->token.data.string, state->compiler->strings);
+            case AST_EXT_FUNC_INFO:
+                entry->is_external = true;
+                entry->ext_from = string_copy(expr->left->token.data.string,  state->compiler->strings);
+                return true;
 
-            // log_warning(t);
-            return true;
+            case AST_BLOCK_IMPERATIVE:
+                break;
+
+            default:
+                log_error_token("Wrong function body.", expr->token);
+                return false;
         }
 
-        if (expr->type != AST_BLOCK_IMPERATIVE) {
-            log_error_token(STRING("cant do functions with expression body."), expr->token);
-            return false;
-        }
 
-        stack_push(&state->current_search_stack, &entry->scope);
-
-        for (u64 i = 0; i < entry->func_params.capacity; i++) {
-            kv_pair_t<string_t, scope_entry_t> *pair = entry->func_params.entries + i;
-
-            if (!pair->occupied) continue;
-            if (pair->deleted)   continue;
-
-            hashmap_add(&entry->scope, pair->key, &pair->value);
-        }
-
-        b32 result = analyze_statement(state, entry->return_typenames.count, false, expr);
-
+        stack_push(&state->current_search_stack, &entry->func_params);
+        u64 curr_load = entry->func_params.load;
+        b32 result = analyze_statement(state, entry->return_typenames.count, 0, false, expr);
+        assert(curr_load == entry->func_params.load);
         stack_pop(&state->current_search_stack);
         expr->analyzed = true;
 
@@ -568,7 +561,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     return true;
 }
 
-b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
+b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *node, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
     assert(state != NULL);
     assert(name != NULL);
     assert(type != NULL);
@@ -583,6 +576,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
     }
 
     entry->node = name;
+    entry->stmt = node;
     entry->expr = expr;
     entry->info.pointer_depth = 0;
 
@@ -596,7 +590,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         b32 result = analyze_expression(state, -1, NULL, type->left);
 
         if (!result) {
-            log_error_token(STRING("Bad array initializer"), type->left->token);
+            log_error_token("Bad array initializer", type->left->token);
             return false;
         }
 
@@ -607,7 +601,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
     while (type->type == AST_PTR_TYPE || type->type == AST_ARR_TYPE) {
         if (type->type != AST_PTR_TYPE) {
-            log_error_token(STRING("Cant create pointer to an array type."), type->token);
+            log_error_token("Cant create pointer to an array type.", type->token);
             return false;
         } 
 
@@ -620,7 +614,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
         switch (type->type) {
             case AST_FUNC_TYPE: {
                 if (!can_do_func) {
-                    log_error(STRING("Cant do functions for multiple var decl..."));
+                    log_error("Cant do functions for multiple var decl...");
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
                     return false;
@@ -637,7 +631,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
 
             case AST_VOID_TYPE:
                 if (!is_indirect) {
-                    log_error_token(STRING("Cant make variable with void type..."), type->token);
+                    log_error_token("Cant make variable with void type...", type->token);
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
                     return false;
@@ -651,7 +645,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
             case AST_AUTO_TYPE:
                 assert(expr != NULL);
 
-                log_error_token(STRING("Cant evaluate the types right now..."), type->token);
+                log_error_token("Cant evaluate the types right now...", type->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -661,7 +655,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                 return false;
 
             default:
-                log_error_token(STRING("unexpected type of ast node..."), entry->node->token);
+                log_error_token("unexpected type of ast node...", entry->node->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
@@ -693,13 +687,13 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nam
                         break;
 
                     case ENTRY_FUNC: 
-                        log_error(STRING("Cant use FUNC as a type of variable [@better_message]"));
+                        log_error("Cant use FUNC as a type of variable [@better_message]");
                         entry->type = ENTRY_ERROR;
                         entry->node->analyzed = true;
                         return false;
 
                     default:
-                        log_error(STRING("Unexpected type..."));
+                        log_error("Unexpected type...");
                         entry->type = ENTRY_ERROR;
                         entry->node->analyzed = true;
                         return false;
@@ -750,7 +744,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
     for (u64 i = 0; i < type_node->left->child_count; i++) {
         assert(next_type->type == AST_PARAM_DEF);
 
-        if (!analyze_definition(state, false, next_type, next_type->left, NULL, should_wait)) {
+        if (!analyze_definition(state, false, entry->stmt, next_type, next_type->left, NULL, should_wait)) {
             result = false;
         }
 
@@ -777,7 +771,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
             b32 result = analyze_expression(state, -1, NULL, curr->left);
 
             if (!result) {
-                log_error_token(STRING("Bad array initializer"), curr->left->token);
+                log_error_token("Bad array initializer", curr->left->token);
                 return false;
             }
 
@@ -788,7 +782,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
         while (curr->type == AST_PTR_TYPE || curr->type == AST_ARR_TYPE) {
             if (curr->type != AST_PTR_TYPE) {
-                log_error_token(STRING("Cant create pointer to an array type."), curr->token);
+                log_error_token("Cant create pointer to an array type.", curr->token);
                 result = false;
                 break;
             } 
@@ -802,7 +796,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
             switch (curr->type) {
                 case AST_VOID_TYPE: // fallthrough
                     if (!is_indirect) {
-                        log_error_token(STRING("Cant return void."), curr->token);
+                        log_error_token("Cant return void.", curr->token);
                         entry->type = ENTRY_ERROR;
                         result = false;
                         break;
@@ -819,7 +813,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                     assert(false);
 
                 default:
-                    log_error(STRING("unexpected type of ast node..."));
+                    log_error("unexpected type of ast node...");
                     result = false;
                     break;
             } 
@@ -849,13 +843,13 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                             break;
 
                         case ENTRY_FUNC: 
-                            log_error_token(STRING("Cant use FUNC as a return type [@better_message]"), curr->token);
+                            log_error_token("Cant use FUNC as a return type [@better_message]", curr->token);
                             entry->type = ENTRY_ERROR;
                             result = false;
                             break;
 
                         default:
-                            log_error_token(STRING("Unexpected type... [@better_message]"), curr->token);
+                            log_error_token("Unexpected type... [@better_message]", curr->token);
                             entry->type = ENTRY_ERROR;
                             result = false;
                             break;
@@ -892,7 +886,7 @@ b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should
     assert(node        != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, false, node, node->left, NULL, should_wait)) {
+    if (!analyze_definition(state, false, node, node, node->left, NULL, should_wait)) {
         return false;
     }
 
@@ -921,7 +915,7 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     entry->node = node;
     entry->type = ENTRY_VAR;
 
-    log_error_token(STRING("TODO: enums"), node->token);
+    log_error_token("TODO: enums", node->token);
     check_value(false);
     // node->left // expression
     
@@ -941,7 +935,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, next, node->right, NULL, should_wait)) {
+            if (!analyze_definition(state, false, node, next, node->right, NULL, should_wait)) {
                 return false;
             }
 
@@ -963,7 +957,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
             next = next->list_next;
         }
 
-        log_error_token(STRING("This variable didn't have it's own type:"), next->token);
+        log_error_token("This variable didn't have it's own type:", next->token);
         return false;
     }
 
@@ -971,7 +965,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
     ast_node_t * type = node->right->list_start;
 
     for (u64 i = 0; i < node->left->child_count; i++) {
-        if (!analyze_definition(state, false, name, type, NULL, should_wait)) {
+        if (!analyze_definition(state, false, node, name, type, NULL, should_wait)) {
             return false;
         }
 
@@ -994,7 +988,7 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(node  != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, true, node, node->left, node->right, should_wait)) {
+    if (!analyze_definition(state, true, node, node, node->left, node->right, should_wait)) {
         return false;
     }
 
@@ -1021,7 +1015,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, next, node->center, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, node, next, node->center, node->right->list_start, should_wait)) {
                 return false;
             }
 
@@ -1047,13 +1041,13 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                     next = next->list_next;
                 }
 
-                log_error_token(STRING("Trailing type without its identifier:"), next->token);
+                log_error_token("Trailing type without its identifier:", next->token);
             } else {
                 next = node->left->list_start;
                 for (u64 i = 0; i < least_size; i++) {
                     next = next->list_next;
                 }
-                log_error_token(STRING("This variable didn't have it's type:"), next->token);
+                log_error_token("This variable didn't have it's type:", next->token);
             }
 
             node->analyzed = true;
@@ -1064,7 +1058,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * type = node->center->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, name, type, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, node->right->list_start, should_wait)) {
                 return false;
             }
 
@@ -1088,13 +1082,13 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                     next = next->list_next;
                 }
 
-                log_error_token(STRING("Trailing expression without its identifier:"), next->token);
+                log_error_token("Trailing expression without its identifier:", next->token);
             } else {
                 next = node->left->list_start;
                 for (u64 i = 0; i < least_size; i++) {
                     next = next->list_next;
                 }
-                log_error_token(STRING("This variable didn't have it's expression:"), next->token);
+                log_error_token("This variable didn't have it's expression:", next->token);
             }
 
             node->analyzed = true;
@@ -1106,7 +1100,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, expr, should_wait)) {
                 return false;
             }
 
@@ -1127,7 +1121,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                 next = next->list_next;
             }
 
-            log_error_token(STRING("This variable didn't have it's own type:"), next->token);
+            log_error_token("This variable didn't have it's own type:", next->token);
             node->analyzed = true;
             return false;
         }
@@ -1142,13 +1136,13 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
                     next = next->list_next;
                 }
 
-                log_error_token(STRING("Trailing expression without its variable:"), next->token);
+                log_error_token("Trailing expression without its variable:", next->token);
             } else {
                 next = node->left->list_start;
                 for (u64 i = 0; i < least_size; i++) {
                     next = next->list_next;
                 }
-                log_error_token(STRING("This variable didn't have it's expression:"), next->token);
+                log_error_token("This variable didn't have it's expression:", next->token);
             }
 
             node->analyzed = true;
@@ -1160,7 +1154,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, expr, should_wait)) {
                 return false;
             }
 
@@ -1207,12 +1201,12 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 } break;
             case AST_BIN_UNKN_DEF:
             case AST_TERN_MULT_DEF:
-                log_error_token(STRING("Cant use initialization in member declaration."), entry->node->token);
+                log_error_token("Cant use initialization in member declaration.", entry->node->token);
                 result = false;
                 break;
 
             default:
-                log_error_token(STRING("Cant use this as member of type."), entry->node->token);
+                log_error_token("Cant use this as member of type.", entry->node->token);
                 result = false;
                 break;
 
@@ -1399,7 +1393,7 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
     }
 
     if (!hashmap_add(&compiler->files, filename, &file)) {
-        log_error(STRING("Couldn't add file to work with."));
+        log_error("Couldn't add file to work with.");
         return false;
     }
 
@@ -1469,16 +1463,14 @@ b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
         return valid_file;
     }
 
-    log_error_token(STRING("Couldn't find corresponding file to this declaration."), node->token);
+    log_error_token("Couldn't find corresponding file to this declaration.", node->token);
     node->analyzed = true;
     return false;
 }
 
 // --------------------
 
-
-
-u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_loop, ast_node_t *node) {
+u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 scope_index, b32 in_loop, ast_node_t *node) {
     assert(state != NULL);
     assert(node != NULL);
 
@@ -1498,18 +1490,28 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 // @todo: here are all the trailing scopes go...
                 // and here we will resolve our vairables
                 ast_node_t *stmt = node->list_start;
-                hashmap_t<string_t, scope_entry_t> block_local_scope = {};
-                stack_push(&state->current_search_stack, &block_local_scope);
+
+                u32 new_index = 0;
+                {
+                    hashmap_t<string_t, scope_entry_t> block = {};
+                    list_add(&state->compiler->scopes, &block);
+                    new_index = state->compiler->scopes.count - 1;
+                }
+
+                node->scope_index = scope_index;
+
+                hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, new_index);
+                stack_push(&state->current_search_stack, block);
 
                 for (u64 i = 0; i < node->child_count; i++) {
-                    switch (analyze_statement(state, expect_return_amount, false, stmt)) {
+                    switch (analyze_statement(state, expect_return_amount, new_index, false, stmt)) {
                         case STMT_BREAK:
                         case STMT_CONTINUE:
-                            if (in_loop) {
+                            if (!in_loop) {
                                 break;
                             }
 
-                            log_error_token(STRING("Cant use break or continue outside of loop."), stmt->token);
+                            log_error_token("Cant use break or continue outside of loop.", stmt->token);
                             result = STMT_ERR;
                             break;
 
@@ -1520,7 +1522,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                         case STMT_RETURN:
                             // @todo: more sophisticated logic of warnings
                             if (i != (node->child_count - 1)) {
-                                log_warning_token(STRING("There are statemets after return."), stmt->token);
+                                log_warning_token("There are statemets after return.", stmt->token);
                             }
                             break;
 
@@ -1532,19 +1534,17 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 }
 
                 stack_pop(&state->current_search_stack);
-
-                hashmap_delete(&block_local_scope);
             }
             break;
         case AST_UNNAMED_MODULE:
-            log_error_token(STRING("cant load files from functions."), node->token);
+            log_error_token("cant load files from functions.", node->token);
             result = STMT_ERR;
             break;
 
         case AST_STRUCT_DEF: 
         case AST_UNION_DEF:
         case AST_ENUM_DEF: 
-            log_error_token(STRING("cant create types not in global scope."), node->token);
+            log_error_token("cant create types not in global scope.", node->token);
             result = STMT_ERR;
             break;
 
@@ -1554,8 +1554,8 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 result = STMT_ERR;
                 break;
             }
-            // @todo: we need new scope anyway...
-            result = analyze_statement(state, expect_return_amount, in_loop, node->right);
+
+            result = analyze_statement(state, expect_return_amount, scope_index, in_loop, node->right);
             if (result != STMT_ERR) {
                 result = STMT_OK;
             }
@@ -1567,8 +1567,8 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 break;
             }
 
-            b32 lr = analyze_statement(state, expect_return_amount, in_loop, node->center);
-            b32 rr = analyze_statement(state, expect_return_amount, in_loop, node->right);
+            b32 lr = analyze_statement(state, expect_return_amount, scope_index, in_loop, node->center);
+            b32 rr = analyze_statement(state, expect_return_amount, scope_index, in_loop, node->right);
 
             if (lr == rr && lr == STMT_RETURN) {
                 result = STMT_RETURN;
@@ -1585,7 +1585,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
                 break;
             }
 
-            result = analyze_statement(state, expect_return_amount, true, node->right);
+            result = analyze_statement(state, expect_return_amount, scope_index, true, node->right);
         } break;
 
         case AST_RET_STMT: {
@@ -1627,14 +1627,11 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, b32 in_
         } break;
     }
 
-    // assert(state->current_search_stack.index == 0);
-
     state->current_search_stack.index = index;
-    // assert(state->current_search_stack.index == 0);
     node->analyzed = true;
 
     if (should_wait) {
-        log_error_token(STRING("Unordered instructions in imperative block."), node->token);
+        log_error_token("Unordered instructions in imperative block.", node->token);
         return false;
     }
 
@@ -1679,7 +1676,7 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
             break;
 
         default:
-            log_error_token(STRING("Wrong type of construct."), node->token);
+            log_error_token("Wrong type of construct.", node->token);
             result = false;
             break;
     }
@@ -1726,11 +1723,11 @@ b32 analyzer_preload_all_files(compiler_t *compiler) {
     }
 
     if (!result) {
-        log_error(STRING("Couldn't find a file."));
+        log_error("Couldn't find a file.");
     } 
 #ifdef DEBUG
     else {
-        log_info(STRING("All files loaded!"));
+        log_info("All files loaded!");
     }
 #endif
 
@@ -1808,8 +1805,10 @@ void print_all_definitions(compiler_t *compiler) {
 
     fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
 
-    for (u64 i = 0; i < compiler->scope.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
+    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+
+    for (u64 i = 0; i < scope->capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> pair = scope->entries[i];
 
         if (!pair.occupied) continue;
         if (pair.deleted)   continue;
@@ -1886,7 +1885,7 @@ b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
     }
 
     if (not_finished) {
-        log_error(STRING("Probably undefined symbols..."));
+        log_error("Probably undefined symbols...");
         return false;
     }
 
@@ -1895,15 +1894,16 @@ b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
 
 b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
     b32 result = true;
+    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
 
-    for (u64 i = 0; i < compiler->scope.capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = compiler->scope.entries[i];
+    for (u64 i = 0; i < scope->capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
 
-        if (!pair.occupied)      continue;
-        if (pair.deleted)        continue;
+        if (!pair->occupied)      continue;
+        if (pair->deleted)        continue;
         profiler_block_start(STRING("Code analyze step"));
 
-        string_t key = pair.value.node->token.data.string;
+        string_t key = pair->value.node->token.data.string;
         stack_push(&state->internal_deps, key);
 
         {
@@ -1911,7 +1911,7 @@ b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
             hashmap_add(&state->symbol_deps, key, &symbol_deps);
         }
 
-        if (!analyze_definition_expr(state, &pair.value)) {
+        if (!analyze_definition_expr(state, &pair->value)) {
             result = false;
         }
 
@@ -1929,7 +1929,9 @@ b32 analyze(compiler_t *compiler) {
 
     analyzer_state_t state = init_state(compiler);
 
-    stack_push(&state.current_search_stack, &compiler->scope);
+    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+
+    stack_push(&state.current_search_stack, scope);
     {
         profiler_block_start(STRING("Global analysis"));
         state.state = STATE_GLOBAL_ANALYSIS;
@@ -1937,7 +1939,7 @@ b32 analyze(compiler_t *compiler) {
         profiler_block_end();
 
         if (!result) {
-            log_error(STRING("Errors on early step of analysis."));
+            log_error("Errors on early step of analysis.");
             return false;
         }
 
@@ -1952,12 +1954,11 @@ b32 analyze(compiler_t *compiler) {
         profiler_block_end();
 
         if (!result) {
-            log_error(STRING("Errors while analyzing code."));
+            log_error("Errors while analyzing code.");
             return false;
         }
     }
     stack_pop(&state.current_search_stack);
-
     clear_state(&state);
     // print_all_definitions(compiler);
 

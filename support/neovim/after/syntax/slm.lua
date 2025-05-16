@@ -8,7 +8,7 @@ vim.api.nvim_create_autocmd("FileType", {
       syntax match slmIdent /[A-Za-z_]\w*/
 
       " Keywords
-      syntax keyword slmKeyword true false return if then else while for default cast break continue use external struct union enum as
+      syntax keyword slmKeyword true false return if else while for default cast break continue use external struct union enum as
       syntax keyword slmType u8 u16 u32 u64 s8 s16 s32 s64 b8 b32 f32 f64 void
       syntax match slmType /\v<[A-Z]\w*(\.[A-Z]\w*)*>/
 
@@ -37,6 +37,7 @@ vim.api.nvim_create_autocmd("FileType", {
       highlight link slmNumber Number
       highlight link slmBoolean Boolean
       highlight link slmComment Comment
+      highlight link slmMultiComment Comment
     ]]
   end
 })

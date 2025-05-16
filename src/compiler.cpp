@@ -77,6 +77,9 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
     compiler.codegen  = codegen_create(alloc);
     compiler.valid = true;
 
+    hashmap_t<string_t, scope_entry_t> hm = {};
+    list_add(&compiler.scopes, &hm);
+
     return compiler;
 }
 

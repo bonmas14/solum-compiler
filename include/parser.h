@@ -4,12 +4,16 @@
 #include "compiler.h"
 #include "scanner.h"
 
+struct ast_node_t;
+
+string_t get_expression_string(ast_node_t *node);
 b32 parse_file(compiler_t *compiler, string_t filename);
 
 struct ast_node_t {
     b32 analyzed;
     b32 compiled;
     s32 type;
+    u32 scope_index;
 
     token_t token;
 
