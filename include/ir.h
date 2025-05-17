@@ -24,8 +24,8 @@ enum ir_codes_t {
     IR_NOP = 0x0,
 
     // Push operations
-    IR_PUSH_s,     // Push signed 64-bit integer
-    IR_PUSH_u,     // Push unsigned 64-bit integer
+    IR_PUSH_SIGN,     // Push signed 64-bit integer
+    IR_PUSH_UNSIGN,     // Push unsigned 64-bit integer
     IR_PUSH_F32,   // Push 32-bit float
     IR_PUSH_F64,   // Push 64-bit float
 
@@ -35,7 +35,7 @@ enum ir_codes_t {
     IR_SWAP,       // Swap top two elements
 
     // Memory operations
-    IR_GLOBAL,     // Push global variable address
+    IR_GLOBAL,     // Push global variable (from address)
     IR_ALLOC,      // Allocate stack memory (size in bytes)
     IR_FREE,       // Free stack memory
     IR_LOAD,       // Load from address (dereference pointer)
@@ -82,13 +82,20 @@ enum ir_codes_t {
 
     // System
     IR_BRK,        // Breakpoint
-    IR_INV,        // Invalid instruction
+    IR_INVALID,        // Invalid instruction
 };
 
 struct ir_opcode_t {
     u64 operation;      // ir_codes_t value
     token_t info;       // Source token for debugging
-    u64 operand;        // Immediate value/label offset
+    u64     index;
+
+    union {
+        u64 u_operand;
+        s64 s_operand;
+        f64 f_operand;
+        string_t string;
+    };
 };
 
 struct ir_function_t {
@@ -104,7 +111,7 @@ struct ir_t {
     list_t<ir_function_t> functions;
     list_t<u8>            data;
     u64                 uninit_size;
-    hashmap_t<string_t, u64> strings;
+    hashmap_t<string_t, u8> strings;
     hashmap_t<string_t, u64> ext_symbols;
 };
 

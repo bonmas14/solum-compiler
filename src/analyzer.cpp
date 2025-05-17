@@ -1498,7 +1498,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 sco
                     new_index = state->compiler->scopes.count - 1;
                 }
 
-                node->scope_index = scope_index;
+                node->scope_index = new_index;
 
                 hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, new_index);
                 stack_push(&state->current_search_stack, block);
