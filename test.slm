@@ -1,15 +1,9 @@
 
-A : struct = {
-    a, b : s32;
-}
 
 main : (arg : s32) -> s32 = {
     i : s32 = 0;
+    j : s32;
 
-    a : A;
-
-    a.a = 2;
-    a.b = 2;
 
     while true {
         if i > 10 {

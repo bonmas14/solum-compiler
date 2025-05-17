@@ -12,8 +12,6 @@ struct ast_node_t;
 
 enum types_t {
     TYPE_UNKN,
-    TYPE_UNKN_FUNC,
-    TYPE_UNKN_TYPE,
 
     TYPE_u8,
     TYPE_u16,

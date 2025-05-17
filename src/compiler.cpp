@@ -12,6 +12,7 @@
 #include "backend.h"
 
 #include "ir.h"
+#include "interop.h"
 
 #include "strings.h"
 #include "profiler.h"

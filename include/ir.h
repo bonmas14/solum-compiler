@@ -3,6 +3,8 @@
 
 #include "stddefines.h"
 #include "list.h"
+#include "compiler.h"
+#include "analyzer.h"
 #include "stack.h"
 #include "hashmap.h"
 #include "scanner.h"
@@ -42,7 +44,7 @@ enum ir_codes_t {
     IR_ALLOC,      // Allocate stack memory
     IR_FREE,       // Free stack memory
     IR_LOAD,       // Load from address
-    IR_STORE,      // Store to address
+    IR_STORE,      // Store to address 1 addr val
 
     IR_ADD,
     IR_SUB,
@@ -92,6 +94,8 @@ struct ir_opcode_t {
     token_t info;       // Source token for debugging
     u64     index;
 
+    stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
+
     union {
         u64 u_operand;
         s64 s_operand;
@@ -110,17 +114,9 @@ struct ir_function_t {
 struct ir_t {
     b32 is_valid;
 
-    list_t<ir_function_t> functions;
-    list_t<u8>            data;
-    u64                 uninit_size;
-    hashmap_t<string_t, u8> strings;
-    hashmap_t<string_t, u64> ext_symbols;
-};
-
-struct ir_scope_t {
-    hashmap_t<string_t, u64> variables;
-    hashmap_t<string_t, u64> constants;
-    u64 stack_size;
+    list_t<ir_function_t>              functions;
+    hashmap_t<string_t, scope_entry_t> variables;
+    // hashmap_t<string_t, u8> strings;
 };
 
 ir_t compile_program(compiler_t *compiler);

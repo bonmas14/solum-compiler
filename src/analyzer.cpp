@@ -1260,6 +1260,11 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
+
+    entry->info.type = TYPE_UNKN;
+
+    log_warning("Struct sizes todo! analyzer.cpp l:1266");
+
     if (!should_wait) {
         node->analyzed = true;
     }

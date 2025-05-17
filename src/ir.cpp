@@ -8,6 +8,11 @@
 #include "strings.h"
 #include "memctl.h"
 
+#define EXPR_CASE(cs, tok) case cs:\
+            compile_expression(state, node->right);\
+            compile_expression(state, node->left);\
+            emit_op(state, tok, node->token, 0);\
+            break;
 
 struct ir_state_t {
     compiler_t *compiler;
@@ -57,50 +62,50 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
 
 const char* ir_code_to_string(u64 code) {
     switch (code) {
-        case IR_NOP:          return "IR_NOP";
-        case IR_PUSH_SIGN:       return "IR_PUSH_SIGN";
-        case IR_PUSH_UNSIGN:       return "IR_PUSH_UNSIGN";
-        case IR_PUSH_F32:     return "IR_PUSH_F32";
-        case IR_PUSH_F64:     return "IR_PUSH_F64";
-        case IR_POP:          return "IR_POP";
-        case IR_CLONE:        return "IR_CLONE";
-        case IR_SWAP:         return "IR_SWAP";
-        case IR_GLOBAL:       return "IR_GLOBAL";
-        case IR_ALLOC:        return "IR_ALLOC";
-        case IR_FREE:         return "IR_FREE";
-        case IR_LOAD:         return "IR_LOAD";
-        case IR_STORE:        return "IR_STORE";
-        case IR_LEA:          return "IR_LEA";
-        case IR_ADD:          return "IR_ADD";
-        case IR_SUB:          return "IR_SUB";
+        case IR_NOP:         return "IR_NOP";
+        case IR_PUSH_SIGN:   return "IR_PUSH_SIGN";
+        case IR_PUSH_UNSIGN: return "IR_PUSH_UNSIGN";
+        case IR_PUSH_F32:    return "IR_PUSH_F32";
+        case IR_PUSH_F64:    return "IR_PUSH_F64";
+        case IR_POP:         return "IR_POP";
+        case IR_CLONE:       return "IR_CLONE";
+        case IR_SWAP:        return "IR_SWAP";
+        case IR_GLOBAL:      return "IR_GLOBAL";
+        case IR_ALLOC:       return "IR_ALLOC";
+        case IR_FREE:        return "IR_FREE";
+        case IR_LOAD:        return "IR_LOAD";
+        case IR_STORE:       return "IR_STORE";
+        case IR_LEA:         return "IR_LEA";
+        case IR_ADD:         return "IR_ADD";
+        case IR_SUB:         return "IR_SUB";
         case IR_MUL:         return "IR_MUL";
         case IR_DIV:         return "IR_DIV";
         case IR_MOD:         return "IR_MOD";
         case IR_NEG:         return "IR_NEG";
-        case IR_BIT_AND:      return "IR_BIT_AND";
-        case IR_BIT_OR:       return "IR_BIT_OR";
-        case IR_BIT_XOR:      return "IR_BIT_XOR";
-        case IR_BIT_NOT:      return "IR_BIT_NOT";
-        case IR_SHIFT_LEFT:   return "IR_SHIFT_LEFT";
-        case IR_SHIFT_RIGHT:  return "IR_SHIFT_RIGHT";
-        case IR_CMP_EQ:       return "IR_CMP_EQ";
-        case IR_CMP_NEQ:      return "IR_CMP_NEQ";
-        case IR_CMP_LT:       return "IR_CMP_LT";
-        case IR_CMP_GT:       return "IR_CMP_GT";
-        case IR_CMP_LTE:      return "IR_CMP_LTE";
-        case IR_CMP_GTE:      return "IR_CMP_GTE";
-        case IR_LOG_AND:      return "IR_LOG_AND";
-        case IR_LOG_OR:       return "IR_LOG_OR";
+        case IR_BIT_AND:     return "IR_BIT_AND";
+        case IR_BIT_OR:      return "IR_BIT_OR";
+        case IR_BIT_XOR:     return "IR_BIT_XOR";
+        case IR_BIT_NOT:     return "IR_BIT_NOT";
+        case IR_SHIFT_LEFT:  return "IR_SHIFT_LEFT";
+        case IR_SHIFT_RIGHT: return "IR_SHIFT_RIGHT";
+        case IR_CMP_EQ:      return "IR_CMP_EQ";
+        case IR_CMP_NEQ:     return "IR_CMP_NEQ";
+        case IR_CMP_LT:      return "IR_CMP_LT";
+        case IR_CMP_GT:      return "IR_CMP_GT";
+        case IR_CMP_LTE:     return "IR_CMP_LTE";
+        case IR_CMP_GTE:     return "IR_CMP_GTE";
+        case IR_LOG_AND:     return "IR_LOG_AND";
+        case IR_LOG_OR:      return "IR_LOG_OR";
         case IR_LOG_NOT:     return "IR_LOG_NOT";
-        case IR_JUMP:         return "IR_JUMP";
-        case IR_JUMP_IF:      return "IR_JUMP_IF";
-        case IR_JUMP_IF_NOT:  return "IR_JUMP_IF_NOT";
-        case IR_RET:          return "IR_RET";
-        case IR_CALL:         return "IR_CALL";
-        case IR_CALL_EXTERN:  return "IR_CALL_EXTERN";
-        case IR_BRK:          return "IR_BRK";
-        case IR_INVALID:          return "IR_INVALID";
-        default:              return "UNKNOWN_OP";
+        case IR_JUMP:        return "IR_JUMP";
+        case IR_JUMP_IF:     return "IR_JUMP_IF";
+        case IR_JUMP_IF_NOT: return "IR_JUMP_IF_NOT";
+        case IR_RET:         return "IR_RET";
+        case IR_CALL:        return "IR_CALL";
+        case IR_CALL_EXTERN: return "IR_CALL_EXTERN";
+        case IR_BRK:         return "IR_BRK";
+        case IR_INVALID:     return "IR_INVALID";
+        default:             return "UNKNOWN_OP";
     }
 }
 
@@ -108,7 +113,7 @@ void print_ir_opcode(ir_opcode_t op) {
     const char* op_name = ir_code_to_string(op.operation);
     
     log_update_color();
-    printf("%u: [IR] %-15s | Operand: 0x%016llx | %4lld | %.*s\n",
+    printf("%10u: [IR] %-15s | Operand: 0x%016llx | %4lld | %.*s\n",
            op.info.l1,
            op_name,
            (unsigned long long)op.u_operand,
@@ -171,6 +176,25 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
     ir_expression_t expr = {};
 
     switch (node->type) {
+        EXPR_CASE(AST_BIN_GR, IR_CMP_GT);
+        EXPR_CASE(AST_BIN_LS, IR_CMP_LT);
+        EXPR_CASE(AST_BIN_GEQ, IR_CMP_GTE);
+        EXPR_CASE(AST_BIN_LEQ, IR_CMP_LTE);
+        EXPR_CASE(AST_BIN_EQ, IR_CMP_EQ);
+        EXPR_CASE(AST_BIN_NEQ, IR_CMP_NEQ);
+        EXPR_CASE(AST_BIN_LOG_OR, IR_LOG_OR);
+        EXPR_CASE(AST_BIN_LOG_AND, IR_LOG_AND);
+        EXPR_CASE(AST_BIN_ADD, IR_ADD);
+        EXPR_CASE(AST_BIN_SUB, IR_SUB);
+        EXPR_CASE(AST_BIN_MUL, IR_MUL);
+        EXPR_CASE(AST_BIN_DIV, IR_DIV);
+        EXPR_CASE(AST_BIN_MOD, IR_MOD);
+        EXPR_CASE(AST_BIN_BIT_XOR, IR_BIT_XOR);
+        EXPR_CASE(AST_BIN_BIT_OR, IR_BIT_OR);
+        EXPR_CASE(AST_BIN_BIT_AND, IR_BIT_AND);
+        EXPR_CASE(AST_BIN_BIT_LSHIFT, IR_SHIFT_LEFT);
+        EXPR_CASE(AST_BIN_BIT_RSHIFT, IR_SHIFT_RIGHT);
+
         case AST_PRIMARY: switch (node->token.type)
             {
                 case TOKEN_CONST_FP:
@@ -212,12 +236,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
             } break;
             break;
 
-        case AST_UNARY_DEREF:
-            compile_expression(state, node->left);
-            expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
-            expr.accessable = true;
-            return expr;
-
         case AST_UNARY_REF:
             expr = compile_expression(state, node->left);
 
@@ -227,8 +245,15 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
                 break;
             } else {
                 expr.emmited_op->operation = IR_LEA;
+                expr.emmited_op->search_info = expr.search_info;
             }
             break;
+
+        case AST_UNARY_DEREF:
+            compile_expression(state, node->left);
+            expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
+            expr.accessable = true;
+            return expr;
 
         case AST_UNARY_NEGATE:
             compile_expression(state, node->left);
@@ -240,7 +265,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
             emit_op(state, IR_LOG_NOT, node->token, 0);
             break;
 
-
         case AST_BIN_CAST:
             // @todo
             //
@@ -249,6 +273,13 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
             // compile_expression(state, node->left);
             // emit_op(state, IR_INVALID, node->token, 0);
             break;
+
+        case AST_FUNC_CALL:
+            compile_expression(state, node->right); // passing args
+            expr = compile_expression(state, node->left);  // getting function address
+            expr.emmited_op->operation = IR_CALL;
+            break;
+
         case AST_MEMBER_ACCESS:
             assert(node->left->type == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
@@ -262,13 +293,18 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
                 break;
             }
 
-            stack_push(&expr.search_info, stack_peek(&state->search_scopes));
+            for (u64 i = 0; i < state->search_scopes.index; i++) {
+                stack_push(&expr.search_info, state->search_scopes.data[i]);
+            }
+
             stack_pop(&state->search_scopes);
             return expr;
 
-        case AST_ARRAY_ACCESS:
-            compile_expression(state, node->right);
+        case AST_ARRAY_ACCESS: // @todo finish
+            log_error("Cant use arrays");
+            break;
 
+            compile_expression(state, node->right);
             expr = compile_expression(state, node->left);
 
             if (!expr.accessable) {
@@ -276,15 +312,9 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
                 state->ir.is_valid = false;
             } else {
                 expr.emmited_op->operation = IR_STORE;
+                expr.emmited_op->search_info = expr.search_info;
             }
             return expr;
-
-        case AST_FUNC_CALL:
-            compile_expression(state, node->right); // passing args
-            expr = compile_expression(state, node->left);  // getting function address
-            expr.emmited_op->operation = IR_CALL;
-            // @todo here we need to get all of the outputs to the vairables
-            break;
 
         case AST_BIN_ASSIGN:
             compile_expression(state, node->right);
@@ -295,98 +325,8 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
                 state->ir.is_valid = false;
             } else {
                 expr.emmited_op->operation = IR_STORE;
+                expr.emmited_op->search_info = expr.search_info;
             }
-            break;
-
-        case AST_BIN_GR:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_GT, node->token, 0);
-            break;
-        case AST_BIN_LS:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_LT, node->token, 0);
-            break;
-        case AST_BIN_GEQ:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_GTE, node->token, 0);
-            break;
-        case AST_BIN_LEQ:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_LTE, node->token, 0);
-            break;
-        case AST_BIN_EQ:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_EQ, node->token, 0);
-            break;
-        case AST_BIN_NEQ:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_CMP_NEQ, node->token, 0);
-            break;
-        case AST_BIN_LOG_OR:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_LOG_OR, node->token, 0);
-            break;
-        case AST_BIN_LOG_AND:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_LOG_AND, node->token, 0);
-            break;
-        case AST_BIN_ADD:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_ADD, node->token, 0);
-            break;
-        case AST_BIN_SUB:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_SUB, node->token, 0);
-            break;
-        case AST_BIN_MUL:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_MUL, node->token, 0);
-            break;
-        case AST_BIN_DIV:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_DIV, node->token, 0);
-            break;
-        case AST_BIN_MOD:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_MOD, node->token, 0);
-            break;
-        case AST_BIN_BIT_XOR:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_BIT_XOR, node->token, 0);
-            break;
-        case AST_BIN_BIT_OR:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_BIT_OR, node->token, 0);
-            break;
-        case AST_BIN_BIT_AND:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_BIT_AND, node->token, 0);
-            break;
-        case AST_BIN_BIT_LSHIFT:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_SHIFT_LEFT, node->token, 0);
-            break;
-        case AST_BIN_BIT_RSHIFT:
-            compile_expression(state, node->right);
-            compile_expression(state, node->left);
-            emit_op(state, IR_SHIFT_RIGHT, node->token, 0);
             break;
 
         case AST_BIN_SWAP:
@@ -436,12 +376,44 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
 
 void compile_variable(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
-    UNUSED(state);
-    UNUSED(node);
+
+
+    scope_entry_t *entry = search_identifier(state, node->token.data.string);
+
+    if (entry->expr) {
+        ir_expression_t expr = compile_expression(state, entry->expr);
+        UNUSED(expr);
+    } else {
+        emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
+    }
+
+    emit_op(state, IR_ALLOC, node->token, 16); // here we get the type size
+    emit_op(state, IR_STORE, node->token, node->token.data.string);
+
 }
 
 void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
+
+    log_info_token("compiling", node->token);
+
+    ast_node_t *next = node->list_start;
+    for (u64 i = 0; i < node->child_count; i++) {
+        scope_entry_t *entry = search_identifier(state, next->token.data.string);
+
+        if (entry->expr) {
+            ir_expression_t expr = compile_expression(state, entry->expr);
+            UNUSED(expr);
+        } else {
+            emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
+        }
+
+        emit_op(state, IR_ALLOC, node->token, 16); // here we get the type size
+        emit_op(state, IR_STORE, node->token, next->token.data.string);
+
+        next = next->list_next;
+    }
+
     UNUSED(state);
     UNUSED(node);
 }
@@ -529,22 +501,6 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
 
 void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     if (entry->is_external) {
-
-        /*
-        string_t t = {};
-
-        t = string_temp_concat(STRING("Ext. func: "), key);
-        t = string_temp_concat(t, STRING(", as: "));
-        t = string_temp_concat(t, entry->ext_from);
-
-        if (entry->ext_name.size) {
-            t = string_temp_concat(t, STRING(":"));
-            t = string_temp_concat(t, entry->ext_name);
-        }
-
-        log_info(t);
-        */
-
         return;
     }  
 
@@ -552,24 +508,23 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
     ir_function_t func = {};
     func.symbol = key;
-
     state->current_function = &func;
-
     stack_push(&state->search_scopes, &entry->func_params);
-    compile_block(state, entry->expr);
+    {
+        compile_block(state, entry->expr);
+
+        if (entry->return_typenames.count == 0) {
+            emit_op(state, IR_RET, entry->node->token, 0);
+        } else {
+            emit_op(state, IR_INVALID, entry->node->token, 0);
+        }
+
+        for (u64 i = 0; i < func.code.count; i++) {
+            print_ir_opcode(func.code.data[i]);
+        }
+    }
     stack_pop(&state->search_scopes);
-    if (entry->return_typenames.count == 0) {
-        emit_op(state, IR_RET, entry->node->token, 0);
-    } else {
-        emit_op(state, IR_INVALID, entry->node->token, 0);
-    }
-
     state->current_function = NULL;
-    log_info(key);
-    for (u64 i = 0; i < func.code.count; i++) {
-        print_ir_opcode(func.code.data[i]);
-    }
-
     list_add(&state->ir.functions, &func);
 }
 
