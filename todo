@@ -15,3 +15,28 @@ ideas:
 
 - soft inlining - is when compiler generates output source code but inlines all of functions on source level. 
 could be great for debug purposes?
+
+
+
+
+
+
+- fix the alignment and make structs alignment.
+
+simple algoritm:
+
+we start at 0 size and alignment
+
+read variable and get its size
+
+
+
+add size of it to a size and set alignment
+
+s, a := 0
+
+foreach v : elements {
+    if a < v.a {
+        a = v.a;
+    }
+}

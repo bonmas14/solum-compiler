@@ -37,15 +37,16 @@ enum ir_codes_t {
     IR_SWAP,       // Swap top two elements
 
     // Memory operations
-    IR_GLOBAL,     // Push global variable (variable index)
-    IR_LEA,        // Load effective address (push address of variable index)
+    IR_GLOBAL,     // Push global variable   (variable index)
+    IR_LEA,        // Load effective address (variable index)
     
     // ------- stack based mem operations
-    IR_ALLOC,      // Allocate stack memory
-    IR_FREE,       // Free stack memory
-    IR_LOAD,       // Load from address
-    IR_STORE,      // Store to address 1 addr val
+    IR_ALLOC,      // Allocate stack memory (amount)
+    IR_FREE,       // Free stack memory     (amount)
+    IR_LOAD,       // Load from address     [address]
+    IR_STORE,      // Store to address [address] [value]
 
+    // math [left] [right]
     IR_ADD,
     IR_SUB,
     IR_MUL,
@@ -74,9 +75,9 @@ enum ir_codes_t {
     IR_LOG_OR,     
     IR_LOG_NOT,    
 
-    // Control flow
+    // Control flow (offset)
     IR_JUMP,       // Unconditional jump (offset operand)
-    IR_JUMP_IF,    // Jump if top != 0
+    IR_JUMP_IF,    // Jump if top != 0 ()
     IR_JUMP_IF_NOT,// Jump if top == 0
     IR_RET,        // Return from function
 

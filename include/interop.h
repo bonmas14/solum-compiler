@@ -3,6 +3,6 @@
 
 #include <ir.h>
 
-void interop_func(ir_t *state);
+void interop_func(ir_t *state, string_t *func_name);
 
 #endif

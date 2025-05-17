@@ -1,5 +1,11 @@
 
 
+A: struct = {
+    a,b,c,d : u8;
+    e,f : u16;
+    g: u32;
+}
+
 main : (arg : s32) -> s32 = {
     i : s32 = 0;
     j : s32;
@@ -19,8 +25,6 @@ main : (arg : s32) -> s32 = {
     return i;
 }
 
-/*
 m : () -> s32, u64 = {
     return 123, 32;
 }
-*/

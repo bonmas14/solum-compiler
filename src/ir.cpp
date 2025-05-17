@@ -1,5 +1,4 @@
 #include "compiler.h"
-#include "analyzer.h"
 #include "parser.h"
 #include "ir.h"
 
@@ -324,8 +323,9 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
                 log_error_token("Bad assignment expression: ", node->left->token);
                 state->ir.is_valid = false;
             } else {
-                expr.emmited_op->operation = IR_STORE;
+                expr.emmited_op->operation = IR_LEA;
                 expr.emmited_op->search_info = expr.search_info;
+                emit_op(state, IR_STORE, node->token, 0);
             }
             break;
 
@@ -377,7 +377,6 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
 void compile_variable(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
-
     scope_entry_t *entry = search_identifier(state, node->token.data.string);
 
     if (entry->expr) {
@@ -388,14 +387,11 @@ void compile_variable(ir_state_t *state, ast_node_t *node) {
     }
 
     emit_op(state, IR_ALLOC, node->token, 16); // here we get the type size
-    emit_op(state, IR_STORE, node->token, node->token.data.string);
-
+    emit_op(state, IR_STORE, node->token, 0);
 }
 
 void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
-
-    log_info_token("compiling", node->token);
 
     ast_node_t *next = node->list_start;
     for (u64 i = 0; i < node->child_count; i++) {
@@ -409,13 +405,10 @@ void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
         }
 
         emit_op(state, IR_ALLOC, node->token, 16); // here we get the type size
-        emit_op(state, IR_STORE, node->token, next->token.data.string);
+        emit_op(state, IR_STORE, node->token, 0);
 
         next = next->list_next;
     }
-
-    UNUSED(state);
-    UNUSED(node);
 }
 
 void compile_statement(ir_state_t *state, ast_node_t *node) {
@@ -511,6 +504,27 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     state->current_function = &func;
     stack_push(&state->search_scopes, &entry->func_params);
     {
+        //                      def -> type -> params
+        ast_node_t *node = entry->node->left->left;
+
+        for (u64 i = 0; i < node->child_count; i++) {
+            ast_node_t *next = node->list_start;
+
+            for (u64 j = 0; j < ((node->child_count - 1) - i); j++) {
+                next = next->list_next;
+            }
+
+            assert(state->current_function != NULL);
+
+            scope_entry_t *entry = search_identifier(state, next->token.data.string);
+            log_info(entry->node->token.data.string);
+
+            emit_op(state, IR_ALLOC, node->token, 16); 
+            emit_op(state, IR_STORE, node->token, 0);
+        }
+
+
+
         compile_block(state, entry->expr);
 
         if (entry->return_typenames.count == 0) {
