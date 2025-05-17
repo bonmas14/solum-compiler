@@ -1,5 +1,15 @@
+
+A : struct = {
+    a, b : s32;
+}
+
 main : (arg : s32) -> s32 = {
     i : s32 = 0;
+
+    a : A;
+
+    a.a = 2;
+    a.b = 2;
 
     while true {
         if i > 10 {
@@ -9,5 +19,14 @@ main : (arg : s32) -> s32 = {
         i = i + 1;
     }
 
+    // a, b : s32, u64 = m();
+    // a, b = m();
+
     return i;
 }
+
+/*
+m : () -> s32, u64 = {
+    return 123, 32;
+}
+*/

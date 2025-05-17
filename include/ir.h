@@ -35,12 +35,14 @@ enum ir_codes_t {
     IR_SWAP,       // Swap top two elements
 
     // Memory operations
-    IR_GLOBAL,     // Push global variable (from address)
-    IR_ALLOC,      // Allocate stack memory (size in bytes)
+    IR_GLOBAL,     // Push global variable (variable index)
+    IR_LEA,        // Load effective address (push address of variable index)
+    
+    // ------- stack based mem operations
+    IR_ALLOC,      // Allocate stack memory
     IR_FREE,       // Free stack memory
-    IR_LOAD,       // Load from address (dereference pointer)
+    IR_LOAD,       // Load from address
     IR_STORE,      // Store to address
-    IR_LEA,        // Load effective address (push address of variable)
 
     IR_ADD,
     IR_SUB,

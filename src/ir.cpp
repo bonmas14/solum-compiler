@@ -39,15 +39,20 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, s64 data, u64 dum
     o.info = debug;
     o.s_operand = data;
     list_add(&state->current_function->code, &o);
-    return list_get(&state->current_function->code, state->current_function->code.count - 1);
+    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    out->index = state->current_function->code.count - 1;
+    return out;
 }
 
-void emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
+ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
     ir_opcode_t o = {};
     o.operation = op;
     o.info = debug;
     o.string = data;
     list_add(&state->current_function->code, &o);
+    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    out->index = state->current_function->code.count - 1;
+    return out;
 }
 
 const char* ir_code_to_string(u64 code) {
@@ -103,7 +108,8 @@ void print_ir_opcode(ir_opcode_t op) {
     const char* op_name = ir_code_to_string(op.operation);
     
     log_update_color();
-    printf("[IR] %-15s | Operand: 0x%016llx | %4lld | %.*s\n",
+    printf("%u: [IR] %-15s | Operand: 0x%016llx | %4lld | %.*s\n",
+           op.info.l1,
            op_name,
            (unsigned long long)op.u_operand,
            (long long)op.s_operand,
@@ -150,10 +156,19 @@ void add_identifier_type_to_search(ir_state_t *state, string_t key) {
     }
 }
 
-void compile_expression(ir_state_t *state, ast_node_t *node) {
+struct ir_expression_t {
+    b32            accessable;
+    ir_opcode_t   *emmited_op;
+    // type info later...
+    stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
+};
+
+ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
     UNUSED(state);
     UNUSED(node);
+
+    ir_expression_t expr = {};
 
     switch (node->type) {
         case AST_PRIMARY: switch (node->token.type)
@@ -173,12 +188,17 @@ void compile_expression(ir_state_t *state, ast_node_t *node) {
                     {
                         scope_entry_t *entry = search_identifier(state, node->token.data.string);
 
-                        if (entry->type != ENTRY_VAR) {
+                        if (entry->type == ENTRY_TYPE) {
+                            log_error_token("Cant use types in expression", node->token);
                             emit_op(state, IR_INVALID, node->token, 0);
-                        } else {
-                            emit_op(state, IR_GLOBAL, node->token, node->token.data.string);
+                            state->ir.is_valid = false;
+                            break;
                         }
+
+                        expr.accessable = true;
+                        expr.emmited_op = emit_op(state, IR_GLOBAL, node->token, node->token.data.string);
                         // @todo, this should be already created stuff...
+                        return expr;
                     } break;
                 case TOK_TRUE:
                     emit_op(state, IR_PUSH_SIGN, node->token, 1);
@@ -187,26 +207,34 @@ void compile_expression(ir_state_t *state, ast_node_t *node) {
                     emit_op(state, IR_PUSH_SIGN, node->token, 0);
                     break;
                 default:
-                    emit_op(state, IR_INVALID, node->token, 0);
+                    emit_op(state, IR_INVALID, node->token, 0xBBBBBBBBBBBBBBBB);
                     break;
             } break;
-            // just easiest
             break;
 
         case AST_UNARY_DEREF:
             compile_expression(state, node->left);
-            emit_op(state, IR_LOAD, node->token, 0);
-            break;
+            expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
+            expr.accessable = true;
+            return expr;
+
         case AST_UNARY_REF:
-            // @todo
-            //
-            // compile_expression(state, node->left);
-            // emit_op(state, IR_PUSH_UNSIGN, node->token, 0xFFFFFFFFFFFFFFFF);
+            expr = compile_expression(state, node->left);
+
+            if (!expr.accessable) {
+                log_error_token("Cant get address of unknown variable", node->left->token);
+                state->ir.is_valid = false;
+                break;
+            } else {
+                expr.emmited_op->operation = IR_LEA;
+            }
             break;
+
         case AST_UNARY_NEGATE:
             compile_expression(state, node->left);
             emit_op(state, IR_NEG, node->token, 0);
             break;
+
         case AST_UNARY_NOT:
             compile_expression(state, node->left);
             emit_op(state, IR_LOG_NOT, node->token, 0);
@@ -225,28 +253,49 @@ void compile_expression(ir_state_t *state, ast_node_t *node) {
             assert(node->left->type == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
             add_identifier_type_to_search(state, node->left->token.data.string);
-            compile_expression(state, node->right);
+            expr = compile_expression(state, node->right);
+
+            if (!expr.accessable) {
+                log_error_token("Bad member access expression: ", node->left->token);
+                state->ir.is_valid = false;
+                stack_pop(&state->search_scopes);
+                break;
+            }
+
+            stack_push(&expr.search_info, stack_peek(&state->search_scopes));
             stack_pop(&state->search_scopes);
-            break;
+            return expr;
+
         case AST_ARRAY_ACCESS:
-            // @todo
-            //
-            // compile_expression(state, node->right);
-            // compile_expression(state, node->left);
-            // emit_op(state, IR_INVALID, node->token, 0);
-            break;
+            compile_expression(state, node->right);
+
+            expr = compile_expression(state, node->left);
+
+            if (!expr.accessable) {
+                log_error_token("Bad array access expression: ", node->left->token);
+                state->ir.is_valid = false;
+            } else {
+                expr.emmited_op->operation = IR_STORE;
+            }
+            return expr;
+
         case AST_FUNC_CALL:
             compile_expression(state, node->right); // passing args
-            // compile_expression(state, node->left);  // getting function address
-            emit_op(state, IR_CALL, node->token, node->left->token.data.string);// reading address and calling
+            expr = compile_expression(state, node->left);  // getting function address
+            expr.emmited_op->operation = IR_CALL;
+            // @todo here we need to get all of the outputs to the vairables
             break;
 
         case AST_BIN_ASSIGN:
-            // @todo
-            //
-            // compile_expression(state, node->right);
-            // compile_expression(state, node->left);
-            // emit_op(state, IR_INVALID, node->token, 0);
+            compile_expression(state, node->right);
+            expr = compile_expression(state, node->left);
+
+            if (!expr.accessable) {
+                log_error_token("Bad assignment expression: ", node->left->token);
+                state->ir.is_valid = false;
+            } else {
+                expr.emmited_op->operation = IR_STORE;
+            }
             break;
 
         case AST_BIN_GR:
@@ -343,6 +392,9 @@ void compile_expression(ir_state_t *state, ast_node_t *node) {
         case AST_BIN_SWAP:
             // @todo
             // log_error("AST_BIN_SWAP compilation TODO");
+            compile_expression(state, node->right);
+            compile_expression(state, node->left);
+            emit_op(state, IR_INVALID, node->token, 0xABABABABABABABAB);
             break;
 
         case AST_SEPARATION:
@@ -361,7 +413,11 @@ void compile_expression(ir_state_t *state, ast_node_t *node) {
             break;
     }
 
+    if (expr.search_info.data != NULL) {
+        stack_delete(&expr.search_info);
+    }
 
+    return {};
 }
 
 void compile_block(ir_state_t *state, ast_node_t *node) {
@@ -369,7 +425,6 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
     stack_push(&state->search_scopes, block);
 
     ast_node_t *stmt = node->list_start;
-    // here we compile the variables inside of function
 
     for (u64 i = 0; i < node->child_count; i++) {
         compile_statement(state, stmt);
@@ -465,7 +520,6 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
                 stack_push(&state->continue_stmt, emit_op(state, IR_JUMP, node->token, 0)); // jump to start of loop
             }
             break;
-            break;
 
         default:
             compile_expression(state, node);
@@ -504,9 +558,13 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     stack_push(&state->search_scopes, &entry->func_params);
     compile_block(state, entry->expr);
     stack_pop(&state->search_scopes);
+    if (entry->return_typenames.count == 0) {
+        emit_op(state, IR_RET, entry->node->token, 0);
+    } else {
+        emit_op(state, IR_INVALID, entry->node->token, 0);
+    }
 
     state->current_function = NULL;
-
     log_info(key);
     for (u64 i = 0; i < func.code.count; i++) {
         print_ir_opcode(func.code.data[i]);

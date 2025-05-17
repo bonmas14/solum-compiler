@@ -16,7 +16,6 @@
 #include "strings.h"
 #include "profiler.h"
 
-#ifdef _WIN32
 #define MODULES_PATH "SOLUM_MODULES"
 
 string_t get_global_modules_search_path(void) {
@@ -31,18 +30,6 @@ string_t get_global_modules_search_path(void) {
 
     return string_copy(STRING(env), default_allocator);
 }
-
-#else 
-
-// @todo also make it environment variable
-#define MODULES_PATH "/usr/local/lib/solum/modules/"
-
-string_t get_global_modules_search_path(void) {
-    assert(default_allocator != NULL);
-    return string_copy(STRING(MODULES_PATH), default_allocator);
-}
-
-#endif
 
 source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
