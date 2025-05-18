@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 cc="clang++"
-lld="ld.lld"
 
 src_dir="./src"
 bin_dir="./bin"
@@ -17,13 +16,21 @@ mkdir "$obj_dir"
 mkdir "$log_dir"
 
 config=${1,-"Debug"}
+shift
+arch=${1,-"x64"}
 
 defines="-D_UNICODE -DUNICODE"
 
 name="$bin_dir/slm"
 obj="$obj_dir"
 
-cflags="-m64 -std=c++14 -I./include -g -Wall -Wno-format $defines"
+if [ "$arch" == "x32" ]; then
+    arch="-m32"
+else
+    arch="-m64 -fPIC"
+fi
+
+cflags="$arch -std=c++14 -I./include -g -Wall -Wno-format $defines"
 
 if [ "$config" == "Release" ]; then
     name="$name-r"
@@ -61,7 +68,7 @@ done
 echo
 echo "Linking:"
 
-echo "$cc -o"$name" $obj_files -m64"
+echo "$cc -o"$name" $obj_files $arch"
 $cc -o"$name" $obj_files -m64
 
 echo
