@@ -56,9 +56,11 @@ u32 mem_compare(u8 *left, u8 *right, u64 size) {
 }
 
 char *string_to_c_string(string_t a, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc  != NULL);
     assert(a.data != NULL);
+
+    if (alloc == NULL) {
+        alloc = default_allocator;
+    }
 
     u8* data = (u8*)mem_alloc(alloc, a.size + 1);
 
@@ -95,8 +97,8 @@ string_t string_swap(string_t input, u8 from, u8 to, allocator_t *alloc) {
 }
 
 b32 string_compare(string_t a, string_t b) {
-    assert(a.data != NULL);
-    assert(b.data != NULL);
+    if (a.data == NULL && b.data == NULL) return true;
+    if (a.data == NULL || b.data == NULL) return false;
 
     if (a.size != b.size) return false;
 
@@ -104,9 +106,6 @@ b32 string_compare(string_t a, string_t b) {
 }
 
 string_t string_join(list_t<string_t> input, string_t separator, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc != NULL);
-
     string_t     temp   = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -127,27 +126,20 @@ string_t string_join(list_t<string_t> input, string_t separator, allocator_t *al
         }
     }
 
-    if (input.count == 0) return {};
-
-    assert(false);
-
     return {};
 }
 
-list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc != NULL);
+list_t<string_t> string_split(string_t input, string_t pattern) {
+    allocator_t *talloc = get_temporary_allocator();
 
     list_t<string_t> splits = {};
 
     if (input.size <= pattern.size) {
-        log_error(STRING("Pattern is bigger than input."));
-        return splits;
+        return {};
     }
 
     if (pattern.size == 0) {
-        log_error(STRING("Pattern is empty."));
-        return splits;
+        return {};
     }
 
     u64 start = 0;
@@ -164,13 +156,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
             continue;
         }
 
-        u8* buffer = (u8*)mem_alloc(alloc, size);
-        if (buffer == NULL) { 
-            log_error(STRING("buy more ram... split allocation failed"));
-            assert(false);
-            return splits;
-        }
-
+        u8* buffer = (u8*)mem_alloc(talloc, size);
         mem_move(buffer, input.data + start, size);
         string_t output = { .size = size, .data = buffer };
         list_add(&splits, &output);
@@ -187,14 +173,7 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
             return splits;
         }
 
-        u8* buffer = (u8*)mem_alloc(alloc, size);
-
-        if (buffer == NULL) { 
-            log_error(STRING("buy more ram... split allocation failed"));
-            assert(false);
-            return splits;
-        }
-
+        u8* buffer = (u8*)mem_alloc(talloc, size);
         mem_move(buffer, input.data + start, size);
         string_t output = { .size = size, .data = buffer };
         list_add(&splits, &output);
@@ -204,22 +183,23 @@ list_t<string_t> string_split(string_t input, string_t pattern, allocator_t *all
 }
 
 string_t string_copy(string_t a, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
-    assert(alloc  != NULL);
-    assert(a.data != NULL);
+    if (a.data == NULL) {
+        return {};
+    }
 
-    if (alloc == NULL)
+    if (alloc == NULL) {
         alloc = default_allocator;
+    }
 
     u8* data = (u8*)mem_alloc(alloc, a.size);
 
     if (data == NULL) {
         log_error(STRING("string copy failed, buy more ram, or provide normal allocator..."));
-        return (string_t) {.size = 0, .data = NULL };
+        return {};
     }
 
     mem_move(data, a.data, a.size);
-    return (string_t) {.size = a.size, .data = (u8*) data };
+    return { .size = a.size, .data = (u8*) data };
 }
 
 string_t string_concat(string_t a, string_t b, allocator_t *alloc) {
@@ -294,7 +274,7 @@ void string_tests(void) {
 
     assert(string_compare(string_copy(result, alloc), result));
     
-    list_t<string_t> splits = string_split(STRING("Eatin burger wit no honey mustard"), STRING(" "), alloc);
+    list_t<string_t> splits = string_split(STRING("Eatin burger wit no honey mustard"), STRING(" "));
 
     assert(splits.count == 6);
 
@@ -307,7 +287,7 @@ void string_tests(void) {
 
     list_delete(&splits);
 
-    splits = string_split(STRING("Eatin||burger||wit||no||honey||mustard"), STRING("||"), alloc);
+    splits = string_split(STRING("Eatin||burger||wit||no||honey||mustard"), STRING("||"));
 
     assert(splits.count == 6);
 
@@ -320,7 +300,7 @@ void string_tests(void) {
 
     list_delete(&splits);
 
-    splits = string_split(STRING("Eatin||burger||wit||no||honey||mustard||a"), STRING("||"), alloc);
+    splits = string_split(STRING("Eatin||burger||wit||no||honey||mustard||a"), STRING("||"));
 
     assert(splits.count == 7);
 
@@ -334,7 +314,7 @@ void string_tests(void) {
 
     list_delete(&splits);
 
-    splits = string_split(STRING("a||Eatin||burger||wit||no||honey||mustard||a"), STRING("||"), alloc);
+    splits = string_split(STRING("a||Eatin||burger||wit||no||honey||mustard||a"), STRING("||"));
 
     assert(splits.count == 8);
 
@@ -349,7 +329,7 @@ void string_tests(void) {
 
     list_delete(&splits);
 
-    splits = string_split(STRING("||Eatin||burger||wit||no||honey||mustard||"), STRING("||"), alloc);
+    splits = string_split(STRING("||Eatin||burger||wit||no||honey||mustard||"), STRING("||"));
 
     assert(splits.count == 6);
 

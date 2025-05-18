@@ -8,8 +8,8 @@
 #include "memctl.h"
 
 #define EXPR_CASE(cs, tok) case cs:\
-            compile_expression(state, node->right, should_shadow);\
-            compile_expression(state, node->left, should_shadow);\
+            compile_expression(state, node->right, shadow);\
+            compile_expression(state, node->left,  shadow);\
             emit_op(state, tok, node->token, 0);\
             break;
 
@@ -19,45 +19,12 @@ struct ir_state_t {
     ir_function_t *current_function;
     stack_t<ir_opcode_t*> continue_stmt;
     stack_t<ir_opcode_t*> break_stmt;
+    stack_t<ast_node_t*> reverse;
     stack_t<hashmap_t<string_t, scope_entry_t>*> search_scopes;
     list_t<hashmap_t<string_t, scope_entry_t>>   local_scopes;
 };
 
 // ------ //
-
-ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, u64 data) {
-    ir_opcode_t o = {};
-    o.operation = op;
-    o.info = debug;
-    o.u_operand = data;
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
-    out->index = state->current_function->code.count - 1;
-    return out;
-}
-
-ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, s64 data, u64 dummy) {
-    UNUSED(dummy);
-    ir_opcode_t o = {};
-    o.operation = op;
-    o.info = debug;
-    o.s_operand = data;
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
-    out->index = state->current_function->code.count - 1;
-    return out;
-}
-
-ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
-    ir_opcode_t o = {};
-    o.operation = op;
-    o.info = debug;
-    o.string = data;
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
-    out->index = state->current_function->code.count - 1;
-    return out;
-}
 
 const char* ir_code_to_string(u64 code) {
     switch (code) {
@@ -121,19 +88,66 @@ void print_ir_opcode(ir_opcode_t op) {
            (char*)op.string.data);
 }
 
+#ifdef NDEBUG
+#define print_ir_opcode(...)
+#endif
+ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, u64 data) {
+    ir_opcode_t o = {};
+    o.operation = op;
+    o.info = debug;
+    o.u_operand = data;
+
+    print_ir_opcode(o);
+
+    list_add(&state->current_function->code, &o);
+    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    out->index = state->current_function->code.count - 1;
+    return out;
+}
+
+ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, s64 data, u64 dummy) {
+    UNUSED(dummy);
+    ir_opcode_t o = {};
+    o.operation = op;
+    o.info = debug;
+    o.s_operand = data;
+
+    print_ir_opcode(o);
+
+    list_add(&state->current_function->code, &o);
+    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    out->index = state->current_function->code.count - 1;
+    return out;
+}
+
+ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
+    ir_opcode_t o = {};
+    o.operation = op;
+    o.info = debug;
+    o.string = data;
+
+    print_ir_opcode(o);
+
+    list_add(&state->current_function->code, &o);
+    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    out->index = state->current_function->code.count - 1;
+    return out;
+}
+
 // ------ // 
 
 void compile_statement(ir_state_t *state, ast_node_t *node);
 
-scope_entry_t *search_identifier(ir_state_t *state, string_t key, b32 shadow = false) {
+scope_entry_t *search_identifier(ir_state_t *state, string_t key, string_t shadow) {
+    b32 shadowed = false;
     for (s64 i = (state->search_scopes.index - 1); i >= 0; i--) {
         hashmap_t<string_t, scope_entry_t> *search_scope = state->search_scopes.data[i];
         
         if (!hashmap_contains(search_scope, key))
             continue;
 
-        if (shadow) {
-            shadow = false;
+        if (!shadowed && string_compare(shadow, key)) {
+            shadowed = true;
             continue;
         }
 
@@ -145,9 +159,9 @@ scope_entry_t *search_identifier(ir_state_t *state, string_t key, b32 shadow = f
 }
 
 void add_identifier_type_to_search(ir_state_t *state, string_t key) {
-    scope_entry_t *entry = search_identifier(state, key);
+    scope_entry_t *entry = search_identifier(state, key, {});
     string_t type_name  = entry->info.type_name;
-    scope_entry_t *type = search_identifier(state, type_name);
+    scope_entry_t *type = search_identifier(state, type_name, {});
 
     switch (type->type) {
         case ENTRY_VAR:
@@ -172,7 +186,7 @@ struct ir_expression_t {
     stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
 };
 
-ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 should_shadow) {
+ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t shadow) {
     assert(state->current_function != NULL);
     UNUSED(state);
     UNUSED(node);
@@ -214,7 +228,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
                     break;
                 case TOKEN_IDENT: 
                     {
-                        scope_entry_t *entry = search_identifier(state, node->token.data.string, should_shadow);
+                        scope_entry_t *entry = search_identifier(state, node->token.data.string, shadow);
 
                         if (entry->type == ENTRY_TYPE) {
                             log_error_token("Cant use types in expression", node->token);
@@ -241,7 +255,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             break;
 
         case AST_UNARY_REF:
-            expr = compile_expression(state, node->left, should_shadow);
+            expr = compile_expression(state, node->left, shadow);
 
             if (!expr.accessable) {
                 log_error_token("Cant get address of unknown variable", node->left->token);
@@ -254,23 +268,23 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             break;
 
         case AST_UNARY_DEREF:
-            compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->left, shadow);
             expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
             expr.accessable = true;
             return expr;
 
         case AST_UNARY_INVERT:
-            compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->left, shadow);
             emit_op(state, IR_BIT_NOT, node->token, 0);
             break;
 
         case AST_UNARY_NEGATE:
-            compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->left, shadow);
             emit_op(state, IR_NEG, node->token, 0);
             break;
 
         case AST_UNARY_NOT:
-            compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->left, shadow);
             emit_op(state, IR_LOG_NOT, node->token, 0);
             break;
 
@@ -278,14 +292,14 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             // @todo
             //
             // log_error("AST_BIN_CAST compilation TODO");
-            compile_expression(state, node->right, should_shadow);
+            compile_expression(state, node->right, shadow);
             // compile_expression(state, node->left);
             // emit_op(state, IR_INVALID, node->token, 0);
             break;
 
         case AST_FUNC_CALL:
-            compile_expression(state, node->right, should_shadow); // passing args
-            expr = compile_expression(state, node->left, should_shadow);  // getting function address
+            compile_expression(state, node->right, shadow); // passing args
+            expr = compile_expression(state, node->left, shadow);  // getting function address
             expr.emmited_op->operation = IR_CALL;
             break;
 
@@ -293,7 +307,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             assert(node->left->type == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
             add_identifier_type_to_search(state, node->left->token.data.string);
-            expr = compile_expression(state, node->right, should_shadow);
+            expr = compile_expression(state, node->right, shadow);
 
             if (!expr.accessable) {
                 log_error_token("Bad member access expression: ", node->left->token);
@@ -313,8 +327,8 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             log_error("Cant use arrays");
             break;
 
-            compile_expression(state, node->right, should_shadow);
-            expr = compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->right, shadow);
+            expr = compile_expression(state, node->left, shadow);
 
             if (!expr.accessable) {
                 log_error_token("Bad array access expression: ", node->left->token);
@@ -326,8 +340,8 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             return expr;
 
         case AST_BIN_ASSIGN:
-            compile_expression(state, node->right, should_shadow);
-            expr = compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->right, shadow);
+            expr = compile_expression(state, node->left, shadow);
 
             if (!expr.accessable) {
                 log_error_token("Bad assignment expression: ", node->left->token);
@@ -342,8 +356,8 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
         case AST_BIN_SWAP:
             // @todo
             // log_error("AST_BIN_SWAP compilation TODO");
-            compile_expression(state, node->right, should_shadow);
-            compile_expression(state, node->left, should_shadow);
+            compile_expression(state, node->right, shadow);
+            compile_expression(state, node->left, shadow);
             emit_op(state, IR_INVALID, node->token, 0xABABABABABABABAB);
             break;
 
@@ -351,9 +365,14 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, b32 shou
             {
                 ast_node_t *next = node->list_start;
 
+                state->reverse.index = 0;
                 for (u64 i = 0; i < node->child_count; i++) {
-                    compile_expression(state, next, should_shadow);
+                    stack_push(&state->reverse, next);
                     next = next->list_next;
+                }
+
+                for (u64 i = 0; i < node->child_count; i++) {
+                    compile_expression(state, stack_pop(&state->reverse), shadow);
                 }
             }
             break;
@@ -387,10 +406,10 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
 void compile_variable(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
-    scope_entry_t *entry = search_identifier(state, node->token.data.string);
+    scope_entry_t *entry = search_identifier(state, node->token.data.string, {});
 
     if (entry->expr) {
-        ir_expression_t expr = compile_expression(state, entry->expr, true);
+        ir_expression_t expr = compile_expression(state, entry->expr, node->token.data.string);
         UNUSED(expr);
     } else {
         emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
@@ -405,10 +424,10 @@ void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
 
     ast_node_t *next = node->list_start;
     for (u64 i = 0; i < node->child_count; i++) {
-        scope_entry_t *entry = search_identifier(state, next->token.data.string);
+        scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
         if (entry->expr) {
-            ir_expression_t expr = compile_expression(state, entry->expr, true);
+            ir_expression_t expr = compile_expression(state, entry->expr, next->token.data.string);
             UNUSED(expr);
         } else {
             emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
@@ -432,7 +451,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
 
         case AST_IF_STMT: 
             {
-                compile_expression(state, node->left, false);
+                compile_expression(state, node->left, {});
                 ir_opcode_t *end = emit_op(state, IR_JUMP_IF_NOT, node->token, 0);
                 compile_block(state, node->right);
                 end->s_operand = state->current_function->code.count - 1 - end->index; // @todo, this could be a problem...
@@ -441,7 +460,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
         case AST_IF_ELSE_STMT:
             {
                 ir_opcode_t *branch, *end;
-                compile_expression(state, node->left, false);
+                compile_expression(state, node->left, {});
                 branch = emit_op(state, IR_JUMP_IF_NOT, node->token, 0);
 
                 compile_block(state, node->center);
@@ -462,7 +481,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
                 u64 start_continue_index = state->continue_stmt.index;
                 u64 start_break_index    = state->break_stmt.index;
 
-                compile_expression(state, node->left, false);
+                compile_expression(state, node->left, {});
                 end = emit_op(state, IR_JUMP_IF_NOT, node->token, 0);
                 compile_block(state, node->right);
                 emit_op(state, IR_JUMP, node->token, -((state->current_function->code.count + 1) - pos), 0);
@@ -481,7 +500,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
             break;
         case AST_RET_STMT: 
             {
-                compile_expression(state, node->left, false);
+                compile_expression(state, node->left, {});
                 emit_op(state, IR_RET, node->token, 0);
             }
             break;
@@ -497,7 +516,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
             break;
 
         default:
-            compile_expression(state, node, false);
+            compile_expression(state, node, {});
             break;
     }
 }
@@ -516,24 +535,17 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     {
         //                      def -> type -> params
         ast_node_t *node = entry->node->left->left;
+        ast_node_t *next = node->list_start;
 
         for (u64 i = 0; i < node->child_count; i++) {
-            ast_node_t *next = node->list_start;
+            scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
-            for (u64 j = 0; j < ((node->child_count - 1) - i); j++) {
-                next = next->list_next;
-            }
-
-            assert(state->current_function != NULL);
-
-            scope_entry_t *entry = search_identifier(state, next->token.data.string);
-            log_info(entry->node->token.data.string);
-
+            UNUSED(entry); // here we check types, etc
             emit_op(state, IR_ALLOC, node->token, 16); 
             emit_op(state, IR_STORE, node->token, 0);
+
+            next = next->list_next;
         }
-
-
 
         compile_block(state, entry->expr);
 
@@ -543,9 +555,11 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             emit_op(state, IR_INVALID, entry->node->token, 0);
         }
 
+        /*
         for (u64 i = 0; i < func.code.count; i++) {
             print_ir_opcode(func.code.data[i]);
         }
+        */
     }
     stack_pop(&state->search_scopes);
     state->current_function = NULL;

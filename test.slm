@@ -1,29 +1,4 @@
 
-
-A: struct = {
-    a,b,c,d : u8;
-    e,f : u16;
-    g: u32;
-}
-
-main : (arg : s32) -> s32 = {
-    i : s32 = 0;
-
-
-    while true {
-        if ~i > 10 {
-            break;
-        }
-
-        i = i + 1;
-    }
-
-    // a, b : s32, u64 = m();
-    // a, b = m();
-
-    return i;
-}
-
-m : () -> s32, u64 = {
-    return 123, 32;
+max : (a: s32, b: s32) -> s32 = {
+    return a + b;
 }
