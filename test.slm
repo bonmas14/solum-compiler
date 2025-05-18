@@ -12,7 +12,7 @@ main : (arg : s32) -> s32 = {
 
 
     while true {
-        if i > 10 {
+        if ~i > 10 {
             break;
         }
 

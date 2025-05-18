@@ -14,7 +14,7 @@ vim.api.nvim_create_autocmd("FileType", {
 
       " Operators
       syntax match slmOperator /\(<<\|>>\|<=\|>=\|==\|!=\|&&\|||\)/
-      syntax match slmOperator /[+\-*\/%&|\^=<>!;.,:@()[\]{}]/
+      syntax match slmOperator /[~+\-*\/%&|\^=<>!;.,:@()[\]{}]/
       syntax match slmOperator /->/
 
       " Literals

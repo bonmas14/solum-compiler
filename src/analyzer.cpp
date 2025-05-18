@@ -369,6 +369,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         case AST_UNARY_REF:
         case AST_UNARY_NEGATE:
         case AST_UNARY_NOT:
+        case AST_UNARY_INVERT:
             result = analyze_expression(state, expected_count_of_expressions, depend_on, expr->left);
             break;
 

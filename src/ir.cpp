@@ -254,6 +254,11 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node) {
             expr.accessable = true;
             return expr;
 
+        case AST_UNARY_INVERT:
+            compile_expression(state, node->left);
+            emit_op(state, IR_BIT_NOT, node->token, 0);
+            break;
+
         case AST_UNARY_NEGATE:
             compile_expression(state, node->left);
             emit_op(state, IR_NEG, node->token, 0);

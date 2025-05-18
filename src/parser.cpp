@@ -159,6 +159,7 @@ static bind_power_t get_prefix_bind_power(token_t token) {
         case '@': 
         case '^':
         case '-': 
+        case '~': 
         case '!': return {0, 23};
 
         default:
@@ -245,6 +246,7 @@ static u32 get_ast_type_based_on_prefix_token(token_t token) {
         case '^': return AST_UNARY_REF;    break;
         case '-': return AST_UNARY_NEGATE; break;
         case '!': return AST_UNARY_NOT;    break;
+        case '~': return AST_UNARY_INVERT; break;
 
         case TOK_CAST: return AST_BIN_CAST; break;
 
@@ -329,6 +331,7 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
         case '!':
         case '@':
         case '^':
+        case '~':
             {
                 result.token    = advance_token(state->scanner, state->strings);
                 result.type     = get_ast_type_based_on_prefix_token(left);

@@ -44,6 +44,7 @@ enum ast_types_t {
     AST_UNARY_REF,
     AST_UNARY_NEGATE,
     AST_UNARY_NOT,
+    AST_UNARY_INVERT,
     AST_NAMED_MODULE,
 
     AST_ENUM_DECL, 

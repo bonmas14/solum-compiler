@@ -478,6 +478,7 @@ token_t advance_token(scanner_t *state, allocator_t *alloc) {
         case '}':
         case '@': 
         case '^':
+        case '~':
             break;
 
         case '&': {
