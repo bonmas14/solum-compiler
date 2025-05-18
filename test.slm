@@ -8,7 +8,6 @@ A: struct = {
 
 main : (arg : s32) -> s32 = {
     i : s32 = 0;
-    j : s32;
 
 
     while true {

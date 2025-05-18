@@ -340,7 +340,8 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                                 break;
                             }
 
-                            log_warning_token("Usage of uninitialized variable", expr->token);
+                            log_error_token("Usage of not created variable", expr->token);
+                            result = false;
                             break;
 
                         case ENTRY_FUNC:
