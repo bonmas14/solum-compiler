@@ -37,7 +37,7 @@ void log_error(const char *text);
 
 #ifdef DEBUG
 #define assert(result) {\
-    if ((b32)(result) == false) {\
+    if ((uintptr_t)(result) == 0) {\
         u8 buffer[1024];\
         sprintf((char*)buffer, "assertion failed in file: '%.256s', in function '%.128s', line: %zu", __FILE__, __func__, (size_t)__LINE__);\
         log_error((string_t) { .size = c_string_length((char*)buffer), .data = (u8*)buffer });\

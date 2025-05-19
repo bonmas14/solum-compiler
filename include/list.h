@@ -19,6 +19,18 @@ struct list_t {
 
     u64 current_size;
     u64 grow_size;
+
+    DataType operator[](u64 index) {
+        if (index >= count) {
+            return {};
+        }
+
+        return data[index];
+    }
+
+    void operator+=(DataType &type) {
+        list_add(this, &type);
+    }
 };
 
 // ----------- Initialization 
@@ -96,6 +108,7 @@ list_t<DataType> list_clone(list_t<DataType> *list) {
 
     return clone;
 }
+
 template<typename DataType>
 b32 list_delete(list_t<DataType> *list) {
     if (list == NULL) {
@@ -113,7 +126,6 @@ b32 list_delete(list_t<DataType> *list) {
 
     return true;
 }
-
 
 // reserve some amount of memory in list
 // return index of a first element
@@ -209,9 +221,7 @@ b32 list_grow_fit(list_t<DataType> *list, u64 fit_elements) {
         return true;
     } else {
         while ((list->count + fit_elements) >= list->current_size) {
-            if (!list_grow(list)) {
-                return false;
-            }
+            if (!list_grow(list)) return false;
         }
     }
 

@@ -42,6 +42,10 @@ struct hashmap_t {
     hash_func_t *hash_func;
     compare_func_t *compare_func;
     kv_pair_t<KeyType, DataType> *entries;
+
+    DataType * operator[](KeyType &key) {
+        return hashmap_get(this, key);
+    }
 };
 
 // ----------- Initialization 
@@ -70,7 +74,10 @@ template<typename KeyType, typename DataType>
 b32 hashmap_remove(hashmap_t<KeyType, DataType>   *map, KeyType key);
 
 template<typename KeyType, typename DataType>
-b32 hashmap_contains(hashmap_t<KeyType, DataType> *map, KeyType key);
+b32 hashmap_contains(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    return hashmap_get(map, key) != NULL ? true : false;
+}
+
 
 // ----------- Helpers
 
@@ -87,6 +94,7 @@ b32 rebuild_map(hashmap_t<KeyType, DataType> *map);
 
 template<typename KeyType, typename DataType>
 b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func) {
+    *map = {};
     assert(init_size > 0);
 
     if (hash_func) {
@@ -118,15 +126,13 @@ b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t
 
 template<typename KeyType, typename DataType>
 hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map) {
-    hashmap_t<KeyType, DataType> clone = {};
-
     if (map->capacity == 0) {
         map->hash_func    = map->hash_func;
         map->compare_func = map->compare_func;
-        return clone;
+        return {};
     }
 
-    
+    hashmap_t<KeyType, DataType> clone = {};
     if (!hashmap_create(&clone, map->capacity, map->hash_func, map->compare_func)) {
         return {};
     }
@@ -152,28 +158,6 @@ void hashmap_clear(hashmap_t<KeyType, DataType> *map) {
     mem_set((u8*)map->entries, 0, map->capacity * sizeof(kv_pair_t<KeyType, DataType>));
 }
 
-
-template<typename KeyType, typename DataType>
-b32 hashmap_contains(hashmap_t<KeyType, DataType> *map, KeyType key) {
-    create_map_if_needed(map);
-
-    u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
-    u32 index = hash % map->capacity;
-
-    for (u64 offset = 0; offset < map->capacity; offset++) {
-        u32 lookup = (index + offset) % map->capacity;
-
-        if (map->entries[lookup].deleted) continue;
-
-        if (!map->entries[lookup].occupied) return false;
-
-        if (map->compare_func(sizeof(KeyType), (void*)&key, sizeof(KeyType), (void*)&map->entries[lookup].key)) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 template<typename KeyType, typename DataType>
 DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
@@ -265,7 +249,7 @@ template<typename KeyType, typename DataType>
 b32 rebuild_map(hashmap_t<KeyType, DataType> *map) {
     hashmap_t<KeyType, DataType> old_map = *map;
 
-    if (!hashmap_create(map, map->capacity * 2, old_map.hash_func, old_map.compare_func)) {
+    if (!hashmap_create(map, old_map.capacity * 2, old_map.hash_func, old_map.compare_func)) {
         *map = old_map;
         return false;
     }

@@ -102,31 +102,31 @@ void hashmap_tests(void) {
         u32 size = 8;
         void* ref;
 
-        ref = hashmap_get(&map, key1);
+        ref = map[key1];
         assert(ref == NULL);
 
         assert(hashmap_add(&map, key1, &size));
-        ref = hashmap_get(&map, key1);
+        ref = map[key1];
         assert(ref != NULL);
 
         assert(hashmap_add(&map, key2, &size));
 
-        ref = hashmap_get(&map, key2);
+        ref = map[key2];
         assert(ref != NULL);
 
         assert(!hashmap_add(&map, key2, &size));
 
-        assert(hashmap_contains(&map, key1));
-        assert(hashmap_contains(&map, key2));
+        assert(map[key1]);
+        assert(map[key2]);
 
         assert(hashmap_remove(&map, key1));
-        assert(!hashmap_contains(&map, key1));
+        assert(!map[key1]);
 
         assert(hashmap_remove(&map, key2));
-        assert(!hashmap_contains(&map, key2));
+        assert(!map[key2]);
 
         assert(hashmap_add(&map, key1, &size));
-        assert(hashmap_contains(&map, key1));
+        assert(map[key1]);
 
         hashmap_delete(&map);
     }
@@ -141,21 +141,21 @@ void hashmap_tests(void) {
 
         void* ref;
 
-        ref = hashmap_get(&map, a);
+        ref = map[a];
         assert(ref == NULL);
 
         assert(hashmap_add(&map, a, &data));
-        ref = hashmap_get(&map, a);
+        ref = map[a];
     
         assert(ref != NULL);
         assert(*(u32*)ref == data);
 
-        ref = hashmap_get(&map, b);
+        ref = map[b];
         assert(ref == NULL);
 
         data = 12312;
         assert(hashmap_add(&map, b, &data));
-        ref = hashmap_get(&map, b);
+        ref = map[b];
     
         assert(ref != NULL);
         assert(*(u32*)ref == data);
@@ -179,53 +179,61 @@ void hashmap_tests(void) {
         hashmap_add(&original, key1, &value1);
 
         auto clone = hashmap_clone(&original);
-        assert(hashmap_contains(&clone, key1));
-        assert(*hashmap_get(&clone, key1) == value1);
+        assert(clone[key1]);
+        assert(*clone[key1] == value1);
 
         // Modify original and verify clone is unaffected
         string_t key2 = STRING("key2");
         u32 value2 = 200;
         hashmap_add(&original, key2, &value2);
-        assert(!hashmap_contains(&clone, key2));
+        assert(!clone[key2]);
 
         hashmap_delete(&original);
         hashmap_delete(&clone);
     }
 
-    {
+    { // Test hashmap clearing
         hashmap_t<u32, u32> map;
         hashmap_create(&map, 10, NULL, NULL);
-
         u32 key = 42;
         u32 value = 100;
         hashmap_add(&map, key, &value);
         hashmap_clear(&map);
         assert(map.load == 0);
-        assert(hashmap_get(&map, key) == NULL);
+        assert(map[key] == NULL);
         hashmap_delete(&map);
     }
 
-    // Test collision handling
-    {
-        hashmap_t<u32, u32> map;
-        hashmap_create(&map, 3, NULL, NULL);
+    { // Test collisions
+        const u64 iterations = 100;
+        hashmap_t<u64, u32> map;
+        hashmap_create(&map, 20, NULL, NULL);
 
-        u32 key1 = 1, key2 = 4; // Colliding keys if capacity is 3
-        u32 val1 = 100, val2 = 200;
+        u64 caps = map.capacity;
+        for (u64 i = 0; i < iterations; i++) {
+            u32 v = (u32)i * (u32)32;
+            hashmap_add(&map, i, &v);
 
-        hashmap_add(&map, key1, &val1);
-        hashmap_add(&map, key2, &val2);
-        assert(*hashmap_get(&map, key1) == val1);
-        assert(*hashmap_get(&map, key2) == val2);
+            if (caps != map.capacity) {
+                caps = map.capacity;
 
-        hashmap_remove(&map, key1);
-        assert(hashmap_get(&map, key1) == NULL);
-        assert(*hashmap_get(&map, key2) == val2);
+                for (u64 j = 0; j < map.load; j++) {
+                    u32 *p = map[j];
+                    assert(p != NULL);
+                    assert(*p == j * 32);
+                }
+            }
+        }
+
+        assert(map.load == iterations);
+        for (u64 j = 0; j < map.load; j++) {
+            u32 *p = map[j];
+            assert(*p == j * 32);
+        }
 
         hashmap_delete(&map);
     }
 
-    // Test edge cases
     {
         // Remove non-existent key
         hashmap_t<u32, u32> map;
@@ -253,8 +261,8 @@ void hashmap_tests(void) {
         u32 v1 = 100, v2 = 200;
         hashmap_add(&map, key1, &v1);
         hashmap_add(&map, key2, &v2);
-        assert(*hashmap_get(&map, key1) == v1);
-        assert(*hashmap_get(&map, key2) == v2);
+        assert(*map[key1] == v1);
+        assert(*map[key2] == v2);
         hashmap_delete(&map);
     }
 
@@ -263,7 +271,7 @@ void hashmap_tests(void) {
         hashmap_t<u32, u32> map = {};
         u32 key = 1, value = 100;
         assert(hashmap_add(&map, key, &value)); // Should auto-initialize
-        assert(hashmap_contains(&map, key));
+        assert(map[key]);
         hashmap_delete(&map);
     }
 }

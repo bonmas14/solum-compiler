@@ -8,9 +8,9 @@ void list_tests(void) {
     u64 data2 = 804;
     u64 data3 = 104;
 
-    list_add(&list, &data1);
-    list_add(&list, &data2);
-    list_add(&list, &data3);
+    list += data1;
+    list += data2;
+    list += data3;
 
     assert(data1 == *list_get(&list, 0));
     assert(data2 == *list_get(&list, 1));
@@ -21,9 +21,9 @@ void list_tests(void) {
     list_allocate(&list, 100, &index);
 
     // checking if allocating didnt erase all of the values
-    assert(data1 == *list_get(&list, 0));
-    assert(data2 == *list_get(&list, 1));
-    assert(data3 == *list_get(&list, 2));
+    assert(data1 == list[0]);
+    assert(data2 == list[1]);
+    assert(data3 == list[2]);
 
     u64 test[100];
     mem_set((u8*)test, 0xab, sizeof(u64) * 100);

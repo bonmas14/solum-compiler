@@ -84,9 +84,8 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
 
     UNUSED(output); // so compiler dont yell
 
-    if (hashmap_contains(scope, key)) {
-        scope_entry_t *entry = hashmap_get(scope, key);
-
+    scope_entry_t *entry = (*scope)[key];
+    if (entry) {
         if (!check_if_unique(entry, node)) {
             string_t buffer = {};
 
@@ -113,11 +112,12 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
     assert(state != NULL);
 
     for (u64 i = 0; i < state->current_search_stack.index; i++) {
-        if (!hashmap_contains(state->current_search_stack.data[i], key))
+        scope_entry_t *entry = (*state->current_search_stack.data[i])[key];
+
+        if (!entry)
             continue;
 
-        scope_entry_t e = *hashmap_get(state->current_search_stack.data[i], key);
-        return e;
+        return *entry;
     }
 
     assert(false);
@@ -176,11 +176,10 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 
     for (s64 i = (state->current_search_stack.index - 1); i >= 0; i--) {
         hashmap_t<string_t, scope_entry_t> *search_scope = state->current_search_stack.data[i];
-        
-        if (!hashmap_contains(search_scope, key))
-            continue;
+        scope_entry_t *entry = (*search_scope)[key];
 
-        scope_entry_t *entry = hashmap_get(search_scope, key);
+        if (!entry)
+            continue;
 
         *output = entry;
 

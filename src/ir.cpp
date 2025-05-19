@@ -91,13 +91,14 @@ void print_ir_opcode(ir_opcode_t op) {
 #ifdef NDEBUG
 #define print_ir_opcode(...)
 #endif
+
 ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, u64 data) {
     ir_opcode_t o = {};
     o.operation = op;
     o.info = debug;
     o.u_operand = data;
 
-    print_ir_opcode(o);
+    // print_ir_opcode(o);
 
     list_add(&state->current_function->code, &o);
     ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
@@ -112,7 +113,7 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, s64 data, u64 dum
     o.info = debug;
     o.s_operand = data;
 
-    print_ir_opcode(o);
+    // print_ir_opcode(o);
 
     list_add(&state->current_function->code, &o);
     ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
@@ -126,7 +127,7 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
     o.info = debug;
     o.string = data;
 
-    print_ir_opcode(o);
+    // print_ir_opcode(o);
 
     list_add(&state->current_function->code, &o);
     ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
