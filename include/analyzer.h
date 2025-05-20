@@ -35,7 +35,8 @@ enum types_t {
 struct type_info_t {
     u32 type;
     b32 is_array;
-    b32 array_size;
+    u32 array_size;
+    u32 struct_offset;
     u32 size;
     u32 pointer_depth;
     string_t type_name;

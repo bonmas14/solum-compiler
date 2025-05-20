@@ -26,25 +26,24 @@ enum ir_codes_t {
     IR_NOP = 0x0,
 
     // Push operations
-    IR_PUSH_SIGN,     // Push signed 64-bit integer
-    IR_PUSH_UNSIGN,     // Push unsigned 64-bit integer
-    IR_PUSH_F32,   // Push 32-bit float
-    IR_PUSH_F64,   // Push 64-bit float
+    IR_PUSH_SIGN,   // Push signed 64-bit integer
+    IR_PUSH_UNSIGN, // Push unsigned 64-bit integer
+    IR_PUSH_F32,    // Push 32-bit float
+    IR_PUSH_F64,    // Push 64-bit float
 
     // Stack manipulation
-    IR_POP,        // Pop top of stack
-    IR_CLONE,      // Duplicate top element
-    IR_SWAP,       // Swap top two elements
+    IR_POP,         // Pop top of stack
+    IR_CLONE,       // Duplicate top element
 
-    // Memory operations
-    IR_GLOBAL,     // Push global variable   (variable index)
-    IR_LEA,        // Load effective address (variable index)
+    // Memory operations for ir
+    IR_GLOBAL,      // Push global variable   (variable index)
+    IR_LEA,         // Load effective address (variable index)
     
-    // ------- stack based mem operations
-    IR_ALLOC,      // Allocate stack memory (amount)
-    IR_FREE,       // Free stack memory     (amount)
-    IR_LOAD,       // Load from address     [address]
-    IR_STORE,      // Store to address [address] [value]
+    // ------- second stack memory!
+    IR_ALLOC,       // Allocate memory   (amount)
+    IR_FREE,        // Free     memory   (amount)
+    IR_LOAD,        // Load from address [address]
+    IR_STORE,       // Store to address  [address] [value]
 
     // math [left] [right]
     IR_ADD,
@@ -101,25 +100,31 @@ struct ir_opcode_t {
         u64 u_operand;
         s64 s_operand;
         f64 f_operand;
-        string_t string;
     };
+
+    string_t string;
+};
+
+struct ir_variable_t {
+    u32 size, alignment;
 };
 
 struct ir_function_t {
     b32 is_valid;
-    string_t symbol;
     
     list_t<ir_opcode_t> code;
+    list_t<ir_variable_t> vars;
 };
 
 struct ir_t {
     b32 is_valid;
 
-    list_t<ir_function_t>              functions;
+    hashmap_t<string_t, ir_function_t> functions;
     hashmap_t<string_t, scope_entry_t> variables;
     // hashmap_t<string_t, u8> strings;
 };
 
+void print_ir_opcode(ir_opcode_t op);
 ir_t compile_program(compiler_t *compiler);
 
 #endif

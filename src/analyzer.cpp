@@ -375,6 +375,10 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
 
 
         case AST_BIN_CAST:
+            if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->right)) {
+                result = false;
+            }
+
             // left is type
             break;
 
@@ -420,10 +424,6 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             } break;
 
         case AST_BIN_ASSIGN:
-
-            // @todo... we should analyze left one, so we sure that we dont do
-            // a + 12231 = 12;
-            
             if (!analyze_expression(state, expected_count_of_expressions, depend_on, expr->left)) {
                 result = false;
             }
@@ -432,6 +432,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                 result = false;
             }
 
+            // @todo, compare amount of returned args if that was a function
             break;
         case AST_BIN_GR:
         case AST_BIN_LS:
@@ -462,11 +463,6 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
 
         case AST_BIN_SWAP: {
                 s64 swap_count = expr->left->child_count;
-
-                if (expr->left->child_count != expr->right->child_count) {
-                    log_error_token("Different amount of parts on different sides of swap expression:", expr->token);
-                    result = false;
-                }
 
                 if (!analyze_expression(state, swap_count, depend_on, expr->left)) {
                     result = false;
@@ -536,11 +532,64 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
                 return false;
         }
 
+        b32 result = true;
 
         stack_push(&state->current_search_stack, &entry->func_params);
-        u64 curr_load = entry->func_params.load;
-        b32 result = analyze_statement(state, entry->return_typenames.count, 0, false, expr);
-        assert(curr_load == entry->func_params.load);
+        {
+            ast_node_t *stmt = expr->list_start;
+
+            u32 new_index = 0;
+            {
+                hashmap_t<string_t, scope_entry_t> block = {};
+                list_add(&state->compiler->scopes, &block);
+                new_index = state->compiler->scopes.count - 1;
+            }
+
+            expr->scope_index = new_index;
+
+            hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, new_index);
+            stack_push(&state->current_search_stack, block);
+
+            for (u64 i = 0; i < expr->child_count; i++) {
+                switch (analyze_statement(state, entry->return_typenames.count, new_index, false, stmt)) {
+                    case STMT_BREAK:
+                    case STMT_CONTINUE:
+                        log_error_token("Cant use break or continue outside of loop.", stmt->token);
+                        result = false;
+                        break;
+
+                    case STMT_ERR:
+                        result = false;
+                        break;
+
+                    case STMT_RETURN:
+                        if (i != (expr->child_count - 1)) {
+                            log_warning_token("There are statemets after return.", stmt->token);
+                        }
+                        break;
+
+                    case STMT_OK:
+                        break;
+                }
+
+                stmt = stmt->list_next;
+            }
+
+            stack_pop(&state->current_search_stack);
+
+            for (u64 i = 0; i <  entry->func_params.capacity; i++) {
+                kv_pair_t<string_t, scope_entry_t> *pair = entry->func_params.entries + i;
+
+                if (!pair->occupied) continue;
+                if (pair->deleted)   continue;
+
+                if ((*block)[pair->key]) {
+                    log_error_token("shadowing input argument", pair->value.node->token);
+                    result = false;
+                }
+            }
+        }
+
         stack_pop(&state->current_search_stack);
         expr->analyzed = true;
 

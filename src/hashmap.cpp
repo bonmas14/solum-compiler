@@ -43,11 +43,14 @@ COMPARE_KEYS(compare_keys_std) {
 
 COMPUTE_HASH(get_string_hash) {
     assert(key != NULL);
-    assert(size > 0);
+    assert(size == sizeof(string_t));
 
     string_t *symbol = (string_t*)key;
-    assert(symbol->data != NULL);
-    return get_hash(symbol->size, (void*)symbol->data);
+    if (symbol->data == NULL) {
+        return 0;
+    } else {
+        return get_hash(symbol->size, (void*)symbol->data);
+    }
 }
 
 COMPARE_KEYS(compare_string_keys) {
