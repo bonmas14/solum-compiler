@@ -5,6 +5,7 @@
 #include "allocator.h"
 #include "talloc.h"
 #include "memctl.h"
+#include "strings.h"
 
 COMP_PROC(std_comp_func) {
     assert(a != NULL);
@@ -20,9 +21,20 @@ COMP_PROC(s32_comp_func) {
     s32 va = *(s32*)a;
     s32 vb = *(s32*)b;
 
-    if (va > vb)  return 1;
-    if (va < vb)  return -1;
+    if (va > vb) return 1;
+    if (va < vb) return -1;
     return 0;
+}
+
+COMP_PROC(string_comp_func) {
+    assert(a != NULL);
+    assert(b != NULL);
+    assert(size == sizeof(string_t));
+
+    string_t va = *(string_t*)a;
+    string_t vb = *(string_t*)b;
+
+    return string_compare(va, vb);
 }
 
 void sort_swap(void *data, u32 size, u64 a, u64 b) {
@@ -95,8 +107,16 @@ void quick_sort(void *data, u32 element_size, u64 start, u64 stop, compare_func_
 
 b32 sort_test_case(s32 *data, s32 *expect, u64 size) {
     quick_sort(data, sizeof(s32), 0, size, s32_comp_func);
-    
     return mem_compare((u8*)data, (u8*)expect, size * sizeof(s32)) == 0;
+}
+
+b32 sort_test_case(string_t *data, string_t *expect, u64 size) {
+    quick_sort(data, sizeof(string_t), 0, size, string_comp_func);
+
+    for (u64 i = 0; i < size; i++) {
+        if (string_compare(data[i], expect[i]) != 0) return false;
+    }
+    return true;
 }
 
 void sorter_tests() {
@@ -117,8 +137,8 @@ void sorter_tests() {
         assert(sort_test_case(data, expected, sizeof(data) / sizeof(s32)));
     }
     {
-        s32 data[]     = {2, 3, 2, 1, 3};
-        s32 expected[] = {1, 2, 2, 3, 3};
+        s32 data[]     = {2, 3, 2, 1, 3, 4};
+        s32 expected[] = {1, 2, 2, 3, 3, 4};
         assert(sort_test_case(data, expected, sizeof(data) / sizeof(s32)));
     }
     {
@@ -145,5 +165,30 @@ void sorter_tests() {
         s32 data[]     = {9, 3, 7, 1, 8, 2, 5, 4, 6, 0};
         s32 expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         assert(sort_test_case(data, expected, sizeof(data) / sizeof(s32)));
+    }
+    {
+        string_t data[]     = { STRING("apple"), STRING("banana"), STRING("cherry") };
+        string_t expected[] = { STRING("apple"), STRING("banana"), STRING("cherry") };
+        assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
+    }
+    {
+        string_t data[]     = { STRING("zebra"), STRING("elephant"), STRING("ant") };
+        string_t expected[] = { STRING("ant"), STRING("elephant"), STRING("zebra") };
+        assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
+    }
+    {
+        string_t data[]     = { STRING("Apple"), STRING("banana"), STRING("cherry") };
+        string_t expected[] = { STRING("Apple"), STRING("banana"), STRING("cherry") };
+        assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
+    }
+    {
+        string_t data[]     = { STRING(""), STRING("123"), STRING("!@#"), STRING("abc") };
+        string_t expected[] = { STRING(""), STRING("!@#"), STRING("123"), STRING("abc") };
+        assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
+    }
+    {
+        string_t data[]     = { STRING("hello world"), STRING("hello"), STRING("  space"), STRING("space") };
+        string_t expected[] = { STRING("  space"), STRING("hello"), STRING("hello world"), STRING("space") };
+        assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
     }
 }

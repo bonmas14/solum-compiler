@@ -97,6 +97,7 @@ string_t string_swap(string_t input, u8 from, u8 to, allocator_t *alloc) {
 }
 
 s32 string_compare(string_t a, string_t b) {
+    if (a.size == b.size && a.size == 0) return 0;
     if (a.size == 0) return -1;
     if (b.size == 0) return 1;
 
