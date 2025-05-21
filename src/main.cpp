@@ -4,6 +4,7 @@
 #include "allocator.h"
 #include "arena.h"
 #include "strings.h"
+#include "sorter.h"
 
 #include "compiler.h"
 #include "profiler.h"
@@ -19,12 +20,13 @@ allocator_t __allocator;
 #include "stack.h"
 
 void debug_tests(void) {
-    hashmap_tests();
-    list_tests();
-    stack_tests();
-    arena_tests();
     temp_tests();
+    arena_tests();
     string_tests();
+    sorter_tests();
+    stack_tests();
+    list_tests();
+    hashmap_tests();
 }
 
 #elif defined(NDEBUG)
