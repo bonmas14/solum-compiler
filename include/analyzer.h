@@ -50,13 +50,14 @@ enum def_type_t {
 
 struct scope_entry_t {
     u32 type;
+    u32 index;
     b32 uninit;
 
     ast_node_t *node;
     ast_node_t *stmt; // used in multiple definitions...
     ast_node_t *expr; // can be null
 
-    // ENTRY_TYPE || ENTRY_HANDLE
+    // ENTRY_TYPE
     u32 def_type;
     hashmap_t<string_t, scope_entry_t> scope;  // info of the struct memebers
 

@@ -146,7 +146,7 @@ scope_entry_t *search_identifier(ir_state_t *state, string_t key, string_t shado
         if (!hashmap_contains(search_scope, key))
             continue;
 
-        if (!shadowed && string_compare(shadow, key)) {
+        if (!shadowed && string_compare(shadow, key) == 0) {
             shadowed = true;
             continue;
         }
@@ -267,7 +267,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             if (!expr.accessable) {
                 log_error_token("Cant get address of unknown variable", node->left->token);
                 state->ir.is_valid = false;
-                break;
             } else {
                 expr.emmited_op->operation = IR_LEA;
                 expr.emmited_op->search_info = expr.search_info;
@@ -311,8 +310,9 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             break;
 
         case AST_MEMBER_ACCESS:
-            assert(node->left->type == AST_PRIMARY);
+            assert(node->left->type       == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
+
             if (!add_identifier_type_to_search(state, node->left->token.data.string)) {
                 log_error_token("Identifier is a primitive type: ", node->left->token);
                 state->ir.is_valid = false;

@@ -44,7 +44,7 @@ void mem_move(u8 *dest, u8 *source, u64 size) {
     mem_copy(dest, buff, size);
 }
 
-u32 mem_compare(u8 *left, u8 *right, u64 size) {
+s32 mem_compare(u8 *left, u8 *right, u64 size) {
     while (size-- > 0) {
         if (*left++ == *right++)
             continue;
@@ -96,13 +96,11 @@ string_t string_swap(string_t input, u8 from, u8 to, allocator_t *alloc) {
     return output;
 }
 
-b32 string_compare(string_t a, string_t b) {
-    if (a.data == NULL && b.data == NULL) return true;
-    if (a.data == NULL || b.data == NULL) return false;
+s32 string_compare(string_t a, string_t b) {
+    if (a.size == 0) return -1;
+    if (b.size == 0) return 1;
 
-    if (a.size != b.size) return false;
-
-    return mem_compare(a.data, b.data, a.size) == 0;
+    return mem_compare(a.data, b.data, a.size);
 }
 
 string_t string_join(list_t<string_t> input, string_t separator, allocator_t *alloc) {
@@ -270,20 +268,20 @@ void string_tests(void) {
     string_t result = {};
 
     result = string_concat(STRING("Hello "), STRING("world!"), alloc);
-    assert(string_compare(result, STRING("Hello world!")));
+    assert(!string_compare(result, STRING("Hello world!")));
 
-    assert(string_compare(string_copy(result, alloc), result));
+    assert(!string_compare(string_copy(result, alloc), result));
     
     list_t<string_t> splits = string_split(STRING("Eatin burger wit no honey mustard"), STRING(" "));
 
     assert(splits.count == 6);
 
-    assert(string_compare(splits.data[0], STRING("Eatin")));
-    assert(string_compare(splits.data[1], STRING("burger")));
-    assert(string_compare(splits.data[2], STRING("wit")));
-    assert(string_compare(splits.data[3], STRING("no")));
-    assert(string_compare(splits.data[4], STRING("honey")));
-    assert(string_compare(splits.data[5], STRING("mustard")));
+    assert(!string_compare(splits.data[0], STRING("Eatin")));
+    assert(!string_compare(splits.data[1], STRING("burger")));
+    assert(!string_compare(splits.data[2], STRING("wit")));
+    assert(!string_compare(splits.data[3], STRING("no")));
+    assert(!string_compare(splits.data[4], STRING("honey")));
+    assert(!string_compare(splits.data[5], STRING("mustard")));
 
     list_delete(&splits);
 
@@ -291,12 +289,12 @@ void string_tests(void) {
 
     assert(splits.count == 6);
 
-    assert(string_compare(splits.data[0], STRING("Eatin")));
-    assert(string_compare(splits.data[1], STRING("burger")));
-    assert(string_compare(splits.data[2], STRING("wit")));
-    assert(string_compare(splits.data[3], STRING("no")));
-    assert(string_compare(splits.data[4], STRING("honey")));
-    assert(string_compare(splits.data[5], STRING("mustard")));
+    assert(!string_compare(splits.data[0], STRING("Eatin")));
+    assert(!string_compare(splits.data[1], STRING("burger")));
+    assert(!string_compare(splits.data[2], STRING("wit")));
+    assert(!string_compare(splits.data[3], STRING("no")));
+    assert(!string_compare(splits.data[4], STRING("honey")));
+    assert(!string_compare(splits.data[5], STRING("mustard")));
 
     list_delete(&splits);
 
@@ -304,13 +302,13 @@ void string_tests(void) {
 
     assert(splits.count == 7);
 
-    assert(string_compare(splits.data[0], STRING("Eatin")));
-    assert(string_compare(splits.data[1], STRING("burger")));
-    assert(string_compare(splits.data[2], STRING("wit")));
-    assert(string_compare(splits.data[3], STRING("no")));
-    assert(string_compare(splits.data[4], STRING("honey")));
-    assert(string_compare(splits.data[5], STRING("mustard")));
-    assert(string_compare(splits.data[6], STRING("a")));
+    assert(!string_compare(splits.data[0], STRING("Eatin")));
+    assert(!string_compare(splits.data[1], STRING("burger")));
+    assert(!string_compare(splits.data[2], STRING("wit")));
+    assert(!string_compare(splits.data[3], STRING("no")));
+    assert(!string_compare(splits.data[4], STRING("honey")));
+    assert(!string_compare(splits.data[5], STRING("mustard")));
+    assert(!string_compare(splits.data[6], STRING("a")));
 
     list_delete(&splits);
 
@@ -318,14 +316,14 @@ void string_tests(void) {
 
     assert(splits.count == 8);
 
-    assert(string_compare(splits.data[0], STRING("a")));
-    assert(string_compare(splits.data[1], STRING("Eatin")));
-    assert(string_compare(splits.data[2], STRING("burger")));
-    assert(string_compare(splits.data[3], STRING("wit")));
-    assert(string_compare(splits.data[4], STRING("no")));
-    assert(string_compare(splits.data[5], STRING("honey")));
-    assert(string_compare(splits.data[6], STRING("mustard")));
-    assert(string_compare(splits.data[7], STRING("a")));
+    assert(!string_compare(splits.data[0], STRING("a")));
+    assert(!string_compare(splits.data[1], STRING("Eatin")));
+    assert(!string_compare(splits.data[2], STRING("burger")));
+    assert(!string_compare(splits.data[3], STRING("wit")));
+    assert(!string_compare(splits.data[4], STRING("no")));
+    assert(!string_compare(splits.data[5], STRING("honey")));
+    assert(!string_compare(splits.data[6], STRING("mustard")));
+    assert(!string_compare(splits.data[7], STRING("a")));
 
     list_delete(&splits);
 
@@ -333,25 +331,25 @@ void string_tests(void) {
 
     assert(splits.count == 6);
 
-    assert(string_compare(splits.data[0], STRING("Eatin")));
-    assert(string_compare(splits.data[1], STRING("burger")));
-    assert(string_compare(splits.data[2], STRING("wit")));
-    assert(string_compare(splits.data[3], STRING("no")));
-    assert(string_compare(splits.data[4], STRING("honey")));
-    assert(string_compare(splits.data[5], STRING("mustard")));
+    assert(!string_compare(splits.data[0], STRING("Eatin")));
+    assert(!string_compare(splits.data[1], STRING("burger")));
+    assert(!string_compare(splits.data[2], STRING("wit")));
+    assert(!string_compare(splits.data[3], STRING("no")));
+    assert(!string_compare(splits.data[4], STRING("honey")));
+    assert(!string_compare(splits.data[5], STRING("mustard")));
 
-    assert(string_compare(string_join(splits, STRING(" "), alloc), STRING("Eatin burger wit no honey mustard")));
+    assert(!string_compare(string_join(splits, STRING(" "), alloc), STRING("Eatin burger wit no honey mustard")));
 
     list_delete(&splits);
 
-    assert(string_compare(string_substring(STRING("HelloWorld!"), 5, 6, alloc), STRING("World!")));
-    assert(string_compare(string_substring(STRING("HelloWorld!"), 0, 11, alloc), STRING("HelloWorld!")));
-    assert(string_compare(string_substring(STRING("HelloWorld!"), 10, 1, alloc), STRING("!")));
+    assert(!string_compare(string_substring(STRING("HelloWorld!"), 5, 6, alloc), STRING("World!")));
+    assert(!string_compare(string_substring(STRING("HelloWorld!"), 0, 11, alloc), STRING("HelloWorld!")));
+    assert(!string_compare(string_substring(STRING("HelloWorld!"), 10, 1, alloc), STRING("!")));
 
     assert(string_index_of(STRING("CP/M"), (u8)'/') == 2);
     assert(string_last_index_of(STRING("https://github.com/bonmas14"), (u8)'/') == 18);
 
-    assert(string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
+    assert(!string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
     temp_reset();
 }

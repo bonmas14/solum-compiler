@@ -132,7 +132,7 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 
         // @cleanup @speed @todo: doesnt work for pointers...
     for (u64 i = 0; i < state->internal_deps.index; i++) {
-        if (string_compare(key, state->internal_deps.data[i])) {
+        if (string_compare(key, state->internal_deps.data[i]) == 0) {
             if (!report_error)
                 return false;
 
@@ -148,7 +148,7 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
         if (deps == NULL) continue;
 
         for (u64 j = 0; j < deps->index; j++) {
-            if (string_compare(state->internal_deps.data[i], deps->data[j])) {
+            if (string_compare(state->internal_deps.data[i], deps->data[j]) == 0) {
                 if (!report_error)
                     return false;
 
@@ -1242,8 +1242,6 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 if (!analyze_bin_var_def(state, next, should_wait)) {
                     result = false;
                 } break;
-
-                // We can find them only in enum_block
             case AST_ENUM_DECL: 
                 assert(block->type == AST_BLOCK_ENUM);
                 if (!analyze_enum_decl(state, next, should_wait)) {
@@ -1259,7 +1257,6 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 log_error_token("Cant use this as member of type.", entry->node->token);
                 result = false;
                 break;
-
         }
 
         if (*should_wait) {
@@ -1310,14 +1307,15 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
     stack_pop(&state->internal_deps);
     stack_pop(&state->current_search_stack);
 
-
     entry->info.type = TYPE_UNKN;
+
+    if (should_wait) {
+        return result;
+    }
 
     log_warning("Struct sizes todo! analyzer.cpp l:1266");
 
-    if (!should_wait) {
-        node->analyzed = true;
-    }
+    node->analyzed = true;
 
     return result;
 }
@@ -1392,13 +1390,18 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
 
     stack_push(&state->current_search_stack, &entry->scope);
     stack_push(&state->internal_deps, key);
-
     {
         stack_t<string_t> symbol_deps = {};
         hashmap_add(&state->symbol_deps, key, &symbol_deps);
-    }
 
-    result = analyze_and_add_type_members(state, &should_wait, entry); 
+        result = analyze_and_add_type_members(state, &should_wait, entry); 
+    }
+    stack_pop(&state->internal_deps);
+    stack_pop(&state->current_search_stack);
+
+    if (should_wait) {
+        return result;
+    }
 
     for (u64 i = 0; i < entry->scope.capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> *pair = entry->scope.entries + i;
@@ -1409,12 +1412,7 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         set_std_info(node->right->token, &pair->value.info);
     }
 
-    stack_pop(&state->internal_deps);
-    stack_pop(&state->current_search_stack);
-
-    if (!should_wait) {
-        node->analyzed = true;
-    }
+    node->analyzed = true;
 
     return result;
 }

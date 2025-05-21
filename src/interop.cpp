@@ -10,21 +10,38 @@
 struct interpreter_state_t {
     b32 running;
     u64 ip;
-    stack_t<s64> stack;
+    stack_t<s64> exec_stack;
+    stack_t<s64> data_stack;
 };
+
+static s64 allocate_memory(interpreter_state_t *state, u64 size) {
+    UNUSED(size);
+
+    if (state->data_stack.index > 1000) {
+        log_error("a lot of mem");
+    }
+
+    stack_push(&state->data_stack, 0LL);
+    return (state->data_stack.index - 1) * sizeof(s64);
+}
+
+static void free_memory(interpreter_state_t *state, u64 size) {
+    UNUSED(size);
+    stack_pop(&state->data_stack);
+}
 
 static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
     switch (op.operation) {
         case IR_NOP: break;
         
-        case IR_PUSH_SIGN:   stack_push(&state->stack, op.s_operand); break;
-        case IR_PUSH_UNSIGN: stack_push(&state->stack, op.s_operand); break;
-        case IR_POP:         stack_pop(&state->stack); break;
+        case IR_PUSH_SIGN:   stack_push(&state->exec_stack, op.s_operand); break;
+        case IR_PUSH_UNSIGN: stack_push(&state->exec_stack, op.s_operand); break;
+        case IR_POP:         stack_pop(&state->exec_stack); break;
             
         case IR_CLONE: {
-            s64 val = stack_pop(&state->stack);
-            stack_push(&state->stack, val);
-            stack_push(&state->stack, val);
+            s64 val = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, val);
+            stack_push(&state->exec_stack, val);
         } break;
             
         case IR_GLOBAL: {
@@ -33,84 +50,85 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             
         case IR_ALLOC: {
             s64 size = op.u_operand;
-            s64 addr = 0;
-            stack_push(&state->stack, addr);
+            s64 addr = allocate_memory(state, size);
+            stack_push(&state->exec_stack, addr);
         } break;
             
         case IR_FREE: {
-
+            s64 size = op.u_operand;
+            free_memory(state, op.u_operand);
         } break;
             
         case IR_LOAD: {
-            s64 addr = stack_pop(&state->stack);
+            s64 addr = stack_pop(&state->exec_stack);
             s64 val  = 404;
-            stack_push(&state->stack, val);
+            stack_push(&state->exec_stack, val);
         } break;
             
         case IR_STORE: {
-            s64 addr = stack_pop(&state->stack);
-            s64 val  = stack_pop(&state->stack);
+            s64 addr = stack_pop(&state->exec_stack);
+            s64 val  = stack_pop(&state->exec_stack);
         } break;
             
         case IR_ADD: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, a + b);
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, a + b);
         } break;
             
         case IR_SUB: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, a - b);
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, a - b);
         } break;
             
         case IR_MUL: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, a * b);
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, a * b);
         } break;
             
         case IR_DIV: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            if (b != 0) stack_push(&state->stack, a / b);
-            stack_push(&state->stack, 0LL);
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            if (b != 0) stack_push(&state->exec_stack, a / b);
+            stack_push(&state->exec_stack, 0LL);
         } break;
             
         case IR_MOD: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            if (b != 0) stack_push(&state->stack, a % b);
-            stack_push(&state->stack, 0LL);
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            if (b != 0) stack_push(&state->exec_stack, a % b);
+            stack_push(&state->exec_stack, 0LL);
         } break;
             
         case IR_NEG: {
-            s64 a = stack_pop(&state->stack);
-            stack_push(&state->stack, -a);
+            s64 a = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, -a);
         } break;
             
         case IR_CMP_EQ: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, (s64)(a == b));
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, (s64)(a == b));
         } break;
             
         case IR_CMP_NEQ: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, (s64)(a != b));
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, (s64)(a != b));
         } break;
             
         case IR_CMP_LT: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, (s64)(a < b));
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, (s64)(a < b));
         } break;
             
         case IR_CMP_GT: {
-            s64 a = stack_pop(&state->stack);
-            s64 b = stack_pop(&state->stack);
-            stack_push(&state->stack, (s64)(a > b));
+            s64 a = stack_pop(&state->exec_stack);
+            s64 b = stack_pop(&state->exec_stack);
+            stack_push(&state->exec_stack, (s64)(a > b));
         } break;
             
         case IR_JUMP: {
@@ -118,14 +136,14 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
         } break;
             
         case IR_JUMP_IF: {
-            s64 cond = stack_pop(&state->stack);
+            s64 cond = stack_pop(&state->exec_stack);
             if (cond) {
                 state->ip += op.s_operand;
             }
         } break;
             
         case IR_JUMP_IF_NOT: {
-            s64 cond = stack_pop(&state->stack);
+            s64 cond = stack_pop(&state->exec_stack);
             if (!cond) {
                 state->ip += op.s_operand;
             }
@@ -142,7 +160,7 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
 
         case IR_BRK: {
             log_error("Debug break");
-            assert(false);
+            debug_break();
         } break;
 
         case IR_INVALID: {

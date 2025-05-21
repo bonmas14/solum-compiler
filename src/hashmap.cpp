@@ -1,4 +1,6 @@
 #include "hashmap.h"
+#include "memctl.h"
+#include "strings.h"
 
 u32 get_hash(u64 size, void *data) {
     assert(size > 0);
@@ -26,19 +28,11 @@ COMPARE_KEYS(compare_keys_std) {
     assert(a != NULL);
     assert(b != NULL);
 
-    if (a_size != b_size) return false;
-
-    b32 hash_comp = get_hash_std(a_size, a) == get_hash_std(b_size, b);
+    b32 hash_comp = get_hash_std(size, a) == get_hash_std(size, b);
 
     if (!hash_comp) return hash_comp;
 
-    for (u64 i = 0; i < a_size; i++) {
-        if (((u8*)a)[i] != ((u8*)b)[i]) {
-            return false;
-        }
-    }
-
-    return true;
+    return mem_compare((u8*)a, (u8*)b, size) == 0;
 }
 
 COMPUTE_HASH(get_string_hash) {
@@ -62,17 +56,11 @@ COMPARE_KEYS(compare_string_keys) {
 
     if (a_str.size != b_str.size) return false;
 
-    b32 hash_comp = get_string_hash(a_size, a) == get_string_hash(b_size, b);
+    b32 hash_comp = get_string_hash(size, a) == get_string_hash(size, b);
 
     if (!hash_comp) return hash_comp;
 
-    for (u64 i = 0; i < a_str.size; i++) {
-        if (a_str.data[i] != b_str.data[i]) {
-            return false;
-        }
-    }
-
-    return true;
+    return string_compare(a_str, b_str) == 0;
 }
 
 struct MyKey { int a; char b; };
@@ -84,8 +72,7 @@ COMPUTE_HASH(mykey_hash) {
 }
 
 COMPARE_KEYS(mykey_compare) {
-    UNUSED(a_size);
-    UNUSED(b_size);
+    UNUSED(size);
     MyKey* k1 = (MyKey*)a;
     MyKey* k2 = (MyKey*)b;
     return k1->a == k2->a && k1->b == k2->b;

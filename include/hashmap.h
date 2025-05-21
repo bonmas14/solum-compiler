@@ -17,8 +17,8 @@
 #define COMPUTE_HASH(name) b32 name(u64 size, void * key)
 typedef COMPUTE_HASH(hash_func_t);
 
-#define COMPARE_KEYS(name) b32 name(u64 a_size, void * a, u64 b_size, void * b)
-typedef COMPARE_KEYS(compare_func_t);
+#define COMPARE_KEYS(name) b32 name(u64 size, void * a, void * b)
+typedef COMPARE_KEYS(key_compare_func_t);
 
 COMPUTE_HASH(get_string_hash);
 COMPARE_KEYS(compare_string_keys);
@@ -40,7 +40,7 @@ struct hashmap_t {
     u64 load;
     u64 capacity;
     hash_func_t *hash_func;
-    compare_func_t *compare_func;
+    key_compare_func_t *compare_func;
     kv_pair_t<KeyType, DataType> *entries;
 
     DataType * operator[](KeyType &key) {
@@ -51,7 +51,7 @@ struct hashmap_t {
 // ----------- Initialization 
 
 template<typename KeyType, typename DataType>
-b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func);
+b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, key_compare_func_t *compare_func);
 
 template<typename KeyType, typename DataType>
 hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map);
@@ -93,7 +93,7 @@ b32 rebuild_map(hashmap_t<KeyType, DataType> *map);
 // ----------- Implementation
 
 template<typename KeyType, typename DataType>
-b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, compare_func_t *compare_func) {
+b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, key_compare_func_t *compare_func) {
     *map = {};
     assert(init_size > 0);
 
@@ -173,7 +173,7 @@ DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
 
         if (!map->entries[lookup].occupied) return NULL;
 
-        if (map->compare_func(sizeof(KeyType), (void*)&key, sizeof(KeyType), (void*)&map->entries[lookup].key)) {
+        if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
             return &(map->entries + lookup)->value;
         }
     }
@@ -206,7 +206,7 @@ b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value)
             map->load++;
 
             return true;
-        } else if (map->compare_func(sizeof(KeyType), (void*)&key, sizeof(KeyType), (void*)&map->entries[lookup].key)) {
+        } else if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
             return false;
         }
     }
@@ -228,7 +228,7 @@ b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
 
         if (!map->entries[lookup].occupied) return false;
 
-        if (map->compare_func(sizeof(KeyType), (void*)&key, sizeof(KeyType), (void*)&map->entries[lookup].key)) {
+        if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
             map->entries[lookup].deleted = true;
             map->load--;
             return true;

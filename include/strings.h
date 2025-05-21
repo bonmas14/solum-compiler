@@ -31,7 +31,7 @@ string_t string_substring(string_t input, u64 start, u64 size, allocator_t *allo
 
 u64 c_string_length(const char *c_str);
 
-b32 string_compare(string_t a, string_t b);
+s32 string_compare(string_t a, string_t b);
 s64 string_index_of(string_t input, u8 value);
 s64 string_last_index_of(string_t input, u8 value);
 
