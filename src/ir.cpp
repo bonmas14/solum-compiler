@@ -575,6 +575,10 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     assert(state->current_function == NULL);
 
     ir_function_t func = {};
+
+    // @todo @bug @error: This is list, and we return a pointer...
+    log_error("We use list for function codes! that is not right because it will break after reallocation");
+    list_create(&func.code, 1000); 
     state->current_function = &func;
     stack_push(&state->search_scopes, &entry->func_params);
     {

@@ -1,4 +1,3 @@
-
 #include "sorter.h"
 #include "logger.h"
 #include "list.h"
@@ -17,6 +16,7 @@ COMP_PROC(s32_comp_func) {
     assert(a != NULL);
     assert(b != NULL);
     assert(size == sizeof(s32));
+    UNUSED(size);
 
     s32 va = *(s32*)a;
     s32 vb = *(s32*)b;
@@ -30,6 +30,7 @@ COMP_PROC(string_comp_func) {
     assert(a != NULL);
     assert(b != NULL);
     assert(size == sizeof(string_t));
+    UNUSED(size);
 
     string_t va = *(string_t*)a;
     string_t vb = *(string_t*)b;
@@ -120,6 +121,7 @@ b32 sort_test_case(string_t *data, string_t *expect, u64 size) {
 }
 
 void sorter_tests() {
+#ifdef DEBUG
     log_push_color(255,255,255);
     {
         s32 data[]     = {5, 4, 3, 2, 1};
@@ -191,4 +193,6 @@ void sorter_tests() {
         string_t expected[] = { STRING("  space"), STRING("hello"), STRING("hello world"), STRING("space") };
         assert(sort_test_case(data, expected, sizeof(data) / sizeof(data[0])));
     }
+
+#endif
 }

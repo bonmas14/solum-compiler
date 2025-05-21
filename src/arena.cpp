@@ -87,6 +87,7 @@ void * arena_allocate(arena_t *cont, u64 size) {
 }
 
 void arena_tests(void) {
+#ifdef DEBUG
     arena_t *arena = arena_create(1024);
     void * result;
 
@@ -117,4 +118,5 @@ void arena_tests(void) {
     assert(arena->next->index == 2048);
 
     arena_delete(arena);
+#endif
 }

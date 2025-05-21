@@ -36,6 +36,7 @@ COMPARE_KEYS(compare_keys_std) {
 }
 
 COMPUTE_HASH(get_string_hash) {
+    UNUSED(size);
     assert(key != NULL);
     assert(size == sizeof(string_t));
 
@@ -79,6 +80,7 @@ COMPARE_KEYS(mykey_compare) {
 }
 
 void hashmap_tests(void) {
+#ifdef DEBUG
     {
         hashmap_t<string_t, u32> map = {};
         map.hash_func    = get_string_hash;
@@ -264,4 +266,5 @@ void hashmap_tests(void) {
         assert(map[key]);
         hashmap_delete(&map);
     }
+#endif
 }

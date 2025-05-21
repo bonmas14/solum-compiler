@@ -258,6 +258,7 @@ s64 string_last_index_of(string_t input, u8 value) {
 }
 
 void string_tests(void) {
+#ifdef DEBUG
     temp_reset();
 
     assert(c_string_length("Hello") == 5);
@@ -353,4 +354,5 @@ void string_tests(void) {
     assert(!string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
     temp_reset();
+#endif
 }

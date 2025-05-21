@@ -1778,7 +1778,7 @@ b32 analyzer_preload_all_files(compiler_t *compiler) {
     if (!result) {
         log_error("Couldn't find a file.");
     } 
-#ifdef DEBUG
+#ifdef VERBOSE
     else {
         log_info("All files loaded!");
     }

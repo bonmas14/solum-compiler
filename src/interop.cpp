@@ -17,10 +17,6 @@ struct interpreter_state_t {
 static s64 allocate_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
 
-    if (state->data_stack.index > 1000) {
-        log_error("a lot of mem");
-    }
-
     stack_push(&state->data_stack, 0LL);
     return (state->data_stack.index - 1) * sizeof(s64);
 }
@@ -186,7 +182,10 @@ void interop_func(ir_t *ir, string_t func_name) {
         ir_opcode_t op = func.code.data[state.ip];
         state.ip++;
         execute_ir_opcode(&state, op);
+
+#ifdef VERBOSE
         print_ir_opcode(op);
+#endif
     }
 
     if (state.running) {

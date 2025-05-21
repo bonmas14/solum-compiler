@@ -2,6 +2,7 @@
 #include "memctl.h" 
 
 void list_tests(void) {
+#ifdef DEBUG
     list_t<u64> list = {};
 
     u64 data1 = 404;
@@ -36,4 +37,5 @@ void list_tests(void) {
 
     assert(list.count == 103);
     list_delete(&list);
+#endif
 }

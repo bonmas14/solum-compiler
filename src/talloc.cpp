@@ -10,6 +10,7 @@ allocator_t __talloc;
 
 ALLOCATOR_PROC(temporary_allocator_proc) {
     UNUSED(p);
+    UNUSED(data);
 
     switch (message) {
         case ALLOC_ALLOCATE:
@@ -83,6 +84,7 @@ void temp_reset(void) {
 }
 
 void temp_tests(void) {
+#ifdef DEBUG
     temp_reset();
     const char* text = "eating burger wit no honey mustard";
     u8* str = STR(text);
@@ -96,4 +98,5 @@ void temp_tests(void) {
     u8* data2 = (u8*)temp_allocate(len);
     assert(data1 == data2);
     temp_reset();
+#endif
 }

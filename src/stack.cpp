@@ -1,6 +1,7 @@
 #include "stack.h"
 
 void stack_tests(void) {
+#ifdef DEBUG
     stack_t<int> stack = {};
 
     stack_push(&stack, 1);
@@ -18,4 +19,5 @@ void stack_tests(void) {
     assert(stack_pop(&stack) == 1);
 
     stack_delete(&stack);
+#endif
 }
