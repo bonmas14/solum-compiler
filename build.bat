@@ -109,9 +109,8 @@ echo Linking...
 
 set pdb="%name%.pdb"
 set out="%name%.exe" 
-set imp="%name%.lib"
 
-set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /IMPLIB:%imp% /DEBUG:FULL"
+set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /DEBUG:FULL"
 
 setlocal enabledelayedexpansion
 
