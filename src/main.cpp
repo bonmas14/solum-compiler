@@ -18,15 +18,18 @@ allocator_t __allocator;
 #include "list.h"
 #include "hashmap.h"
 #include "stack.h"
+#include "array.h"
 
 void debug_tests(void) {
-    arena_tests();
     temp_tests();
+    array_tests();
+    arena_tests();
     string_tests();
     sorter_tests();
     stack_tests();
     list_tests();
     hashmap_tests();
+    log_info("Finished tests");
 }
 
 #elif defined(NDEBUG)

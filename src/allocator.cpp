@@ -8,7 +8,6 @@ struct {
     allocator_t allocators[ALLOCATOR_GLOBAL_BUFF_SIZE];
 } __global_allocators_buffer;
 
-
 allocator_t *preserve_allocator_from_stack(allocator_t allocator) {
     if (__global_allocators_buffer.current_index >= ALLOCATOR_GLOBAL_BUFF_SIZE) {
         log_error(STRING("Allcator stack is full"));
@@ -25,22 +24,31 @@ ALLOCATOR_PROC(std_alloc_proc) {
     UNUSED(data);
 
     switch (message) {
-        case ALLOC_ALLOCATE:
+        case ALLOC_ALLOCATE: {
+            void *out = calloc(1, size);
 #ifdef VERBOSE
             log_update_color();
-            fprintf(stderr, "Allocation size: %llu\n", size);
+            fprintf(stderr, "ALLOC--: %llx SIZE: %llu\n", (uintptr_t)out, size);
 #endif
-            return calloc(1, size);
 
-        case ALLOC_REALLOCATE:
+            return out; 
+        }
+
+        case ALLOC_REALLOCATE: {
+            void *out = realloc(p, size);
 #ifdef VERBOSE
             log_update_color();
-            fprintf(stderr, "Allocation size: %llu\n", size);
+            fprintf(stderr, "REALLOC: %llx -> %llx SIZE: %llu\n", (uintptr_t)p, (uintptr_t)out, size);
 #endif
-            return realloc(p, size);
+            return out;
+        }
 
         case ALLOC_DEALLOCATE:
             free(p);
+#ifdef VERBOSE
+            log_update_color();
+            fprintf(stderr, "FREE---: %llx\n", (uintptr_t)p);
+#endif
             break;
 
         default:

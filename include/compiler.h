@@ -4,6 +4,7 @@
 #include "stddefines.h"
 #include "allocator.h"
 #include "list.h"
+#include "array.h"
 #include "hashmap.h"
 #include "logger.h"
 
@@ -30,7 +31,7 @@ struct compiler_t {
     codegen_t   *codegen;
     string_t     modules_path;
 
-    list_t<hashmap_t<string_t, scope_entry_t>> scopes;
+    array_t<hashmap_t<string_t, scope_entry_t>> scopes;
     hashmap_t<string_t, source_file_t> files;
 };
 

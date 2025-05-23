@@ -5,7 +5,6 @@
 #include "talloc.h"
 
 #ifdef _WIN32
-
 #include <windows.h>
 #include <shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")

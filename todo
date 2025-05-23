@@ -17,6 +17,7 @@ ideas:
 could be great for debug purposes?
 
 
+- allocators shouldn't be pointers!
 
 
 

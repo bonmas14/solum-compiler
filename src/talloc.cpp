@@ -16,6 +16,9 @@ ALLOCATOR_PROC(temporary_allocator_proc) {
         case ALLOC_ALLOCATE:
             assert(data != NULL);
             return temp_allocate(size);
+        case ALLOC_DELETE:
+            temp_reset();
+            break;
 
         case ALLOC_REALLOCATE:
 #ifdef VERBOSE
@@ -104,5 +107,15 @@ void temp_tests(void) {
     u8* data2 = (u8*)temp_allocate(len);
     assert(data1 == data2);
     temp_reset();
+
+    u64 *arr[1024];
+    for (u64 i = 0; i < 1024; i++) {
+        arr[i] = (u64*)temp_allocate(8);
+        *(arr[i]) = i;
+    }
+
+    for (u64 i = 0; i < 1024; i++) {
+        assert(*(arr[i]) == i);
+    }
 #endif
 }

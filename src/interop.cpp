@@ -179,7 +179,7 @@ void interop_func(ir_t *ir, string_t func_name) {
     ir_function_t func = *ir->functions[func_name];
 
     while (state.running && state.ip < func.code.count) {
-        ir_opcode_t op = func.code.data[state.ip];
+        ir_opcode_t op = func.code[state.ip];
         state.ip++;
         execute_ir_opcode(&state, op);
 

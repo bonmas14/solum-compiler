@@ -6,7 +6,7 @@
 #include "memctl.h"
 #include "allocator.h"
 
-#define STANDART_LIST_SIZE 64
+#define STANDART_LIST_SIZE 10
 
 template<typename DataType>
 struct list_t {
@@ -69,14 +69,13 @@ template<typename DataType>
 b32 list_grow_fit(list_t<DataType> *list);
 
 template<typename DataType>
-void create_if_needed(list_t<DataType> *list);
+void list_create_if_needed(list_t<DataType> *list);
 
 
 // ----------- Implementation
 
 template<typename DataType>
 b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t *alloc) {
-    assert(alloc != NULL);
     if (alloc == NULL) alloc = default_allocator;
     list->count        = 0;
     list->current_size = init_size;
@@ -86,7 +85,7 @@ b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t *alloc) {
     list->data      = (DataType*)mem_alloc(alloc, init_size * sizeof(DataType));
 
     if (list->data == NULL) {
-        log_error(STRING("Area: Couldn't create list."));
+        log_error(STRING("List: Couldn't create list."));
         return false; 
     }
 
@@ -113,12 +112,12 @@ list_t<DataType> list_clone(list_t<DataType> *list) {
 template<typename DataType>
 b32 list_delete(list_t<DataType> *list) {
     if (list == NULL) {
-        log_error(STRING("Area: Reference to list wasn't valid."));
+        log_error(STRING("List: Reference to list wasn't valid."));
         return false;
     }
 
     if (list->data == NULL) {
-        log_error(STRING("Area: Area was already deleted."));
+        log_error(STRING("List: List was already deleted."));
         return false;
     }
 
@@ -177,7 +176,6 @@ DataType *list_get(list_t<DataType> *list, u64 index) {
     list_create_if_needed(list);
 
     if (index >= list->count) {
-        log_error(STRING("Area: Index is greater than count of elements."));
         return NULL;
     }
 
@@ -200,7 +198,7 @@ b32 list_grow(list_t<DataType> *list) {
     DataType *data = (DataType*)mem_alloc(list->alloc, list->grow_size * sizeof(DataType));
 
     if (data == NULL) {
-        log_error(STRING("Area: Couldn't grow list."));
+        log_error(STRING("List: Couldn't grow list."));
         return false;
     }
 

@@ -1,9 +1,11 @@
 #include "compiler.h"
+#include "array.h"
 #include "parser.h"
 #include "ir.h"
 
 #include "allocator.h"
 #include "talloc.h"
+#include "arena.h"
 #include "strings.h"
 #include "memctl.h"
 
@@ -22,7 +24,7 @@ struct ir_state_t {
     ir_function_t *current_function;
     stack_t<ir_opcode_t*> continue_stmt;
     stack_t<ir_opcode_t*> break_stmt;
-    stack_t<ast_node_t*> reverse;
+    stack_t<ast_node_t*>  reverse;
     stack_t<hashmap_t<string_t, scope_entry_t>*> search_scopes;
     list_t<hashmap_t<string_t, scope_entry_t>>   local_scopes;
 };
@@ -103,8 +105,8 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, u64 data) {
     o.info = debug;
     o.u_operand = data;
 
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    array_add(&state->current_function->code, o);
+    ir_opcode_t *out = array_get(&state->current_function->code, state->current_function->code.count - 1);
     out->index = state->current_function->code.count - 1;
     return out;
 }
@@ -116,8 +118,8 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, s64 data, u64 dum
     o.info = debug;
     o.s_operand = data;
 
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    array_add(&state->current_function->code, o);
+    ir_opcode_t *out = array_get(&state->current_function->code, state->current_function->code.count - 1);
     out->index = state->current_function->code.count - 1;
     return out;
 }
@@ -128,8 +130,8 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
     o.info = debug;
     o.string = data;
 
-    list_add(&state->current_function->code, &o);
-    ir_opcode_t *out = list_get(&state->current_function->code, state->current_function->code.count - 1);
+    array_add(&state->current_function->code, o);
+    ir_opcode_t *out = array_get(&state->current_function->code, state->current_function->code.count - 1);
     out->index = state->current_function->code.count - 1;
     return out;
 }
@@ -426,7 +428,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
 }
 
 void compile_block(ir_state_t *state, ast_node_t *node) {
-    hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, node->scope_index);
+    hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, node->scope_index);
     stack_push(&state->search_scopes, block);
 
     ast_node_t *stmt = node->list_start;
@@ -576,9 +578,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
     ir_function_t func = {};
 
-    // @todo @bug @error: This is list, and we return a pointer...
-    log_error("We use list for function codes! that is not right because it will break after reallocation");
-    list_create(&func.code, 1000, default_allocator); 
+    array_create(&func.code, 8, state->ir.code);
     state->current_function = &func;
     stack_push(&state->search_scopes, &entry->func_params);
     {
@@ -614,13 +614,13 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         u64 last_line = 0;
 
         for (u64 i = 0; i < func.code.count; i++) {
-            if (last_line != func.code.data[i].info.l0) {
+            if (last_line != func.code[i].info.l0) {
                 log_write("\n");
-                print_lines_of_code(func.code.data[i].info, 0, 0, 0);
-                last_line = func.code.data[i].info.l0;
+                print_lines_of_code(func.code[i].info, 0, 0, 0);
+                last_line = func.code[i].info.l0;
             }
 
-            print_ir_opcode(func.code.data[i]);
+            print_ir_opcode(func.code[i]);
         }
 #endif
     }
@@ -659,10 +659,11 @@ ir_t compile_program(compiler_t *compiler) {
 
     ir_state_t state = {};
 
+    state.ir.code     = create_arena_allocator(1024 * sizeof(ir_opcode_t));
     state.compiler    = compiler;
     state.ir.is_valid = true;
 
-    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+    hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
 
     stack_push(&state.search_scopes, scope);
 

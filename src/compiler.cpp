@@ -65,8 +65,10 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
     compiler.codegen  = codegen_create(alloc);
     compiler.valid = true;
 
+    array_create(&compiler.scopes, 32, create_arena_allocator(32 * sizeof(hashmap_t<string_t, scope_entry_t>)));
+
     hashmap_t<string_t, scope_entry_t> hm = {};
-    list_add(&compiler.scopes, &hm);
+    array_add(&compiler.scopes, hm);
 
     return compiler;
 }

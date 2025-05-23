@@ -3,6 +3,7 @@
 
 #include "stddefines.h"
 #include "list.h"
+#include "array.h"
 #include "compiler.h"
 #include "analyzer.h"
 #include "stack.h"
@@ -112,13 +113,14 @@ struct ir_variable_t {
 struct ir_function_t {
     b32 is_valid;
     
-    list_t<ir_opcode_t> code;
+    array_t<ir_opcode_t> code;
     list_t<ir_variable_t> vars;
 };
 
 struct ir_t {
     b32 is_valid;
 
+    allocator_t code;
     hashmap_t<string_t, ir_function_t> functions;
     hashmap_t<string_t, scope_entry_t> variables;
     // hashmap_t<string_t, u8> strings;

@@ -11,7 +11,7 @@ set "obj_out_dir=obj\"
 set "linking_deps="
 
 set "defines=/D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE"
-set "compile_config=/nologo /c /std:c++14 /utf-8 /Gr /TP /Z7 /W4 /WX- /diagnostics:column /fp:precise /Iinclude %defines%"
+set "compile_config=/nologo -fansi-escape-codes -fcolor-diagnostics -m64 /c /std:c++14 /utf-8 /Gr /TP /Z7 /W4 /WX- /diagnostics:column /fp:precise /Iinclude /Ideps %defines%"
 
 if "%1"=="Release"  ( goto release )
 if "%1"=="Sanitize" ( goto sanitize )
@@ -60,7 +60,7 @@ echo Building: Release
 echo:
 set "name=%bin_dir%%filename%-r"
 set "obj_path=%obj_out_dir%Release\\"
-set "complie=%compile_config% /Ox /Oi /GF /MT /GS /Gy /D NDEBUG"
+set "complie=%compile_config% /Ox /Oi /GF /MT /Gy /D NDEBUG /D RADDBG_MARKUP_STUBS"
 set "link_config=/INCREMENTAL:NO /OPT:REF /OPT:ICF /time"
 set "per_target_link_deps="
 goto configured
@@ -109,8 +109,9 @@ echo Linking...
 
 set pdb="%name%.pdb"
 set out="%name%.exe" 
+set imp="%name%.lib"
 
-set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /DEBUG:FULL"
+set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /IMPLIB:%imp% /DEBUG:FULL"
 
 setlocal enabledelayedexpansion
 

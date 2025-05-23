@@ -1,5 +1,7 @@
 #include "analyzer.h"
 
+#include "list.h"
+#include "array.h"
 #include "stack.h"
 #include "logger.h"
 #include "compiler.h"
@@ -34,7 +36,6 @@ enum {
 struct analyzer_state_t {
     u64 state;
     compiler_t *compiler;
-    list_t<hashmap_t<string_t, scope_entry_t>*> scopes;
     stack_t<hashmap_t<string_t, scope_entry_t>*> current_search_stack;
 
     stack_t<string_t> internal_deps;
@@ -541,13 +542,13 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
             u32 new_index = 0;
             {
                 hashmap_t<string_t, scope_entry_t> block = {};
-                list_add(&state->compiler->scopes, &block);
+                array_add(&state->compiler->scopes, block);
                 new_index = state->compiler->scopes.count - 1;
             }
 
             expr->scope_index = new_index;
 
-            hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, new_index);
+            hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, new_index);
             stack_push(&state->current_search_stack, block);
 
             for (u64 i = 0; i < expr->child_count; i++) {
@@ -1437,7 +1438,7 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
 
     string_t source;
 
-    if (!platform_read_file_into_string(filename, default_allocator, &source)) {
+    if (!platform_read_file_into_string(filename, compiler->strings, &source)) {
         return false;
     }
 
@@ -1547,13 +1548,13 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 sco
                 u32 new_index = 0;
                 {
                     hashmap_t<string_t, scope_entry_t> block = {};
-                    list_add(&state->compiler->scopes, &block);
+                    array_add(&state->compiler->scopes, block);
                     new_index = state->compiler->scopes.count - 1;
                 }
 
                 node->scope_index = new_index;
 
-                hashmap_t<string_t, scope_entry_t> *block = list_get(&state->compiler->scopes, new_index);
+                hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, new_index);
                 stack_push(&state->current_search_stack, block);
 
                 for (u64 i = 0; i < node->child_count; i++) {
@@ -1858,7 +1859,7 @@ void print_all_definitions(compiler_t *compiler) {
 
     fprintf(stderr, "--------GLOBAL-SCOPE---------\n");
 
-    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+    hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
 
     for (u64 i = 0; i < scope->capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> pair = scope->entries[i];
@@ -1947,7 +1948,7 @@ b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
 
 b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
     b32 result = true;
-    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+    hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
 
     for (u64 i = 0; i < scope->capacity; i++) {
         kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
@@ -1982,7 +1983,7 @@ b32 analyze(compiler_t *compiler) {
 
     analyzer_state_t state = init_state(compiler);
 
-    hashmap_t<string_t, scope_entry_t> *scope = list_get(&compiler->scopes, 0);
+    hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
 
     stack_push(&state.current_search_stack, scope);
     {
