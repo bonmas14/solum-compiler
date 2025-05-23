@@ -20,8 +20,8 @@ allocator_t __allocator;
 #include "stack.h"
 
 void debug_tests(void) {
-    temp_tests();
     arena_tests();
+    temp_tests();
     string_tests();
     sorter_tests();
     stack_tests();
@@ -34,10 +34,10 @@ void debug_tests(void) {
 #endif
 
 void init(void) {
+    log_push_color(255, 255, 255);
+    alloc_init();
     debug_init();
     debug_tests();
-    default_allocator = preserve_allocator_from_stack(create_arena_allocator(PG(10)));
-    log_push_color(255, 255, 255);
 }
 
 int main(int argc, char **argv) {

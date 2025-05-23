@@ -32,18 +32,28 @@ ALLOCATOR_PROC(arena_allocator_proc) {
             return arena_allocate((arena_t*)data, size);
 
         case ALLOC_REALLOCATE:
-            log_warning(STRING("arena allocator doesn't reallocate."));
-            return NULL;
+#ifdef VERBOSE
+            log_warning(STRING("Arena allocator doesn't reallocate."));
+#endif
+            break;
 
         case ALLOC_DEALLOCATE:
-            log_warning(STRING("arena allocator doesn't deallocate allocated memory the whole arena"));
-            return NULL;
+#ifdef VERBOSE
+            log_warning(STRING("Arena allocator doesn't deallocate. Delete the the underlying arena"));
+#endif
+            break;
+
+        case ALLOC_DELETE:
+            arena_delete((arena_t*)data);
+            break;
 
         default:
             log_error(STRING("unexpected allocator message."));
             assert(false);
             break;
     }
+
+    return NULL;
 }
 
 

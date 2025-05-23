@@ -18,11 +18,15 @@ ALLOCATOR_PROC(temporary_allocator_proc) {
             return temp_allocate(size);
 
         case ALLOC_REALLOCATE:
+#ifdef VERBOSE
             log_warning(STRING("Temp allocator is in static memory... we cant reallocate here"));
+#endif
             return NULL;
 
         case ALLOC_DEALLOCATE:
+#ifdef VERBOSE
             log_warning(STRING("Temp allocator is in static memory... we cant deallocate here"));
+#endif
             return NULL;
 
         default:
@@ -30,6 +34,8 @@ ALLOCATOR_PROC(temporary_allocator_proc) {
             assert(false);
             break;
     }
+
+    return NULL;
 }
 
 // @todo : for all allocators
