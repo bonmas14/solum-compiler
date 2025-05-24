@@ -22,12 +22,12 @@ allocator_t __allocator;
 
 void debug_tests(void) {
     temp_tests();
-    array_tests();
-    arena_tests();
-    string_tests();
-    sorter_tests();
     stack_tests();
+    arena_tests();
     list_tests();
+    string_tests();
+    array_tests();
+    sorter_tests();
     hashmap_tests();
     log_info("Finished tests");
 }

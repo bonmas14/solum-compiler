@@ -17,17 +17,18 @@ mkdir "$log_dir"
 
 config=${1,-"Debug"}
 shift
-arch=${1,-"x64"}
 
 defines="-D_UNICODE -DUNICODE"
 
 name="$bin_dir/slm"
 obj="$obj_dir"
 
-if [ "$arch" == "x32" ]; then
-    arch="-m32"
-else
+arch=$(/usr/bin/arch)
+
+if [ "$arch" == "aarch64" ] || [ "$arch" == "x86_64" ]; then
     arch="-m64 -fPIC"
+else
+    arch="-m32"
 fi
 
 cflags="$arch -std=c++14 -I./include -g -Wall -Wno-format $defines"
@@ -69,7 +70,7 @@ echo
 echo "Linking:"
 
 echo "$cc -o"$name" $obj_files $arch"
-$cc -o"$name" $obj_files -m64
+$cc -o"$name" $obj_files $arch
 
 echo
 echo "Done!"
