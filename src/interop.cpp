@@ -17,7 +17,7 @@ struct interpreter_state_t {
 static s64 allocate_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
 
-    stack_push(&state->data_stack, 0LL);
+    stack_push(&state->data_stack, (s64) 0);
     return (state->data_stack.index - 1) * sizeof(s64);
 }
 
@@ -88,14 +88,14 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             s64 a = stack_pop(&state->exec_stack);
             s64 b = stack_pop(&state->exec_stack);
             if (b != 0) stack_push(&state->exec_stack, a / b);
-            stack_push(&state->exec_stack, 0LL);
+            stack_push(&state->exec_stack, (s64) 0);
         } break;
             
         case IR_MOD: {
             s64 a = stack_pop(&state->exec_stack);
             s64 b = stack_pop(&state->exec_stack);
             if (b != 0) stack_push(&state->exec_stack, a % b);
-            stack_push(&state->exec_stack, 0LL);
+            stack_push(&state->exec_stack, (s64) 0);
         } break;
             
         case IR_NEG: {

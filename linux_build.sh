@@ -23,7 +23,7 @@ defines="-D_UNICODE -DUNICODE"
 name="$bin_dir/slm"
 obj="$obj_dir"
 
-arch=$(/usr/bin/arch)
+arch=$(/usr/bin/env uname -m)
 
 if [ "$arch" == "aarch64" ] || [ "$arch" == "x86_64" ]; then
     arch="-m64 -fPIC"
