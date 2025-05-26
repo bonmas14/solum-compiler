@@ -3,6 +3,7 @@
 #include "parser.h"
 #include "ir.h"
 
+#include "profiler.h"
 #include "allocator.h"
 #include "talloc.h"
 #include "arena.h"
@@ -243,7 +244,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
 
                         expr.accessable = true;
                         expr.offset     = entry->info.offset;
-                        expr.emmited_op = emit_op(state, IR_PUSH_GLOBAL, node->token, entry->info.offset);
+                        expr.emmited_op = emit_op(state, IR_PUSH_STACK, node->token, entry->info.offset);
                         // @todo, this should be already created stuff...
                         return expr;
                     } break;
@@ -347,7 +348,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             return expr;
 
         case AST_ARRAY_ACCESS: // @todo finish
-            log_error("Cant use arrays");
+            // log_error("Cant use arrays");
             break;
 
             compile_expression(state, node->right, shadow);
@@ -592,6 +593,8 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         return;
     }  
 
+    profiler_func_start();
+
     assert(state->current_function == NULL);
 
     ir_function_t func = {};
@@ -658,6 +661,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     stack_pop(&state->search_scopes);
     state->current_function = NULL;
     hashmap_add(&state->ir.functions, key, &func);
+    profiler_func_end();
 }
 
 void evaluate_variable(ir_state_t *state, scope_entry_t *entry) {
@@ -684,6 +688,7 @@ void compile_global_statement(ir_state_t *state, string_t key, scope_entry_t *en
 }
 
 ir_t compile_program(compiler_t *compiler) {
+    profiler_func_start();
     UNUSED(compiler);
 
     assert(compiler != NULL);
@@ -713,6 +718,7 @@ ir_t compile_program(compiler_t *compiler) {
 
     stack_delete(&state.search_scopes);
 
+    profiler_func_end();
     return state.ir;
 }
 

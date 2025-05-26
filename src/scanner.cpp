@@ -654,35 +654,28 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
     assert(token.l1 >= token.l0);
     scanner_t *state = token.from;
 
-    b32 cancel_empty_line_skip = false;
+    b32 dont_skip_lines = false;
 
-    s64 line_start = (s64)token.l0;
-    s64 line_stop  = (s64)token.l1;
+    s64 line_start = MAX(0,                       (s64)token.l0 - start_shift);
+    u64 line_stop  = MIN((s64)state->lines.count, (s64)token.l1 + stop_shift + 1);
 
-    line_start = (line_start - start_shift) > 0 ? (line_start - start_shift) : line_start;
+    for (u64 i = line_start; i < line_stop; i++) {
+        line_tuple_t line = state->lines[i];
 
-    u64 stop_pos = line_stop + stop_shift + 1;
-    if (stop_pos > state->lines.count) {
-        stop_pos = state->lines.count;
-    }
-
-    for (u64 i = line_start; i < stop_pos; i++) {
-        line_tuple_t line = *list_get(&state->lines, i);
-
-        u64 len   = line.stop - line.start + 1;
-        u8 *start = state->file.data + line.start;
+        u64 line_length = line.stop - line.start + 1;
+        u8 *start_pos = state->file.data + line.start;
 
         b32 skip_line = true;
 
-        for (u64 j = 0; j < len; j++) {
-            if (*(start + j) != ' ' && *(start + j) != '\n' && *(start + j) != '\r') {
-                skip_line   = false;
-                cancel_empty_line_skip = true;
+        for (u64 j = 0; j < line_length; j++) {
+            if (*(start_pos + j) != ' ' && *(start_pos + j) != '\n' && *(start_pos + j) != '\r') {
+                skip_line       = false;
+                dont_skip_lines = true;
             }
         }
         
-        if (!cancel_empty_line_skip && skip_line && i < token.l0) { 
-            cancel_empty_line_skip = true;
+        if (!dont_skip_lines && skip_line && i < token.l0) { 
+            dont_skip_lines = true;
             continue;
         }
 
@@ -690,7 +683,7 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
 
         if (i < token.l0 || i > token.l1) {
             log_update_color();
-            fprintf(stderr, "%4llu | %.*s\n", i + 1, (int)len - 1, start);
+            fprintf(stderr, "%4llu | %.*s\n", i + 1, (int)line_length - 1, start_pos);
         } else {
             u64 token_size = token.c1 - token.c0;
 
@@ -699,42 +692,42 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
 
                 if (i > token.l0 && i < token.l1) {
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)len, start);
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)line_length, start_pos);
                     log_pop_color();
                 } else if (i == token.l0) {
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start);
-                    len -= token.c0;
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
+                    line_length -= token.c0;
                     log_push_color(ERROR_COLOR); 
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int)len, start + token.c0);
+                    fprintf(stderr, "%.*s", (int)line_length, start_pos + token.c0);
                     log_pop_color();
                 } else if (i == token.l1) {
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c1, start);
-                    len -= token.c1;
+                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c1, start_pos);
+                    line_length -= token.c1;
 
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int) len, start + token.c1);
+                    fprintf(stderr, "%.*s", (int) line_length, start_pos + token.c1);
                 } else {
                     log_pop_color();
                 }
             } else {
                 log_update_color();
-                fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start);
-                len -= token.c0;
+                fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
+                line_length -= token.c0;
 
                 log_push_color(255, 64, 64); 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int)token_size, start + token.c0);
+                fprintf(stderr, "%.*s", (int)token_size, start_pos + token.c0);
                 log_pop_color();
 
-                len -= token_size;
+                line_length -= token_size;
 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int) len, start + token.c0 + token_size);
+                fprintf(stderr, "%.*s", (int) line_length, start_pos + token.c0 + token_size);
             }
         }
     }

@@ -10,6 +10,7 @@
 struct interpreter_state_t {
     b32 running;
     u64 ip;
+    stack_t<u64> fp;
     stack_t<s64> exec_stack;
     stack_t<s64> data_stack;
 };
@@ -28,20 +29,50 @@ static void free_memory(interpreter_state_t *state, u64 size) {
 
 static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
     switch (op.operation) {
-        case IR_NOP: break;
+        case IR_NOP: 
+            break;
         
-        case IR_PUSH_SIGN:   stack_push(&state->exec_stack, op.s_operand); break;
-        case IR_PUSH_UNSIGN: stack_push(&state->exec_stack, op.s_operand); break;
-        case IR_POP:         stack_pop(&state->exec_stack); break;
+        case IR_STACK_FRAME_PUSH:
+            stack_push(&state->fp, state->data_stack.index); 
+            break;
+
+        case IR_STACK_FRAME_POP:
+            state->data_stack.index = stack_pop(&state->fp); 
+            break;
+
+        case IR_PUSH_SIGN:   
+            stack_push(&state->exec_stack, op.s_operand); 
+            break;
+        case IR_PUSH_UNSIGN: 
+            stack_push(&state->exec_stack, op.s_operand);
+            break;
+
+        case IR_PUSH_STACK: 
+        {
+            stack_push(&state->exec_stack, state->data_stack.data[stack_peek(&state->fp) + op.u_operand]);
+        } break;
+        case IR_PUSH_SEA: 
+        {
+            log_warning("push addr from stack");
+        } break;
+
+        case IR_PUSH_GLOBAL: 
+        {
+            log_warning("push from global");
+        } break;
+        case IR_PUSH_GEA: 
+        {
+            log_warning("push addr from global");
+        } break;
+
+        case IR_POP:
+            stack_pop(&state->exec_stack); 
+            break;
             
         case IR_CLONE: {
             s64 val = stack_pop(&state->exec_stack);
             stack_push(&state->exec_stack, val);
             stack_push(&state->exec_stack, val);
-        } break;
-            
-        case IR_PUSH_GLOBAL: {
-            // interpreter_push(state, 0xDEADBEEF);
         } break;
             
         case IR_ALLOC: {
@@ -128,7 +159,7 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
         } break;
             
         case IR_JUMP: {
-            state->ip += op.s_operand; // -1 because we increment ip after
+            state->ip += op.s_operand;
         } break;
             
         case IR_JUMP_IF: {

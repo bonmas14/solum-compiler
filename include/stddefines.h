@@ -39,6 +39,14 @@ typedef uint32_t b32;
 struct string_t {
     u64 size;
     u8 *data;
+
+    u8 operator[](u64 index) {
+        if (index >= size) {
+            return 0;
+        }
+
+        return data[index];
+    }
 };
 
 struct allocator_t;

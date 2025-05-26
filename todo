@@ -19,7 +19,7 @@ could be great for debug purposes?
 
 - allocators shouldn't be pointers!
 
-
+- harmonize names
 
 
 - fix the alignment and make structs alignment.

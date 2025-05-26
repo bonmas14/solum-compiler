@@ -24,6 +24,7 @@ string_t string_join(list_t<string_t> input,  string_t separator, allocator_t *a
 
 char   * string_to_c_string(string_t a, allocator_t *alloc);
 
+string_t string_format(allocator_t *alloc, string_t format...);
 string_t string_swap(string_t input, u8 from, u8 to, allocator_t *alloc);
 string_t string_concat(string_t a, string_t b, allocator_t *alloc);
 string_t string_copy(string_t a, allocator_t *alloc);

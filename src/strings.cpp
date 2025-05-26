@@ -2,6 +2,7 @@
 #include "memctl.h"
 #include "logger.h"
 #include "talloc.h"
+#include <stdarg.h>
 
 void mem_set(u8 *buffer, u8 value, u64 size) {
     if (size == 0) return;
@@ -256,6 +257,107 @@ s64 string_last_index_of(string_t input, u8 value) {
 
     return index;
 }
+
+static u64 format_u64(u8 *buffer, u64 value) {
+    if (value == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    u64 offset = 0;
+    while (value) {
+        buffer[offset++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    for (u64 l = 0, r = offset - 1; l < r; l++, r--) {
+        u8 t      = buffer[l];
+        buffer[l] = buffer[r];
+        buffer[r] = t;
+    }
+
+    return offset;
+}
+
+static u64 format_s64(u8 *buffer, s64 value) {
+    if (value == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    u64 offset = 0;
+    b32 negative = false;
+
+    if (value < 0) {
+        value    = -value;
+        negative = true;
+    }
+
+    while (value) {
+        buffer[offset++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    if (negative) {
+        buffer[offset++] = '-';
+    }
+
+    for (u64 l = 0, r = offset - 1; l < r; l++, r--) {
+        u8 t      = buffer[l];
+        buffer[l] = buffer[r];
+        buffer[r] = t;
+    }
+
+    return offset;
+}
+
+string_t string_format(allocator_t *alloc, string_t buffer...) {
+    if (alloc == NULL) alloc = default_allocator;
+    assert(alloc != NULL);
+
+    va_list args;
+    va_start(args, buffer);
+    
+    u64 max_size   = PG(1);
+    u64 curr_index = 0;
+    u8 *output = (u8*)mem_alloc(alloc, max_size);
+    
+    for (u64 i = 0; i < buffer.size; i++) {
+        if (buffer[i++] != '%') {
+            output[curr_index++] = buffer[i - 1];
+            continue;
+        }
+
+        switch (buffer[i]) {
+            case 'u':
+            {
+                u64 arg = va_arg(args, u64);
+                curr_index += format_u64(output + curr_index, arg);
+            } break;
+
+            case 'd': 
+            {
+                s64 arg = va_arg(args, s64);
+                curr_index += format_s64(output + curr_index, arg);
+            } break;
+
+            case 's':
+            {
+                string_t arg = va_arg(args, string_t);
+                mem_move(output + curr_index, arg.data, arg.size);
+                curr_index += arg.size;
+            } break;
+            default: break;
+        }
+    }
+    // va_arg(args, );
+    // va_arg(args, long long);
+
+    va_end(args);
+    return { curr_index, output };
+}
+
+
 
 void string_tests(void) {
 #ifdef DEBUG

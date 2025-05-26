@@ -3,7 +3,6 @@ main : () = {
     b : s32 = 0;
     c : s32 = 0;
 
-
     while true {
         d : s32 = a;
     }

@@ -2,6 +2,7 @@
 #include "list.h"
 #include "strings.h"
 #include "talloc.h"
+#include "memctl.h"
 
 #define LOGGER_COLOR_STACK_SIZE 256
 
@@ -41,7 +42,7 @@ void log_reset_color(void) {
 }
 
 void add_left_pad(FILE * file, u64 amount) {
-    while (amount-- > 0) fprintf(file, " ");
+    fprintf(file, "%*s", (int)amount, "");
 }
 
 void log_write(string_t text) {
@@ -70,22 +71,10 @@ void log_error(string_t text) {
     log_pop_color();
 }
 
-void log_write(const char *text) {
-    log_write(STRING(text));
-}
-
-void log_info(const char *text) {
-    log_info(STRING(text));
-}
-
-void log_warning(const char *text) {
-    log_warning(STRING(text));
-}
-
-void log_error(const char *text) {
-    log_error(STRING(text));
-}
-
+void log_write(const   char *text) { log_write(STRING(text));   }
+void log_info(const    char *text) { log_info(STRING(text));    }
+void log_warning(const char *text) { log_warning(STRING(text)); }
+void log_error(const   char *text) { log_error(STRING(text));   }
 /*
 string_t log_sprintf(string_t string, void * data, ...) {
     va_list parameters;
