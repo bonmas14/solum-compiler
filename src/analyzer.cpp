@@ -612,7 +612,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     return true;
 }
 
-b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *node, ast_node_t *name, ast_node_t *type, ast_node_t *expr, b32 *should_wait) {
+b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *node, ast_node_t *name, ast_node_t *type, ast_node_t *expr, u32 offset, b32 *should_wait) {
     assert(state != NULL);
     assert(name != NULL);
     assert(type != NULL);
@@ -630,6 +630,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
     entry->stmt = node;
     entry->expr = expr;
     entry->info.pointer_depth = 0;
+    entry->info.offset = offset;
 
     b32 is_indirect = false;
 
@@ -795,7 +796,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
     for (u64 i = 0; i < type_node->left->child_count; i++) {
         assert(next_type->type == AST_PARAM_DEF);
 
-        if (!analyze_definition(state, false, entry->stmt, next_type, next_type->left, NULL, should_wait)) {
+        if (!analyze_definition(state, false, entry->stmt, next_type, next_type->left, NULL, 0, should_wait)) {
             result = false;
         }
 
@@ -931,13 +932,13 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
     return result;
 }
 
-b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, u32 offset, b32 *should_wait) {
     assert(node->type == AST_UNARY_VAR_DEF);
     assert(state       != NULL);
     assert(node        != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, false, node, node, node->left, NULL, should_wait)) {
+    if (!analyze_definition(state, false, node, node, node->left, NULL, offset, should_wait)) {
         return false;
     }
 
@@ -974,11 +975,15 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
     return true;
 }
 
-b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, b32 *should_wait) {
     assert(node->type == AST_BIN_MULT_DEF);
     assert(state != NULL);
     assert(node  != NULL);
     assert(should_wait != NULL);
+
+    u32 ioff = 0;
+    if (offset == NULL) offset = &ioff;
+
 
     ast_node_t *type_node = node->right;
 
@@ -986,9 +991,11 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, node, next, node->right, NULL, should_wait)) {
+            if (!analyze_definition(state, false, node, next, node->right, NULL, *offset, should_wait)) {
                 return false;
             }
+
+            (*offset)++;
 
             if (*should_wait) {
                 return true;
@@ -1016,7 +1023,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, b32 *should_w
     ast_node_t * type = node->right->list_start;
 
     for (u64 i = 0; i < node->left->child_count; i++) {
-        if (!analyze_definition(state, false, node, name, type, NULL, should_wait)) {
+        if (!analyze_definition(state, false, node, name, type, NULL, 0, should_wait)) {
             return false;
         }
 
@@ -1039,7 +1046,7 @@ b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     assert(node  != NULL);
     assert(should_wait != NULL);
 
-    if (!analyze_definition(state, true, node, node, node->left, node->right, should_wait)) {
+    if (!analyze_definition(state, true, node, node, node->left, node->right, 0, should_wait)) {
         return false;
     }
 
@@ -1066,7 +1073,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * next = node->left->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, node, next, node->center, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, node, next, node->center, node->right->list_start, 0, should_wait)) {
                 return false;
             }
 
@@ -1109,7 +1116,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * type = node->center->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, node, name, type, node->right->list_start, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, node->right->list_start, 0, should_wait)) {
                 return false;
             }
 
@@ -1151,7 +1158,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, node, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, expr, 0, should_wait)) {
                 return false;
             }
 
@@ -1205,7 +1212,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         ast_node_t * expr = node->right->list_start;
 
         for (u64 i = 0; i < node->left->child_count; i++) {
-            if (!analyze_definition(state, false, node, name, type, expr, should_wait)) {
+            if (!analyze_definition(state, false, node, name, type, expr, 0, should_wait)) {
                 return false;
             }
 
@@ -1231,16 +1238,17 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
     ast_node_t * block = entry->node->left;
     ast_node_t * next  = block->list_start;
 
+    u32 offset = 0;
     b32 result = true;
 
     for (u64 i = 0; i < block->child_count; i++) {
         switch (next->type) {
             case AST_UNARY_VAR_DEF:
-                if (!analyze_unary_var_def(state, next, should_wait)) {
+                if (!analyze_unary_var_def(state, next, offset, should_wait)) {
                     result = false;
                 } break;
             case AST_BIN_MULT_DEF:  
-                if (!analyze_bin_var_def(state, next, should_wait)) {
+                if (!analyze_bin_var_def(state, next, &offset, should_wait)) {
                     result = false;
                 } break;
             case AST_ENUM_DECL: 
@@ -1259,6 +1267,8 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
                 result = false;
                 break;
         }
+
+        offset++;
 
         if (*should_wait) {
             return result;
@@ -1314,7 +1324,7 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
         return result;
     }
 
-    log_warning("Struct sizes todo! analyzer.cpp l:1266");
+    log_warning("Struct sizes todo!");
 
     node->analyzed = true;
 
@@ -1661,7 +1671,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 sco
 
         case AST_UNARY_VAR_DEF:
             // @todo: allow the analysis of variables
-            result = analyze_unary_var_def(state, node, &should_wait) ? STMT_OK : STMT_ERR;
+            result = analyze_unary_var_def(state, node, 0, &should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_BIN_UNKN_DEF: 
@@ -1669,7 +1679,7 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 sco
             break;
 
         case AST_BIN_MULT_DEF: 
-            result = analyze_bin_var_def(state, node, &should_wait) ? STMT_OK : STMT_ERR;
+            result = analyze_bin_var_def(state, node, 0, &should_wait) ? STMT_OK : STMT_ERR;
             break;
 
         case AST_TERN_MULT_DEF:
@@ -1714,7 +1724,7 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
             break;
 
         case AST_UNARY_VAR_DEF:
-            result = analyze_unary_var_def(state, node, &should_wait);
+            result = analyze_unary_var_def(state, node, 0, &should_wait);
             break;
 
         case AST_BIN_UNKN_DEF: 
@@ -1722,7 +1732,7 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
             break;
 
         case AST_BIN_MULT_DEF: 
-            result = analyze_bin_var_def(state, node, &should_wait);
+            result = analyze_bin_var_def(state, node, 0, &should_wait);
             break;
 
         case AST_TERN_MULT_DEF:

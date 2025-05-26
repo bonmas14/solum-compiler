@@ -36,16 +36,18 @@ const char* ir_code_to_string(u64 code) {
         case IR_NOP:         return "NOP";
         case IR_PUSH_SIGN:   return "PUSH_SIGN";
         case IR_PUSH_UNSIGN: return "PUSH_UNSIGN";
-        case IR_PUSH_F32:    return "PUSH_F32";
-        case IR_PUSH_F64:    return "PUSH_F64";
+        case IR_PUSH_STACK:  return "PUSH_STACK";
+        case IR_PUSH_GLOBAL: return "PUSH_GLOBAL";
+        case IR_PUSH_GEA:     return "PUSH_GEA";
+        case IR_PUSH_SEA:     return "PUSH_SEA";
         case IR_POP:         return "POP";
         case IR_CLONE:       return "CLONE";
-        case IR_GLOBAL:      return "GLOBAL";
+        case IR_STACK_FRAME_PUSH: return "SF_PUSH";
+        case IR_STACK_FRAME_POP:  return "SF_POP";
         case IR_ALLOC:       return "ALLOC";
         case IR_FREE:        return "FREE";
         case IR_LOAD:        return "LOAD";
         case IR_STORE:       return "STORE";
-        case IR_LEA:         return "LEA";
         case IR_ADD:         return "ADD";
         case IR_SUB:         return "SUB";
         case IR_MUL:         return "MUL";
@@ -83,16 +85,7 @@ void print_ir_opcode(ir_opcode_t op) {
     const char* op_name = ir_code_to_string(op.operation);
     
     log_update_color();
-    if (op.s_operand != 0) {
-        printf("[IR] | %-14s | %lld\n",
-                op_name,
-                (long long)op.s_operand);
-    } else {
-        printf("[IR] | %-14s | %.*s\n",
-                op_name,
-                op.string.data == NULL ? 0 : (int)op.string.size,
-                (char*)op.string.data);
-    }
+    printf("[IR] | %-14s | %lld\n", op_name, (long long) op.s_operand);
 }
 
 #ifdef NDEBUG
@@ -246,8 +239,11 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                             break;
                         }
 
+                        // IR_PUSH_GLOBAL | IR_PUSH_STACK
+
                         expr.accessable = true;
-                        expr.emmited_op = emit_op(state, IR_GLOBAL, node->token, node->token.data.string);
+                        expr.offset     = entry->info.offset;
+                        expr.emmited_op = emit_op(state, IR_PUSH_GLOBAL, node->token, entry->info.offset);
                         // @todo, this should be already created stuff...
                         return expr;
                     } break;
@@ -270,8 +266,13 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                 log_error_token("Cant get address of unknown variable", node->left->token);
                 state->ir.is_valid = false;
             } else {
-                expr.emmited_op->operation = IR_LEA;
-                expr.emmited_op->search_info = expr.search_info;
+                if (expr.emmited_op->operation == IR_PUSH_GLOBAL) {
+                    expr.emmited_op->operation = IR_PUSH_GEA;
+                } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
+                    expr.emmited_op->operation = IR_PUSH_SEA;
+                } else {
+                    expr.emmited_op->operation = IR_INVALID;
+                }
             }
             break;
 
@@ -318,33 +319,31 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             if (!add_identifier_type_to_search(state, node->left->token.data.string)) {
                 log_error_token("Identifier is a primitive type: ", node->left->token);
                 state->ir.is_valid = false;
-                stack_pop(&state->search_scopes);
                 break;
             }
 
             expr = compile_expression(state, node->right, shadow);
+            stack_pop(&state->search_scopes);
 
             if (!expr.accessable) {
                 log_error_token("Bad member access expression: ", node->left->token);
                 state->ir.is_valid = false;
-                stack_pop(&state->search_scopes);
                 break;
             }
 
-            if (expr.emmited_op->operation != IR_GLOBAL) {
+            if ((expr.emmited_op->operation != IR_PUSH_GLOBAL) && (expr.emmited_op->operation != IR_PUSH_STACK)) {
                 log_error_token("Bad access target: ", node->left->token);
                 state->ir.is_valid = false;
-                stack_pop(&state->search_scopes);
                 break;
             }
 
-            // expr.emmited_op.string = ;
+            // TODO: here we set code for loading real address,
+            // because before we added offset of variable in type!
+            // not the real offset
+            //
+            // so get (struct addr) + (offset, size)
 
-            for (u64 i = 0; i < state->search_scopes.index; i++) {
-                stack_push(&expr.search_info, state->search_scopes.data[i]);
-            }
 
-            stack_pop(&state->search_scopes);
             return expr;
 
         case AST_ARRAY_ACCESS: // @todo finish
@@ -359,7 +358,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                 state->ir.is_valid = false;
             } else {
                 expr.emmited_op->operation = IR_STORE;
-                expr.emmited_op->search_info = expr.search_info;
             }
             return expr;
 
@@ -371,9 +369,16 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                 log_error_token("Bad assignment expression: ", node->left->token);
                 state->ir.is_valid = false;
             } else {
-                expr.emmited_op->operation = IR_LEA;
-                expr.emmited_op->search_info = expr.search_info;
-                emit_op(state, IR_STORE, node->left->token, 0);
+                if (expr.emmited_op->operation == IR_PUSH_GLOBAL) {
+                    expr.emmited_op->operation = IR_PUSH_GEA;
+                } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
+                    expr.emmited_op->operation = IR_PUSH_SEA;
+                } else {
+                    expr.emmited_op->operation = IR_INVALID;
+                }
+
+                expr.offset += 0; // struct offset
+                emit_op(state, IR_STORE, node->left->token, expr.offset);
             }
             break;
 
@@ -389,9 +394,15 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                         log_error_token("Bad swap part: ", next->token);
                         state->ir.is_valid = false;
                     } else {
-                        expr.emmited_op->operation = IR_LEA;
-                        expr.emmited_op->search_info = expr.search_info;
-                        emit_op(state, IR_STORE, next->token, 0);
+                        if (expr.emmited_op->operation == IR_PUSH_GLOBAL) {
+                            expr.emmited_op->operation = IR_PUSH_GEA;
+                        } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
+                            expr.emmited_op->operation = IR_PUSH_SEA;
+                        } else {
+                            expr.emmited_op->operation = IR_INVALID;
+                        }
+
+                        emit_op(state, IR_STORE, next->token, expr.offset);
                     }
 
                     next = next->list_next;
@@ -454,12 +465,15 @@ void compile_variable(ir_state_t *state, ast_node_t *node) {
     }
 
     ir_variable_t var = {};
+    assert(entry->info.offset == 0);
+    entry->info.offset = state->current_function->vars.count;
     var.size      = 8;
     var.alignment = 8;
+    var.entry     = entry;
     state->current_function->vars += var;
 
     emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
-    emit_op(state, IR_STORE, node->token, 0);
+    emit_op(state, IR_STORE, node->token, var.entry->info.offset);
 }
 
 void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
@@ -477,12 +491,15 @@ void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
         }
 
         ir_variable_t var = {};
+        assert(entry->info.offset == 0);
+        entry->info.offset = state->current_function->vars.count;
         var.size      = 8;
         var.alignment = 8;
+        var.entry     = entry;
         state->current_function->vars += var;
 
         emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
-        emit_op(state, IR_STORE, node->token, 0);
+        emit_op(state, IR_STORE, next->token, var.entry->info.offset);
 
         next = next->list_next;
     }
@@ -549,6 +566,7 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
         case AST_RET_STMT: 
             {
                 compile_expression(state, node->left, {});
+                emit_op(state, IR_STACK_FRAME_POP, node->token, 0);
                 emit_op(state, IR_RET, node->token, 0);
             }
             break;
@@ -580,6 +598,9 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
     array_create(&func.code, 8, state->ir.code);
     state->current_function = &func;
+
+    emit_op(state, IR_STACK_FRAME_PUSH, entry->node->token, 0);
+
     stack_push(&state->search_scopes, &entry->func_params);
     {
         //                      def -> type -> params
@@ -592,12 +613,15 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             UNUSED(entry); // here we check types, etc
             
             ir_variable_t var = {};
+            assert(entry->info.offset == 0);
+            entry->info.offset = func.vars.count;
             var.size      = 8;
             var.alignment = 8;
-            func.vars += var;
+            var.entry     = entry;
+            func.vars    += var;
 
             emit_op(state, IR_ALLOC, node->token, var.size); 
-            emit_op(state, IR_STORE, node->token, 0);
+            emit_op(state, IR_STORE, next->token, var.entry->info.offset);
 
             next = next->list_next;
         }
@@ -605,9 +629,16 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         compile_block(state, entry->expr);
 
         if (entry->return_typenames.count == 0) {
+            emit_op(state, IR_STACK_FRAME_POP, node->token, 0);
             emit_op(state, IR_RET, entry->node->token, 0);
         } else {
             emit_op(state, IR_INVALID, entry->node->token, 0);
+        }
+
+        for (u64 i = 0; i < func.vars.count; i++) {
+            log_update_color();
+            string_t ts = func.vars[i].entry->node->token.data.string;
+            printf("VAR: size: %2u, align: %2u, %.*s\n", func.vars[i].size, func.vars[i].alignment, (u32)ts.size, ts.data);
         }
 
 #ifdef VERBOSE

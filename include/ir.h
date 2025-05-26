@@ -26,21 +26,23 @@
 enum ir_codes_t {
     IR_NOP = 0x0,
 
-    // Push operations
-    IR_PUSH_SIGN,   // Push signed 64-bit integer
-    IR_PUSH_UNSIGN, // Push unsigned 64-bit integer
-    IR_PUSH_F32,    // Push 32-bit float
-    IR_PUSH_F64,    // Push 64-bit float
-
     // Stack manipulation
+    IR_PUSH_SIGN,   // Push s64 integer
+    IR_PUSH_UNSIGN, // Push u64 integer
+    
+    IR_PUSH_STACK,  // Push stack  variable          (offset)
+    IR_PUSH_GLOBAL, // Push global variable          (offset)
+    IR_PUSH_GEA,    // Push global effective address (offset)
+    IR_PUSH_SEA,    // Push stack  effective address (offset)
+
     IR_POP,         // Pop top of stack
     IR_CLONE,       // Duplicate top element
-
-    // Memory operations for ir
-    IR_GLOBAL,      // Push global variable   (variable index)
-    IR_LEA,         // Load effective address (variable index)
     
     // ------- second stack memory!
+    
+    IR_STACK_FRAME_PUSH,
+    IR_STACK_FRAME_POP,
+
     IR_ALLOC,       // Allocate memory   (amount)
     IR_FREE,        // Free     memory   (amount)
     IR_LOAD,        // Load from address [address]
@@ -95,8 +97,6 @@ struct ir_opcode_t {
     token_t info;       // Source token for debugging
     u64     index;
 
-    stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
-
     union {
         u64 u_operand;
         s64 s_operand;
@@ -108,12 +108,13 @@ struct ir_opcode_t {
 
 struct ir_variable_t {
     u32 size, alignment;
+    scope_entry_t *entry;
 };
 
 struct ir_function_t {
     b32 is_valid;
     
-    array_t<ir_opcode_t> code;
+    array_t<ir_opcode_t>  code;
     list_t<ir_variable_t> vars;
 };
 
@@ -122,7 +123,7 @@ struct ir_t {
 
     allocator_t code;
     hashmap_t<string_t, ir_function_t> functions;
-    hashmap_t<string_t, scope_entry_t> variables;
+    hashmap_t<string_t, ir_variable_t> variables;
     // hashmap_t<string_t, u8> strings;
 };
 

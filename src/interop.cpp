@@ -40,7 +40,7 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             stack_push(&state->exec_stack, val);
         } break;
             
-        case IR_GLOBAL: {
+        case IR_PUSH_GLOBAL: {
             // interpreter_push(state, 0xDEADBEEF);
         } break;
             
