@@ -194,12 +194,13 @@ static bind_power_t get_infix_bind_power(token_t token) {
         case '/':
         case '%': return {13, 14};
 
-        case '^': return {15, 16};
-        case '|': return {17, 18};
-        case '&': return {19, 20};
         case TOKEN_LSHIFT: 
         case TOKEN_RSHIFT: 
-                  return {21, 22};
+                  return {15, 16};
+
+        case '^': return {17, 18};
+        case '|': return {19, 20};
+        case '&': return {21, 22};
 
         // prefixes are here
         // postfixes are here

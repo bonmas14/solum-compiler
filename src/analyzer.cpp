@@ -984,7 +984,6 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
     u32 ioff = 0;
     if (offset == NULL) offset = &ioff;
 
-
     ast_node_t *type_node = node->right;
 
     if (type_node->type != AST_MUL_TYPES) {
