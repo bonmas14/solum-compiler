@@ -1,6 +1,7 @@
 #include "strings.h"
 #include "memctl.h"
 #include "logger.h"
+#include "allocator.h"
 #include "talloc.h"
 #include <stdarg.h>
 
@@ -258,34 +259,37 @@ s64 string_last_index_of(string_t input, u8 value) {
     return index;
 }
 
-static u64 format_u64(u8 *buffer, u64 value) {
+static string_t format_u64(u64 value) {
     if (value == 0) {
-        buffer[0] = '0';
-        return 1;
+        return STRING("0");
     }
+ 
+    allocator_t *talloc = get_temporary_allocator();
+    string_t     output = {};
 
-    u64 offset = 0;
     while (value) {
-        buffer[offset++] = '0' + (value % 10);
+        u8 digit = '0' + (value % 10);
+        output = string_concat(output, { 1, &digit }, talloc);
         value /= 10;
     }
 
-    for (u64 l = 0, r = offset - 1; l < r; l++, r--) {
-        u8 t      = buffer[l];
-        buffer[l] = buffer[r];
-        buffer[r] = t;
+    for (u64 l = 0, r = output.size - 1; l < r; l++, r--) {
+        u8 t           = output[l];
+        output.data[l] = output[r];
+        output.data[r] = t;
     }
 
-    return offset;
+    return output;
 }
 
-static u64 format_s64(u8 *buffer, s64 value) {
+static string_t format_s64(s64 value) {
     if (value == 0) {
-        buffer[0] = '0';
-        return 1;
+        return STRING("0");
     }
+ 
+    allocator_t *talloc = get_temporary_allocator();
+    string_t     output = {};
 
-    u64 offset = 0;
     b32 negative = false;
 
     if (value < 0) {
@@ -294,21 +298,23 @@ static u64 format_s64(u8 *buffer, s64 value) {
     }
 
     while (value) {
-        buffer[offset++] = '0' + (value % 10);
+        u8 digit = '0' + (value % 10);
+        output = string_concat(output, { 1, &digit }, talloc);
         value /= 10;
     }
 
     if (negative) {
-        buffer[offset++] = '-';
+        u8 sign = '-';
+        output = string_concat(output, { 1, &sign }, talloc);
     }
 
-    for (u64 l = 0, r = offset - 1; l < r; l++, r--) {
-        u8 t      = buffer[l];
-        buffer[l] = buffer[r];
-        buffer[r] = t;
+    for (u64 l = 0, r = output.size - 1; l < r; l++, r--) {
+        u8 t           = output[l];
+        output.data[l] = output[r];
+        output.data[r] = t;
     }
 
-    return offset;
+    return output;
 }
 
 string_t string_format(allocator_t *alloc, string_t buffer...) {
@@ -318,34 +324,30 @@ string_t string_format(allocator_t *alloc, string_t buffer...) {
     va_list args;
     va_start(args, buffer);
     
-    u64 max_size   = PG(1);
-    u64 curr_index = 0;
-    u8 *output = (u8*)mem_alloc(alloc, max_size);
+    allocator_t *talloc = get_temporary_allocator();
+
+    string_t o = {};
     
     for (u64 i = 0; i < buffer.size; i++) {
-        if (buffer[i++] != '%') {
-            output[curr_index++] = buffer[i - 1];
+        if (buffer[i] != '%') {
+            o = string_concat(o, { 1, buffer.data + i }, talloc);
             continue;
         }
 
-        switch (buffer[i]) {
+        switch (buffer[++i]) {
             case 'u':
             {
-                u64 arg = va_arg(args, u64);
-                curr_index += format_u64(output + curr_index, arg);
+                o = string_concat(o, format_u64(va_arg(args, u64)), talloc);
             } break;
 
             case 'd': 
             {
-                s64 arg = va_arg(args, s64);
-                curr_index += format_s64(output + curr_index, arg);
+                o = string_concat(o, format_s64(va_arg(args, s64)), talloc);
             } break;
 
             case 's':
             {
-                string_t arg = va_arg(args, string_t);
-                mem_move(output + curr_index, arg.data, arg.size);
-                curr_index += arg.size;
+                o = string_concat(o, va_arg(args, string_t), talloc);
             } break;
             default: break;
         }
@@ -354,7 +356,7 @@ string_t string_format(allocator_t *alloc, string_t buffer...) {
     // va_arg(args, long long);
 
     va_end(args);
-    return { curr_index, output };
+    return string_copy(o, alloc);
 }
 
 
@@ -454,6 +456,8 @@ void string_tests(void) {
     assert(string_last_index_of(STRING("https://github.com/bonmas14"), (u8)'/') == 18);
 
     assert(!string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
+
+    assert(!string_compare(string_format(alloc, STRING("/path/%s/unix/a %d %u"), STRING("test"), (s64)-100, (u64)404), STRING("/path/test/unix/a -100 404"))); 
 
     temp_reset();
 #endif

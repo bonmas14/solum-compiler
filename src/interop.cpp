@@ -1,10 +1,12 @@
-#include <interop.h>
+#include "interop.h"
 
 #include "ir.h"
 #include "analyzer.h"
 #include "list.h"
 #include "stack.h"
 #include "hashmap.h"
+#include "talloc.h"
+#include "strings.h"
 #include <math.h>
 
 struct interpreter_state_t {
@@ -211,6 +213,7 @@ void interop_func(ir_t *ir, string_t func_name) {
 
     while (state.running && state.ip < func.code.count) {
         ir_opcode_t op = func.code[state.ip];
+        log_info(string_format(get_temporary_allocator(), STRING("ex: %u, data: %u"), state.exec_stack.index, state.data_stack.index));
         state.ip++;
         execute_ir_opcode(&state, op);
 

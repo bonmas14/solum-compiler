@@ -132,7 +132,7 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
 
 // ------ // 
 
-void compile_statement(ir_state_t *state, ast_node_t *node);
+u64 compile_statement(ir_state_t *state, ast_node_t *node);
 
 scope_entry_t *search_identifier(ir_state_t *state, string_t key, string_t shadow) {
     b32 shadowed = false;
@@ -445,15 +445,21 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
 
     ast_node_t *stmt = node->list_start;
 
+    u64 alloc_size = 0;
     for (u64 i = 0; i < node->child_count; i++) {
-        compile_statement(state, stmt);
+        alloc_size += compile_statement(state, stmt);
+        
         stmt = stmt->list_next;
+    }
+
+    if (alloc_size) {
+        emit_op(state, IR_FREE, node->token, alloc_size);
     }
 
     stack_pop(&state->search_scopes);
 }
 
-void compile_variable(ir_state_t *state, ast_node_t *node) {
+u64 compile_variable(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
     scope_entry_t *entry = search_identifier(state, node->token.data.string, {});
@@ -475,11 +481,13 @@ void compile_variable(ir_state_t *state, ast_node_t *node) {
 
     emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
     emit_op(state, IR_STORE, node->token, var.entry->info.offset);
+    return var.size;
 }
 
-void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
+u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
+    u64 alloc_size = 0;
     ast_node_t *next = node->list_start;
     for (u64 i = 0; i < node->child_count; i++) {
         scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
@@ -501,17 +509,20 @@ void compile_mul_variables(ir_state_t *state, ast_node_t *node) {
 
         emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
         emit_op(state, IR_STORE, next->token, var.entry->info.offset);
+        alloc_size += var.size;
 
         next = next->list_next;
     }
+
+    return alloc_size;
 }
 
-void compile_statement(ir_state_t *state, ast_node_t *node) {
+u64 compile_statement(ir_state_t *state, ast_node_t *node) {
     switch (node->type) {
-        case AST_BIN_UNKN_DEF:  compile_variable(state, node); break;
-        case AST_UNARY_VAR_DEF: compile_variable(state, node); break;
-        case AST_BIN_MULT_DEF:  compile_mul_variables(state, node); break;
-        case AST_TERN_MULT_DEF: compile_mul_variables(state, node); break;
+        case AST_BIN_UNKN_DEF:  return compile_variable(state, node); break;
+        case AST_UNARY_VAR_DEF: return compile_variable(state, node); break;
+        case AST_BIN_MULT_DEF:  return compile_mul_variables(state, node); break;
+        case AST_TERN_MULT_DEF: return compile_mul_variables(state, node); break;
 
         case AST_BLOCK_IMPERATIVE: compile_block(state, node); break;
 
@@ -586,6 +597,8 @@ void compile_statement(ir_state_t *state, ast_node_t *node) {
             compile_expression(state, node, {});
             break;
     }
+
+    return 0;
 }
 
 void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
