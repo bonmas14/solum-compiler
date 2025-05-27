@@ -1,7 +1,3 @@
-HANDLE: struct = {
-    _: ^void;
-};
-
 /* @todo: enums
 Win_Std_Handles: enum(s32) = {
     STD_INPUT_HANDLE  = -10,
@@ -15,7 +11,7 @@ win_get_last_error: (
 
 win_get_std_handle: (
     nStdHandle: s32
-) -> HANDLE = external "kernel32.lib" as "GetStdHandle";
+) -> ^void = external "kernel32.lib" as "GetStdHandle";
 
 // ---
 win_alloc_console: (
@@ -34,7 +30,7 @@ win_attach_console: (
 
 // ---
 win_write_console: (
-    hConsoleOutput:          HANDLE,
+    hConsoleOutput:         ^void,
     lpBuffer:               ^void,
     nNumberOfCharsToWrite:   s32,
     lpNumberOfCharsWritten: ^s32,
@@ -43,7 +39,7 @@ win_write_console: (
 
 // ---
 win_read_console: (
-    hConsoleInput:        HANDLE,
+    hConsoleInput:       ^void,
     lpBuffer:            ^void,
     nNumberOfCharsToRead: s32,
     lpNumberOfCharsRead: ^s32,

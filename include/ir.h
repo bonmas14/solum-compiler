@@ -115,7 +115,7 @@ struct ir_function_t {
     b32 is_valid;
     
     array_t<ir_opcode_t>  code;
-    list_t<ir_variable_t> vars;
+    u64 stack_index;
 };
 
 struct ir_t {
@@ -123,7 +123,7 @@ struct ir_t {
 
     allocator_t code;
     hashmap_t<string_t, ir_function_t> functions;
-    hashmap_t<string_t, ir_variable_t> variables;
+    list_t<ir_variable_t>              globals;
     // hashmap_t<string_t, u8> strings;
 };
 

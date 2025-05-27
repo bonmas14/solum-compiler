@@ -359,8 +359,6 @@ string_t string_format(allocator_t *alloc, string_t buffer...) {
     return string_copy(o, alloc);
 }
 
-
-
 void string_tests(void) {
 #ifdef DEBUG
     temp_reset();

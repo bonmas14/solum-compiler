@@ -36,7 +36,7 @@ struct type_info_t {
     u32 type;
     b32 is_array;
     u32 array_size;
-    u32 offset;        // struct offset/or just offset of type in valiable
+    u32 offset;        // struct offset
     u32 size;          // var size
     u32 pointer_depth;
     string_t type_name;
@@ -69,6 +69,11 @@ struct scope_entry_t {
 
     // ENTRY_VAR
     type_info_t info;
+
+    // -------- info for IR
+
+    b32 on_stack;
+    u32 offset;
 };
 
 enum entry_type_t {

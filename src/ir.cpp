@@ -19,6 +19,8 @@
             emit_op(state, tok, node->token, 0);\
             break;
 
+
+
 struct ir_state_t {
     compiler_t *compiler;
     ir_t ir;
@@ -132,7 +134,7 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
 
 // ------ // 
 
-u64 compile_statement(ir_state_t *state, ast_node_t *node);
+u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size);
 
 scope_entry_t *search_identifier(ir_state_t *state, string_t key, string_t shadow) {
     b32 shadowed = false;
@@ -240,12 +242,17 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                             break;
                         }
 
-                        // IR_PUSH_GLOBAL | IR_PUSH_STACK
-
                         expr.accessable = true;
-                        expr.offset     = entry->info.offset;
-                        expr.emmited_op = emit_op(state, IR_PUSH_STACK, node->token, entry->info.offset);
-                        // @todo, this should be already created stuff...
+                        expr.offset     = entry->offset;
+
+                        if (entry->on_stack) {
+                            expr.emmited_op = emit_op(state, IR_PUSH_STACK,  node->token, expr.offset);
+                        } else {
+                            expr.emmited_op = emit_op(state, IR_PUSH_GLOBAL, node->token, expr.offset);
+                        }
+
+                        expr.emmited_op->string = node->token.data.string;
+
                         return expr;
                     } break;
                 case TOK_TRUE:
@@ -314,6 +321,9 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             break;
 
         case AST_MEMBER_ACCESS:
+            log_error("Structs TODO:");
+            break;
+
             assert(node->left->type       == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
 
@@ -427,8 +437,11 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             }
             break;
 
+        case AST_EMPTY:
+            break;
+
         default:
-            log_error("UNKN!!!");
+            log_error_token("UNKN!!!", node->token);
             break;
     }
 
@@ -447,13 +460,15 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
 
     u64 alloc_size = 0;
     for (u64 i = 0; i < node->child_count; i++) {
-        alloc_size += compile_statement(state, stmt);
+        alloc_size += compile_statement(state, stmt, alloc_size);
         
-        stmt = stmt->list_next;
+        if (stmt->list_next) {
+            stmt = stmt->list_next;
+        }
     }
 
     if (alloc_size) {
-        emit_op(state, IR_FREE, node->token, alloc_size);
+        emit_op(state, IR_FREE, stmt->token, alloc_size);
     }
 
     stack_pop(&state->search_scopes);
@@ -471,17 +486,12 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
         emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
     }
 
-    ir_variable_t var = {};
-    assert(entry->info.offset == 0);
-    entry->info.offset = state->current_function->vars.count;
-    var.size      = 8;
-    var.alignment = 8;
-    var.entry     = entry;
-    state->current_function->vars += var;
+    entry->offset   = state->current_function->stack_index++;
+    entry->on_stack = true;
 
-    emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
-    emit_op(state, IR_STORE, node->token, var.entry->info.offset);
-    return var.size;
+    emit_op(state, IR_ALLOC, node->token, 8); // here we get the type size
+    emit_op(state, IR_STORE, node->token, entry->offset);
+    return 8;
 }
 
 u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
@@ -499,17 +509,12 @@ u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
             emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
         }
 
-        ir_variable_t var = {};
-        assert(entry->info.offset == 0);
-        entry->info.offset = state->current_function->vars.count;
-        var.size      = 8;
-        var.alignment = 8;
-        var.entry     = entry;
-        state->current_function->vars += var;
+        entry->offset   = state->current_function->stack_index++;
+        entry->on_stack = true;
 
-        emit_op(state, IR_ALLOC, node->token, var.size); // here we get the type size
-        emit_op(state, IR_STORE, next->token, var.entry->info.offset);
-        alloc_size += var.size;
+        emit_op(state, IR_ALLOC, node->token, 8); // here we get the type size
+        emit_op(state, IR_STORE, next->token, entry->offset);
+        alloc_size += 8;
 
         next = next->list_next;
     }
@@ -517,7 +522,7 @@ u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     return alloc_size;
 }
 
-u64 compile_statement(ir_state_t *state, ast_node_t *node) {
+u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size = 0) {
     switch (node->type) {
         case AST_BIN_UNKN_DEF:  return compile_variable(state, node); break;
         case AST_UNARY_VAR_DEF: return compile_variable(state, node); break;
@@ -562,7 +567,7 @@ u64 compile_statement(ir_state_t *state, ast_node_t *node) {
                 end = emit_op(state, IR_JUMP_IF_NOT, node->token, 0);
                 compile_block(state, node->right);
                 emit_op(state, IR_JUMP, node->token, -((state->current_function->code.count + 1) - pos), 0);
-                end->s_operand = state->current_function->code.count - end->index; // @todo, this could be a problem...
+                end->s_operand = state->current_function->code.count - end->index - 1; // @todo, this could be a problem...
             
                 while (start_continue_index < state->continue_stmt.index) {
                     ir_opcode_t *op = stack_pop(&state->continue_stmt);
@@ -578,17 +583,20 @@ u64 compile_statement(ir_state_t *state, ast_node_t *node) {
         case AST_RET_STMT: 
             {
                 compile_expression(state, node->left, {});
+                emit_op(state, IR_FREE, node->token, alloc_size);
                 emit_op(state, IR_STACK_FRAME_POP, node->token, 0);
                 emit_op(state, IR_RET, node->token, 0);
             }
             break;
         case AST_BREAK_STMT: 
             {
+                emit_op(state, IR_FREE, node->token, alloc_size);
                 stack_push(&state->break_stmt, emit_op(state, IR_JUMP, node->token, 0)); // jump outa loop
             }
             break;
         case AST_CONTINUE_STMT:
             {
+                emit_op(state, IR_FREE, node->token, alloc_size);
                 stack_push(&state->continue_stmt, emit_op(state, IR_JUMP, node->token, 0)); // jump to start of loop
             }
             break;
@@ -615,10 +623,9 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     array_create(&func.code, 8, state->ir.code);
     state->current_function = &func;
 
-    emit_op(state, IR_STACK_FRAME_PUSH, entry->node->token, 0);
-
     stack_push(&state->search_scopes, &entry->func_params);
     {
+        emit_op(state, IR_STACK_FRAME_PUSH, entry->node->token, 0);
         //                      def -> type -> params
         ast_node_t *node = entry->node->left->left;
         ast_node_t *next = node->list_start;
@@ -626,18 +633,11 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         for (u64 i = 0; i < node->child_count; i++) {
             scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
-            UNUSED(entry); // here we check types, etc
-            
-            ir_variable_t var = {};
-            assert(entry->info.offset == 0);
-            entry->info.offset = func.vars.count;
-            var.size      = 8;
-            var.alignment = 8;
-            var.entry     = entry;
-            func.vars    += var;
+            entry->offset   = state->current_function->stack_index++;
+            entry->on_stack = true;
 
-            emit_op(state, IR_ALLOC, node->token, var.size); 
-            emit_op(state, IR_STORE, next->token, var.entry->info.offset);
+            emit_op(state, IR_ALLOC, node->token, 8); 
+            emit_op(state, IR_STORE, next->token, entry->offset);
 
             next = next->list_next;
         }
@@ -649,12 +649,6 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             emit_op(state, IR_RET, entry->node->token, 0);
         } else {
             emit_op(state, IR_INVALID, entry->node->token, 0);
-        }
-
-        for (u64 i = 0; i < func.vars.count; i++) {
-            log_update_color();
-            string_t ts = func.vars[i].entry->node->token.data.string;
-            printf("VAR: size: %2u, align: %2u, %.*s\n", func.vars[i].size, func.vars[i].alignment, (u32)ts.size, ts.data);
         }
 
 #ifdef VERBOSE
@@ -678,8 +672,18 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 }
 
 void evaluate_variable(ir_state_t *state, scope_entry_t *entry) {
-    UNUSED(state);
-    UNUSED(entry);
+    if (entry->expr) {
+        // ir_expression_t expr = evaluate_expression(state, entry->expr, node->token.data.string);
+        // UNUSED(expr);
+    }
+
+    ir_variable_t var = {};
+    entry->offset   = state->ir.globals.count;
+    entry->on_stack = false;
+    var.size      = 8;
+    var.alignment = 8;
+    var.entry     = entry;
+    state->ir.globals += var;
 }
 
 void compile_global_statement(ir_state_t *state, string_t key, scope_entry_t *entry) {
@@ -716,17 +720,33 @@ ir_t compile_program(compiler_t *compiler) {
 
     stack_push(&state.search_scopes, scope);
 
+    // compiling globals
     for (u64 i = 0; i < scope->capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> pair = scope->entries[i];
+        kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
     
-        if (!pair.occupied) continue;
-        if (pair.deleted)   continue;
+        if (!pair->occupied) continue;
+        if (pair->deleted)   continue;
 
-        if (pair.value.type == ENTRY_TYPE) {
+        if (pair->value.type != ENTRY_VAR) {
             continue;
         }
 
-        compile_global_statement(&state, pair.key, &pair.value);
+        compile_global_statement(&state, pair->key, &pair->value);
+    }
+
+    // compiling code, functions
+    for (u64 i = 0; i < scope->capacity; i++) {
+        kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
+    
+        if (!pair->occupied) continue;
+        if (pair->deleted)   continue;
+
+        if (pair->value.type == ENTRY_TYPE
+        ||  pair->value.type == ENTRY_VAR) {
+            continue;
+        }
+
+        compile_global_statement(&state, pair->key, &pair->value);
     }
 
     stack_delete(&state.search_scopes);

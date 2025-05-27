@@ -476,6 +476,20 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         case AST_SEPARATION: {
             ast_node_t *next = expr->list_start;
 
+            /* I dont really know if it works as intended...
+             *
+             * @todo @fix @bug.
+             *
+             * return func(1, 2); // is a bug without it, because we use AST_SEPARATION in return statement
+             *
+            if (expr->child_count == 1) {
+                if (!analyze_expression(state, -1, depend_on, next)) {
+                    result = false;
+                }
+                break;
+            }
+            */
+
             if (expected_count_of_expressions >= 0) {
                 if (expr->child_count != (u64)expected_count_of_expressions) {
                     log_error_token("Not expected count of elements", expr->token);
@@ -635,8 +649,9 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
     b32 is_indirect = false;
 
     // @todo:
-    // the problem is that if we have arrays, we should be able to create array of pointers or pointer to array of pointers...
-    //
+    // the problem is that if we have arrays,
+    // we should be able to create array of pointers 
+    // or pointer to array of pointers...
 
     if (type->type == AST_ARR_TYPE) {
         b32 result = analyze_expression(state, -1, NULL, type->left);
@@ -646,7 +661,6 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
             return false;
         }
 
-        // we need to set size... here @todo
         entry->info.is_array = true;
         type = type->right;
     }
@@ -696,11 +710,11 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
             case AST_MUL_AUTO:
             case AST_AUTO_TYPE:
                 assert(expr != NULL);
-
                 log_error_token("Cant evaluate the types right now...", type->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
                 return false;
+
             case AST_ARR_TYPE:
             case AST_PTR_TYPE:
                 assert(false);
@@ -1281,6 +1295,9 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
 }
 
 b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
+    log_error_token("TODO: structs", node->token);
+    return false;
+
     assert(state != NULL);
     assert(node != NULL);
     assert(node->type == AST_STRUCT_DEF);
@@ -1327,10 +1344,15 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
 
     node->analyzed = true;
 
+    u64 size = 0;
+
     return result;
 }
 
 b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
+    log_error_token("TODO: union", node->token);
+    return false;
+
     assert(state != NULL);
     assert(node != NULL);
     assert(node->type == AST_UNION_DEF);
@@ -1344,8 +1366,8 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
         return false;
     }
 
-    entry->node  = node;
-    entry->type  = ENTRY_TYPE;
+    entry->node = node;
+    entry->type = ENTRY_TYPE;
     entry->def_type = DEF_TYPE_UNION;
     if (!entry->scope.entries) {
         entry->scope = create_scope();
@@ -1375,6 +1397,9 @@ b32 analyze_union(analyzer_state_t *state, ast_node_t *node) {
 }
 
 b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
+    log_error_token("TODO: enums", node->token);
+    return false;
+
     assert(state != NULL);
     assert(node != NULL);
     assert(node->type == AST_ENUM_DEF);

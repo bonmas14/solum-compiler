@@ -109,13 +109,10 @@ void compile(string_t filename) {
     // or there is an error
 
     if (result.is_valid) {
-        log_info(STRING("Compiled successfully!!!!!"));
         interop_func(&result, STRING("main"));
     } else {
-        log_error(STRING("NOT COMPILED!@!!!LJ#LKj !!!!!"));
+        log_error(STRING("NOT COMPILED"));
     }
-
-
 
     // codegen from IR here
     return;

@@ -11,22 +11,32 @@
 
 struct interpreter_state_t {
     b32 running;
+    ir_t *ir;
     u64 ip;
     stack_t<u64> fp;
     stack_t<s64> exec_stack;
     stack_t<s64> data_stack;
+    stack_t<ir_function_t*> curr_func;
 };
 
 static s64 allocate_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
 
     stack_push(&state->data_stack, (s64) 0);
-    return (state->data_stack.index - 1) * sizeof(s64);
+    return (state->data_stack.index - 1);
 }
 
 static void free_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
     stack_pop(&state->data_stack);
+}
+
+static void push_function(interpreter_state_t *state, string_t string) {
+    stack_push(&state->curr_func, hashmap_get(&state->ir->functions, string));
+}
+
+static void pop_function(interpreter_state_t *state) {
+    stack_pop(&state->curr_func);
 }
 
 static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
@@ -55,12 +65,12 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
         } break;
         case IR_PUSH_SEA: 
         {
-            log_warning("push addr from stack");
+            stack_push(&state->exec_stack, (s64)op.u_operand);
         } break;
 
         case IR_PUSH_GLOBAL: 
         {
-            log_warning("push from global");
+            stack_push(&state->exec_stack, (s64) 0);
         } break;
         case IR_PUSH_GEA: 
         {
@@ -90,13 +100,14 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             
         case IR_LOAD: {
             s64 addr = stack_pop(&state->exec_stack);
-            s64 val  = 404;
+            s64 val  = state->data_stack.data[addr];
             stack_push(&state->exec_stack, val);
         } break;
             
         case IR_STORE: {
             s64 addr = stack_pop(&state->exec_stack);
             s64 val  = stack_pop(&state->exec_stack);
+            state->data_stack.data[addr] = val;
         } break;
             
         case IR_ADD: {
@@ -179,7 +190,19 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
         } break;
 
         case IR_RET: {
-            state->running = false;
+            if (state->data_stack.index == 0) {
+                state->running = false;
+            } else {
+                s64 ip_addr = stack_pop(&state->data_stack);
+                state->ip = (u64)ip_addr; // assume that it will be not too big...
+                pop_function(state);
+            }
+        } break;
+        case IR_CALL:
+        {
+            push_function(state, op.string);
+            stack_push(&state->data_stack, (s64)state->ip);
+            state->ip = 0;
         } break;
 
         case IR_CALL_EXTERN: {
@@ -209,20 +232,18 @@ void interop_func(ir_t *ir, string_t func_name) {
     interpreter_state_t state = {};
     state.running = true;
 
-    ir_function_t func = *ir->functions[func_name];
+    state.ir = ir;
 
-    while (state.running && state.ip < func.code.count) {
-        ir_opcode_t op = func.code[state.ip];
-        log_info(string_format(get_temporary_allocator(), STRING("ex: %u, data: %u"), state.exec_stack.index, state.data_stack.index));
-        state.ip++;
+    stack_push(&state.curr_func, ir->functions[func_name]);
+    while (state.running) {
+        ir_function_t *func = stack_peek(&state.curr_func);
+        ir_opcode_t op = func->code[state.ip++];
         execute_ir_opcode(&state, op);
-
 #ifdef VERBOSE
+        log_info(string_format(get_temporary_allocator(), STRING("e:%u d:%u"), (u64)state.exec_stack.index, (u64)state.data_stack.index));
         print_ir_opcode(op);
 #endif
     }
 
-    if (state.running) {
-        log_error("Unexpected value.");
-    }
+    log_info(string_format(get_temporary_allocator(), STRING("%d"), (s64)stack_pop(&state.exec_stack)));
 }
