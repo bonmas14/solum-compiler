@@ -252,10 +252,22 @@ b32 add_var_type_into_search(analyzer_state_t *state, scope_entry_t *output) {
 }
 
 
-void set_std_info(token_t token, type_info_t *info) {
+b32 compare_std_info(type_info_t lhs, type_info_t rhs) {
+    if (lhs.type != rhs.type) {
+        return false;
+    }
+
+    if (lhs.type != TYPE_UNKN) {
+        return false;
+    }
+
+    return string_compare(lhs.type_name, rhs.type_name) == 0;
+}
+
+void set_std_info(u64 token_type, type_info_t *info) {
     assert(info != NULL);
 
-    switch (token.type) {
+    switch (token_type) {
         case TOK_S8:  info->type = TYPE_s8;  info->size = 1; break;
         case TOK_S16: info->type = TYPE_s16; info->size = 2; break;
         case TOK_S32: info->type = TYPE_s32; info->size = 4; break;
@@ -704,7 +716,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                 }
             case AST_STD_TYPE:
                 entry->type = ENTRY_VAR;
-                set_std_info(type->token, &entry->info);
+                set_std_info(type->token.type, &entry->info);
                 break;
 
             case AST_MUL_AUTO:
@@ -868,7 +880,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
                         break;
                     }
                 case AST_STD_TYPE:
-                    set_std_info(curr->token, &info);
+                    set_std_info(curr->token.type, &info);
                     break;
 
 
@@ -1444,7 +1456,7 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
         if (!pair->occupied) continue;
         if (pair->deleted)   continue;
 
-        set_std_info(node->right->token, &pair->value.info);
+        set_std_info(node->right->token.type, &pair->value.info);
     }
 
     node->analyzed = true;

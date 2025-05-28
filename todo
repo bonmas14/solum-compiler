@@ -1,8 +1,6 @@
 - create allocator functions that will check if pointer inside of theirs function
 for debug purposes
 
-- we dont know how to merge scopes and resolve named includes
-
 - constants
 
 - we have complie flag... just validate a node and try to compile function body
@@ -16,13 +14,14 @@ ideas:
 - soft inlining - is when compiler generates output source code but inlines all of functions on source level. 
 could be great for debug purposes?
 
+- global variables
 
 - allocators shouldn't be pointers!
 
 - harmonize names
 
 
-- fix the alignment and make structs alignment.
+X- fix the alignment and make structs alignment.
 
 simple algoritm:
 

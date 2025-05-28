@@ -1,7 +1,20 @@
 // This is core module for our compiler
 
+putchar: (char: u32) = external "compiler";
 
 
-add_source_file : (file : ^u8) -> b32 = {
+console_clear: () = {
+    putchar(0x1b);
+    putchar(0x5b);
+    putchar(0x32);
+    putchar(0x4a);
+}
 
+console_cursor_reset: () = {
+    putchar(0x1b);
+    putchar(0x5b);
+    putchar(0x31);
+    putchar(0x3b);
+    putchar(0x31);
+    putchar(0x48);
 }

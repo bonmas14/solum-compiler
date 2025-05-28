@@ -1,16 +1,19 @@
-use: "win";
+use: "core";
 
-array:  [100, 100]u8;
-width:  s64 = 100;
-height: s64 = 100;
-cout : ^void;
+array: ^u8;
+w: s64 = 60;
+h: s64 = 30;
 
-main: () -> s32 = {
-    cout = win_get_std_handle(-10);
+main: () -> s64 = {
+    i : s64 = 0;
 
-    while true {
+    console_clear();
+    console_cursor_reset();
+
+    while i < 256 {
         step();
         draw();
+        i = i + 1;
     }
 
     return 0;
@@ -18,41 +21,42 @@ main: () -> s32 = {
 
 step: () = {
     i : s64 = 0; 
-    
-    cx, cy : s64;
 
     // cleaning state
-    while i < width * height {
-        x, y : s64 = i % width, i / width;
-        cell : ^u8 = array + x + y * width;
+    while i < w * h {
+        x, y : s64 = i % w, i / w;
+        cell : ^u8 = array + x + y * w;
         @cell = @cell & 0x80;
+        i = i + 1;
     }
 
+    i = 0;
+
     // calculating neignbours
-    while i < width * height {
-        x, y : s64 = i % width, i / width;
-        cell : ^u8 = array + x + y * width;
+    while i < w * h {
+        x, y : s64 = i % w, i / w;
+        cell : ^u8 = array + x + y * w;
 
-        cx, cy = x - 1, y - 1;
-        
-        count_neighbours(cell, x - 1, y - 1);
-        count_neighbours(cell, x,     y - 1);
-        count_neighbours(cell, x + 1, y - 1);
+        @cell = @cell + check_neighbour(x, y, -1, -1);
+        @cell = @cell + check_neighbour(x, y,  0, -1);
+        @cell = @cell + check_neighbour(x, y,  1, -1);
 
-        count_neighbours(cell, x - 1, y);
-        count_neighbours(cell, x + 1, y);
+        @cell = @cell + check_neighbour(x, y, -1,  0);
+        @cell = @cell + check_neighbour(x, y,  1,  0);
 
-        count_neighbours(cell, x - 1, y + 1);
-        count_neighbours(cell, x,     y + 1);
-        count_neighbours(cell, x + 1, y + 1);
+        @cell = @cell + check_neighbour(x, y, -1,  1);
+        @cell = @cell + check_neighbour(x, y,  0,  1);
+        @cell = @cell + check_neighbour(x, y,  1,  1);
 
         i = i + 1;
     }
 
+    i = 0;
+
     // calculating new state
-    while i < width * height {
-        x, y: s64 = i % width, i / width;
-        cell: ^u8 = array + x + y * width;
+    while i < w * h {
+        x, y: s64 = i % w, i / w;
+        cell: ^u8 = array + x + y * w;
         alive, n: b8, u8 = @cell & 0x80 >> 7, @cell & 0x7F;
 
         if alive && (n > 3 || n < 2) {
@@ -60,38 +64,46 @@ step: () = {
         } if alive || n == 3 {
             @cell = 0x80;
         }
-        
+
         i = i + 1;
     }
 }
 
-count_neighbours: (cell: ^u8, x: s64, y: s64) = {
-   if (x > 0 && x < width) && (y > 0 && y < height) {
-        cell = @cell + @(cell - x + y * width) & 0x80 >> 7;
-       @(cell - x + y * width) = @cell & 0x80 >> 7;
-   }
-}
+check_neighbour: (xo: s64, yo: s64, x: s64, y: s64) -> s64 = {
+    if ((xo + x) > 0 && (xo + x) < w) 
+    && ((yo + y) > 0 && (yo + y) < h) {
+        offset : ^s64 = array + (xo + x) + (yo + y) * w;
 
-draw: () = {
-    i : s64 = 0; 
-    array : [101, 100] u8;
-
-    while i < width * height {
-        x, y : s64 = i % width, i / width;
-
-        cell : u8 = array[i] | 0x80;
-        
-        if cell {
-            array[x + y * (width + 1)] = 0x23; // '#'
-        } else {
-            array[x + y * (width + 1)] = 0x2E; // '.'
-        }
-
-        if x == width - 1 {
-            array[width + y * (width + 1)] = 0x0A; // '\n'
+        if @offset & 0x80 {
+            return 1;
         }
     }
 
-    win_write_console(cout, array, 101 * 100, 0, 0);
+    return 0;
+}
+
+draw: () = {
+    console_cursor_reset();
+
+    i : s64 = 0; 
+    while i < w * h {
+        x, y : s64 = i % w, i / w;
+
+        cell : u8 = @(array + i) | 0x80;
+
+        if cell {
+            putchar(0x23);
+            putchar(0x20);
+        } else {
+            putchar(0x2E);
+            putchar(0x20);
+        }
+
+        if x == w - 1 {
+            putchar(0x0A); // '\n'
+        }
+
+        i = i + 1;
+    }
 }
 

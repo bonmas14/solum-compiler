@@ -7,6 +7,7 @@
 #include "hashmap.h"
 #include "talloc.h"
 #include "strings.h"
+#include "profiler.h"
 #include <math.h>
 
 struct interpreter_state_t {
@@ -19,67 +20,120 @@ struct interpreter_state_t {
     stack_t<ir_function_t*> curr_func;
 };
 
-static s64 allocate_memory(interpreter_state_t *state, u64 size) {
+#define UNOP(irop, val) case irop: {\
+    s64 a = stack_pop(&state->exec_stack);\
+    stack_push(&state->exec_stack, val);\
+} break;
+
+#define BINOP(irop, val) case irop: {\
+    s64 a = stack_pop(&state->exec_stack);\
+    s64 b = stack_pop(&state->exec_stack);\
+    stack_push(&state->exec_stack, val);\
+} break;
+
+#define BINCHKOP(irop, val) case irop: {\
+    s64 a = stack_pop(&state->exec_stack);\
+    s64 b = stack_pop(&state->exec_stack);\
+    if (b != 0) stack_push(&state->exec_stack, val);\
+    stack_push(&state->exec_stack, (s64) 0);\
+} break;
+
+static inline s64 allocate_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
 
     stack_push(&state->data_stack, (s64) 0);
     return (state->data_stack.index - 1);
 }
 
-static void free_memory(interpreter_state_t *state, u64 size) {
+static inline void free_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
     stack_pop(&state->data_stack);
 }
 
-static void push_function(interpreter_state_t *state, string_t string) {
-    stack_push(&state->curr_func, hashmap_get(&state->ir->functions, string));
+static inline b32 push_function(interpreter_state_t *state, string_t string) {
+    ir_function_t *func = hashmap_get(&state->ir->functions, string);
+
+    if (func->is_external) {
+        // actually call it here
+
+        if (string_compare(string, STRING("putchar")) == 0) {
+            string_t str = {};
+
+            s64 value = stack_pop(&state->exec_stack);
+            str.size = 1;
+            str.data = (u8*)&value;
+
+            log_write(string_format(get_temporary_allocator(), STRING("%s"), str));
+        }
+        return true;
+    }
+
+    stack_push(&state->curr_func, func);
+    return false;
 }
 
-static void pop_function(interpreter_state_t *state) {
+static inline void pop_function(interpreter_state_t *state) {
     stack_pop(&state->curr_func);
 }
 
-static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
+static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
     switch (op.operation) {
-        case IR_NOP: 
-            break;
-        
-        case IR_STACK_FRAME_PUSH:
-            stack_push(&state->fp, state->data_stack.index); 
-            break;
+        case IR_NOP: break;
 
+        BINOP   (IR_ADD, a + b);
+        BINOP   (IR_SUB, a - b);
+        BINOP   (IR_MUL, a * b);
+        BINCHKOP(IR_DIV, a / b);
+        BINCHKOP(IR_MOD, a % b);
+        UNOP    (IR_NEG, -a);
+            
+        UNOP (IR_BIT_NOT,     (s64)(~a));
+        BINOP(IR_BIT_AND,     (s64)(a & b));
+        BINOP(IR_BIT_OR,      (s64)(a | b));
+        BINOP(IR_BIT_XOR,     (s64)(a ^ b));
+        BINOP(IR_SHIFT_LEFT,  (s64)(a << b));
+        BINOP(IR_SHIFT_RIGHT, (s64)(a >> b));
+
+        BINOP(IR_CMP_EQ,  (s64)(a == b));
+        BINOP(IR_CMP_NEQ, (s64)(a != b));
+        BINOP(IR_CMP_LT,  (s64)(a < b));
+        BINOP(IR_CMP_GT,  (s64)(a > b));
+        BINOP(IR_CMP_LTE, (s64)(a <= b));
+        BINOP(IR_CMP_GTE, (s64)(a >= b));
+            
+        BINOP(IR_LOG_AND, (s64)(a && b));
+        BINOP(IR_LOG_OR,  (s64)(a || b));
+        UNOP (IR_LOG_NOT, (s64)(!a));
+
+        case IR_STACK_FRAME_PUSH: 
+                             stack_push(&state->fp, state->data_stack.index); 
+                             break;
         case IR_STACK_FRAME_POP:
-            state->data_stack.index = stack_pop(&state->fp); 
-            break;
+                             state->data_stack.index = stack_pop(&state->fp);
+                             break;
 
-        case IR_PUSH_SIGN:   
-            stack_push(&state->exec_stack, op.s_operand); 
-            break;
-        case IR_PUSH_UNSIGN: 
-            stack_push(&state->exec_stack, op.s_operand);
-            break;
-
-        case IR_PUSH_STACK: 
-        {
-            stack_push(&state->exec_stack, state->data_stack.data[stack_peek(&state->fp) + op.u_operand]);
-        } break;
-        case IR_PUSH_SEA: 
-        {
-            stack_push(&state->exec_stack, (s64)op.u_operand);
-        } break;
+        case IR_PUSH_SIGN:   stack_push(&state->exec_stack, op.s_operand); 
+                             break;
+        case IR_PUSH_UNSIGN: stack_push(&state->exec_stack, op.s_operand);
+                             break;
+        case IR_PUSH_STACK:  stack_push(&state->exec_stack, state->data_stack.data[stack_peek(&state->fp) + op.u_operand]); 
+                             break;
+        case IR_PUSH_SEA:    stack_push(&state->exec_stack, (s64)(stack_peek(&state->fp) + op.u_operand));
+                             break;
 
         case IR_PUSH_GLOBAL: 
         {
             stack_push(&state->exec_stack, (s64) 0);
         } break;
-        case IR_PUSH_GEA: 
+
+        case IR_PUSH_GEA:
         {
             log_warning("push addr from global");
         } break;
 
-        case IR_POP:
-            stack_pop(&state->exec_stack); 
-            break;
+        case IR_POP: {
+            stack_pop(&state->exec_stack);
+        } break;
             
         case IR_CLONE: {
             s64 val = stack_pop(&state->exec_stack);
@@ -95,11 +149,16 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             
         case IR_FREE: {
             s64 size = op.u_operand;
-            free_memory(state, op.u_operand);
+            if (size) free_memory(state, op.u_operand);
         } break;
             
         case IR_LOAD: {
             s64 addr = stack_pop(&state->exec_stack);
+            if ((u64)addr > state->data_stack.index) {
+                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
+                state->running = false;
+                break;
+            }
             s64 val  = state->data_stack.data[addr];
             stack_push(&state->exec_stack, val);
         } break;
@@ -107,70 +166,16 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
         case IR_STORE: {
             s64 addr = stack_pop(&state->exec_stack);
             s64 val  = stack_pop(&state->exec_stack);
+
+            if ((u64)addr > state->data_stack.index) {
+                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
+                state->running = false;
+                break;
+            }
+
             state->data_stack.data[addr] = val;
         } break;
-            
-        case IR_ADD: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, a + b);
-        } break;
-            
-        case IR_SUB: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, a - b);
-        } break;
-            
-        case IR_MUL: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, a * b);
-        } break;
-            
-        case IR_DIV: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            if (b != 0) stack_push(&state->exec_stack, a / b);
-            stack_push(&state->exec_stack, (s64) 0);
-        } break;
-            
-        case IR_MOD: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            if (b != 0) stack_push(&state->exec_stack, a % b);
-            stack_push(&state->exec_stack, (s64) 0);
-        } break;
-            
-        case IR_NEG: {
-            s64 a = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, -a);
-        } break;
-            
-        case IR_CMP_EQ: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, (s64)(a == b));
-        } break;
-            
-        case IR_CMP_NEQ: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, (s64)(a != b));
-        } break;
-            
-        case IR_CMP_LT: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, (s64)(a < b));
-        } break;
-            
-        case IR_CMP_GT: {
-            s64 a = stack_pop(&state->exec_stack);
-            s64 b = stack_pop(&state->exec_stack);
-            stack_push(&state->exec_stack, (s64)(a > b));
-        } break;
-            
+
         case IR_JUMP: {
             state->ip += op.s_operand;
         } break;
@@ -198,16 +203,13 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
                 pop_function(state);
             }
         } break;
+
         case IR_CALL:
         {
-            push_function(state, op.string);
-            stack_push(&state->data_stack, (s64)state->ip);
-            state->ip = 0;
-        } break;
-
-        case IR_CALL_EXTERN: {
-            log_error("External call not implemented.");
-            state->running = false;
+            if (!push_function(state, op.string)) {
+                stack_push(&state->data_stack, (s64)state->ip);
+                state->ip = 0;
+            }
         } break;
 
         case IR_BRK: {
@@ -223,27 +225,41 @@ static void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op) {
             
         default:
             log_error("Unknown IR opcode.");
+            print_ir_opcode(op);
             state->running = false;
             break;
     }
 }
 
 void interop_func(ir_t *ir, string_t func_name) {
+    profiler_func_start();
     interpreter_state_t state = {};
     state.running = true;
 
     state.ir = ir;
 
     stack_push(&state.curr_func, ir->functions[func_name]);
+
+    ir_function_t *func = {};
+    u64 i = 0;
     while (state.running) {
-        ir_function_t *func = stack_peek(&state.curr_func);
-        ir_opcode_t op = func->code[state.ip++];
-        execute_ir_opcode(&state, op);
+        if (i != state.curr_func.index) {
+            i = state.curr_func.index;
+            func = stack_peek(&state.curr_func);
 #ifdef VERBOSE
-        log_info(string_format(get_temporary_allocator(), STRING("e:%u d:%u"), (u64)state.exec_stack.index, (u64)state.data_stack.index));
+        log_update_color();
+        fprintf(stderr, " SWITCH");
+#endif
+        }
+        ir_opcode_t op = func->code[state.ip++];
+#ifdef VERBOSE
+        log_update_color();
+        fprintf(stderr, " %4llu - about to: ", state.ip);
         print_ir_opcode(op);
 #endif
+        execute_ir_opcode(&state, op);
     }
 
     log_info(string_format(get_temporary_allocator(), STRING("%d"), (s64)stack_pop(&state.exec_stack)));
+    profiler_func_end();
 }

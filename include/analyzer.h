@@ -4,6 +4,7 @@
 #include "list.h"
 #include "hashmap.h"
 
+struct token_t;
 struct compiler_t;
 struct ast_node_t;
 
@@ -35,7 +36,6 @@ enum types_t {
 struct type_info_t {
     u32 type;
     b32 is_array;
-    u32 array_size;
     u32 offset;        // struct offset
     u32 size;          // var size
     u32 pointer_depth;
@@ -87,5 +87,7 @@ b32 analyzer_preload_all_files(compiler_t *compiler);
 b32 analyze(compiler_t *compiler);
 
 b32 load_and_process_file(compiler_t *compiler, string_t filename);
+void set_std_info(u64 token_type, type_info_t *info);
+b32 compare_std_info(type_info_t lhs, type_info_t rhs);
 
 #endif // ANALYZER_H

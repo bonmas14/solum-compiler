@@ -56,7 +56,7 @@ enum ir_codes_t {
     IR_MOD,
     IR_NEG,
 
-    // Bitwise operations
+    // Bitwise operations [left] [right]
     IR_BIT_AND,    
     IR_BIT_OR,     
     IR_BIT_XOR,    
@@ -85,7 +85,6 @@ enum ir_codes_t {
 
     // Function calls
     IR_CALL,       // Call function (address on stack)
-    IR_CALL_EXTERN,// Call external symbol (string operand)
 
     // System
     IR_BRK,        // Breakpoint
@@ -113,9 +112,9 @@ struct ir_variable_t {
 
 struct ir_function_t {
     b32 is_valid;
-    
-    array_t<ir_opcode_t>  code;
+    b32 is_external;
     u64 stack_index;
+    array_t<ir_opcode_t> code;
 };
 
 struct ir_t {

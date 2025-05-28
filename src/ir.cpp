@@ -13,12 +13,19 @@
 // just for now this will be here
 // #define VERBOSE
 
-#define EXPR_CASE(cs, tok) case cs:\
-            compile_expression(state, node->right, shadow);\
-            compile_expression(state, node->left,  shadow);\
+#define EXPR_CASE(cs, tok) case cs: {\
+            ir_expression_t rhs = compile_expression(state, node->right, shadow);\
+            ir_expression_t lhs = compile_expression(state, node->left,  shadow);\
+            UNUSED(rhs);\
+            expr = lhs;\
             emit_op(state, tok, node->token, 0);\
-            break;
+            } break;
 
+#define EXPR_UN_CASE(cs, tok) case cs: {\
+            ir_expression_t lhs = compile_expression(state, node->left,  shadow);\
+            expr = lhs;\
+            emit_op(state, tok, node->token, 0);\
+            } break;
 
 
 struct ir_state_t {
@@ -77,7 +84,6 @@ const char* ir_code_to_string(u64 code) {
         case IR_JUMP_IF_NOT: return "JUMP_IF_NOT";
         case IR_RET:         return "RET";
         case IR_CALL:        return "CALL";
-        case IR_CALL_EXTERN: return "CALL_EXTERN";
         case IR_BRK:         return "BRK";
         case IR_INVALID:     return "INVALID";
         default:             return "UNKNOWN_OP";
@@ -185,9 +191,9 @@ b32 add_identifier_type_to_search(ir_state_t *state, string_t key) {
 
 struct ir_expression_t {
     b32            accessable;
+    type_info_t    type;
     u32            offset;
     ir_opcode_t   *emmited_op;
-    // type info later...
     stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
 };
 
@@ -226,6 +232,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     break;
                 case TOKEN_CONST_INT:
                     emit_op(state, IR_PUSH_SIGN, node->token, (s64)node->token.data.const_int);
+                    set_std_info(TOK_U64, &expr.type);
                     break;
                 case TOKEN_CONST_STRING:
                     log_error("AST_PRIMARY:TOKEN_STRING compilation TODO");
@@ -242,6 +249,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                             break;
                         }
 
+                        expr.type       = entry->info;
                         expr.accessable = true;
                         expr.offset     = entry->offset;
 
@@ -252,14 +260,14 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                         }
 
                         expr.emmited_op->string = node->token.data.string;
-
-                        return expr;
                     } break;
                 case TOK_TRUE:
                     emit_op(state, IR_PUSH_SIGN, node->token, 1);
+                    set_std_info(TOK_BOOL32, &expr.type);
                     break;
                 case TOK_FALSE:
                     emit_op(state, IR_PUSH_SIGN, node->token, 0);
+                    set_std_info(TOK_BOOL32, &expr.type);
                     break;
                 default:
                     emit_op(state, IR_INVALID, node->token, 0xFFFFFFFFFFFFFFFF);
@@ -282,34 +290,30 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     expr.emmited_op->operation = IR_INVALID;
                 }
             }
+
+            expr.type.pointer_depth++;
             break;
 
-        case AST_UNARY_DEREF:
-            compile_expression(state, node->left, shadow);
+        case AST_UNARY_DEREF: {
+            ir_expression_t value = compile_expression(state, node->left, shadow);
+
+            if (value.type.pointer_depth == 0) {
+                log_warning_token("Trying to dereference non-pointer variable.", node->left->token);
+            }
+
             expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
             expr.accessable = true;
-            return expr;
+        } break;
 
-        case AST_UNARY_INVERT:
-            compile_expression(state, node->left, shadow);
-            emit_op(state, IR_BIT_NOT, node->token, 0);
-            break;
-
-        case AST_UNARY_NEGATE:
-            compile_expression(state, node->left, shadow);
-            emit_op(state, IR_NEG, node->token, 0);
-            break;
-
-        case AST_UNARY_NOT:
-            compile_expression(state, node->left, shadow);
-            emit_op(state, IR_LOG_NOT, node->token, 0);
-            break;
+        EXPR_UN_CASE(AST_UNARY_INVERT, IR_BIT_NOT);
+        EXPR_UN_CASE(AST_UNARY_NEGATE, IR_NEG);
+        EXPR_UN_CASE( AST_UNARY_NOT,   IR_LOG_NOT);
 
         case AST_BIN_CAST:
             // @todo
             //
             // log_error("AST_BIN_CAST compilation TODO");
-            compile_expression(state, node->right, shadow);
+            expr = compile_expression(state, node->right, shadow);
             // compile_expression(state, node->left);
             // emit_op(state, IR_INVALID, node->token, 0);
             break;
@@ -384,11 +388,13 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     expr.emmited_op->operation = IR_PUSH_GEA;
                 } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
                     expr.emmited_op->operation = IR_PUSH_SEA;
+                } else if (expr.emmited_op->operation == IR_LOAD) {
+                    expr.emmited_op->operation = IR_STORE;
+                    break;
                 } else {
                     expr.emmited_op->operation = IR_INVALID;
                 }
 
-                expr.offset += 0; // struct offset
                 emit_op(state, IR_STORE, node->left->token, expr.offset);
             }
             break;
@@ -409,6 +415,9 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                             expr.emmited_op->operation = IR_PUSH_GEA;
                         } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
                             expr.emmited_op->operation = IR_PUSH_SEA;
+                        } else if (expr.emmited_op->operation == IR_LOAD) {
+                            expr.emmited_op->operation = IR_STORE;
+                            break;
                         } else {
                             expr.emmited_op->operation = IR_INVALID;
                         }
@@ -449,7 +458,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
         stack_delete(&expr.search_info);
     }
 
-    return {};
+    return expr;
 }
 
 void compile_block(ir_state_t *state, ast_node_t *node) {
@@ -489,17 +498,25 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
     entry->offset   = state->current_function->stack_index++;
     entry->on_stack = true;
 
-    emit_op(state, IR_ALLOC, node->token, 8); // here we get the type size
+    u64 size = entry->info.size;
+
+    if (entry->info.is_array) { 
+        size *= 1 * 1;
+        entry->info.pointer_depth += 1;
+    }
+
+    emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
     emit_op(state, IR_STORE, node->token, entry->offset);
-    return 8;
+    return size;
 }
 
 u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
     u64 alloc_size = 0;
-    ast_node_t *next = node->list_start;
-    for (u64 i = 0; i < node->child_count; i++) {
+    ast_node_t *next = node->left->list_start;
+    
+    for (u64 i = 0; i < node->left->child_count; i++) {
         scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
         if (entry->expr) {
@@ -512,9 +529,16 @@ u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
         entry->offset   = state->current_function->stack_index++;
         entry->on_stack = true;
 
-        emit_op(state, IR_ALLOC, node->token, 8); // here we get the type size
+        u64 size = entry->info.size;
+
+        if (entry->info.is_array) { 
+            size *= 100 * 100;
+            entry->info.pointer_depth += 1;
+        }
+
+        emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
         emit_op(state, IR_STORE, next->token, entry->offset);
-        alloc_size += 8;
+        alloc_size += size;
 
         next = next->list_next;
     }
@@ -610,10 +634,6 @@ u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size = 0) {
 }
 
 void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
-    if (entry->is_external) {
-        return;
-    }  
-
     profiler_func_start();
 
     assert(state->current_function == NULL);
@@ -621,6 +641,13 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     ir_function_t func = {};
 
     array_create(&func.code, 8, state->ir.code);
+    if (entry->is_external) {
+        func.is_external = true;
+        hashmap_add(&state->ir.functions, key, &func);
+        profiler_func_end();
+        return;
+    }  
+
     state->current_function = &func;
 
     stack_push(&state->search_scopes, &entry->func_params);

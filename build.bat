@@ -1,4 +1,6 @@
 @echo off
+setlocal
+
 set "filename=slm"
 set "cc=clang-cl"
 set "lld=lld-link"
@@ -128,5 +130,5 @@ echo:
 echo Done!
 
 endlocal
-
 :end
+endlocal
