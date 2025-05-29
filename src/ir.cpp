@@ -140,7 +140,7 @@ ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, string_t data) {
 
 // ------ // 
 
-u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size);
+u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_count);
 
 scope_entry_t *search_identifier(ir_state_t *state, string_t key, string_t shadow) {
     b32 shadowed = false;
@@ -205,13 +205,17 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
     ir_expression_t expr = {};
 
     switch (node->type) {
-        EXPR_CASE(AST_BIN_GR, IR_CMP_GT);
-        EXPR_CASE(AST_BIN_LS, IR_CMP_LT);
+        EXPR_UN_CASE(AST_UNARY_INVERT, IR_BIT_NOT);
+        EXPR_UN_CASE(AST_UNARY_NEGATE, IR_NEG);
+        EXPR_UN_CASE(AST_UNARY_NOT,    IR_LOG_NOT);
+
+        EXPR_CASE(AST_BIN_GR,  IR_CMP_GT);
+        EXPR_CASE(AST_BIN_LS,  IR_CMP_LT);
         EXPR_CASE(AST_BIN_GEQ, IR_CMP_GTE);
         EXPR_CASE(AST_BIN_LEQ, IR_CMP_LTE);
-        EXPR_CASE(AST_BIN_EQ, IR_CMP_EQ);
+        EXPR_CASE(AST_BIN_EQ,  IR_CMP_EQ);
         EXPR_CASE(AST_BIN_NEQ, IR_CMP_NEQ);
-        EXPR_CASE(AST_BIN_LOG_OR, IR_LOG_OR);
+        EXPR_CASE(AST_BIN_LOG_OR,  IR_LOG_OR);
         EXPR_CASE(AST_BIN_LOG_AND, IR_LOG_AND);
         EXPR_CASE(AST_BIN_ADD, IR_ADD);
         EXPR_CASE(AST_BIN_SUB, IR_SUB);
@@ -219,7 +223,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
         EXPR_CASE(AST_BIN_DIV, IR_DIV);
         EXPR_CASE(AST_BIN_MOD, IR_MOD);
         EXPR_CASE(AST_BIN_BIT_XOR, IR_BIT_XOR);
-        EXPR_CASE(AST_BIN_BIT_OR, IR_BIT_OR);
+        EXPR_CASE(AST_BIN_BIT_OR,  IR_BIT_OR);
         EXPR_CASE(AST_BIN_BIT_AND, IR_BIT_AND);
         EXPR_CASE(AST_BIN_BIT_LSHIFT, IR_SHIFT_LEFT);
         EXPR_CASE(AST_BIN_BIT_RSHIFT, IR_SHIFT_RIGHT);
@@ -304,10 +308,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
             expr.accessable = true;
         } break;
-
-        EXPR_UN_CASE(AST_UNARY_INVERT, IR_BIT_NOT);
-        EXPR_UN_CASE(AST_UNARY_NEGATE, IR_NEG);
-        EXPR_UN_CASE( AST_UNARY_NOT,   IR_LOG_NOT);
 
         case AST_BIN_CAST:
             // @todo
@@ -464,22 +464,25 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
 void compile_block(ir_state_t *state, ast_node_t *node) {
     hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, node->scope_index);
     stack_push(&state->search_scopes, block);
+    u64 si = state->current_function->stack_index;
 
     ast_node_t *stmt = node->list_start;
 
-    u64 alloc_size = 0;
+    u64 alloc_count = 0;
     for (u64 i = 0; i < node->child_count; i++) {
-        alloc_size += compile_statement(state, stmt, alloc_size);
+        alloc_count += compile_statement(state, stmt, alloc_count);
         
         if (stmt->list_next) {
             stmt = stmt->list_next;
         }
     }
 
-    if (alloc_size) {
-        emit_op(state, IR_FREE, stmt->token, alloc_size);
+    if (alloc_count) {
+        emit_op(state, IR_FREE, stmt->token, alloc_count);
     }
 
+
+    state->current_function->stack_index = si;
     stack_pop(&state->search_scopes);
 }
 
@@ -495,25 +498,29 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
         emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
     }
 
-    entry->offset   = state->current_function->stack_index++;
-    entry->on_stack = true;
-
-    u64 size = entry->info.size;
+    // u64 size = entry->info.size;
+    u64 size = 1;
 
     if (entry->info.is_array) { 
-        size *= 1 * 1;
+        size *= 100 * 100;
         entry->info.pointer_depth += 1;
     }
 
+    entry->offset   = state->current_function->stack_index;
+    state->current_function->stack_index += size;
+    entry->on_stack = true;
+
+
     emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
-    emit_op(state, IR_STORE, node->token, entry->offset);
+    emit_op(state, IR_STORE, node->token, 0);
+
     return size;
 }
 
 u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
     assert(state->current_function != NULL);
 
-    u64 alloc_size = 0;
+    u64 alloc_count = 0;
     ast_node_t *next = node->left->list_start;
     
     for (u64 i = 0; i < node->left->child_count; i++) {
@@ -526,27 +533,28 @@ u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
             emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
         }
 
-        entry->offset   = state->current_function->stack_index++;
-        entry->on_stack = true;
-
-        u64 size = entry->info.size;
+        u64 size = 1;
 
         if (entry->info.is_array) { 
             size *= 100 * 100;
             entry->info.pointer_depth += 1;
         }
 
+        entry->offset   = state->current_function->stack_index;
+        state->current_function->stack_index += size;
+        entry->on_stack = true;
+
         emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
-        emit_op(state, IR_STORE, next->token, entry->offset);
-        alloc_size += size;
+        emit_op(state, IR_STORE, next->token, 0);
+        alloc_count += size;
 
         next = next->list_next;
     }
 
-    return alloc_size;
+    return alloc_count;
 }
 
-u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size = 0) {
+u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_count = 0) {
     switch (node->type) {
         case AST_BIN_UNKN_DEF:  return compile_variable(state, node); break;
         case AST_UNARY_VAR_DEF: return compile_variable(state, node); break;
@@ -607,20 +615,20 @@ u64 compile_statement(ir_state_t *state, ast_node_t *node, u64 alloc_size = 0) {
         case AST_RET_STMT: 
             {
                 compile_expression(state, node->left, {});
-                emit_op(state, IR_FREE, node->token, alloc_size);
+                if (alloc_count) emit_op(state, IR_FREE, node->token, alloc_count);
                 emit_op(state, IR_STACK_FRAME_POP, node->token, 0);
                 emit_op(state, IR_RET, node->token, 0);
             }
             break;
         case AST_BREAK_STMT: 
             {
-                emit_op(state, IR_FREE, node->token, alloc_size);
+                if (alloc_count) emit_op(state, IR_FREE, node->token, alloc_count);
                 stack_push(&state->break_stmt, emit_op(state, IR_JUMP, node->token, 0)); // jump outa loop
             }
             break;
         case AST_CONTINUE_STMT:
             {
-                emit_op(state, IR_FREE, node->token, alloc_size);
+                if (alloc_count) emit_op(state, IR_FREE, node->token, alloc_count);
                 stack_push(&state->continue_stmt, emit_op(state, IR_JUMP, node->token, 0)); // jump to start of loop
             }
             break;
@@ -663,7 +671,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             entry->offset   = state->current_function->stack_index++;
             entry->on_stack = true;
 
-            emit_op(state, IR_ALLOC, node->token, 8); 
+            emit_op(state, IR_ALLOC, node->token, 1); 
             emit_op(state, IR_STORE, next->token, entry->offset);
 
             next = next->list_next;

@@ -2,6 +2,7 @@
 
 putchar: (char: u32) = external "compiler";
 
+debug_break: () = external "compiler";
 
 console_clear: () = {
     putchar(0x1b);

@@ -35,23 +35,34 @@ struct interpreter_state_t {
     s64 a = stack_pop(&state->exec_stack);\
     s64 b = stack_pop(&state->exec_stack);\
     if (b != 0) stack_push(&state->exec_stack, val);\
-    stack_push(&state->exec_stack, (s64) 0);\
+    else        stack_push(&state->exec_stack, (s64) 0);\
 } break;
 
 static inline s64 allocate_memory(interpreter_state_t *state, u64 size) {
     UNUSED(size);
 
-    stack_push(&state->data_stack, (s64) 0);
-    return (state->data_stack.index - 1);
+    u64 start = state->data_stack.index;
+
+    for (u64 i = 0; i < size; i++) {
+        stack_push(&state->data_stack, (s64) 0);
+    }
+
+    return start;
 }
 
 static inline void free_memory(interpreter_state_t *state, u64 size) {
-    UNUSED(size);
-    stack_pop(&state->data_stack);
+    for (u64 i = 0; i < size; i++) {
+        stack_pop(&state->data_stack);
+    }
 }
 
 static inline b32 push_function(interpreter_state_t *state, string_t string) {
     ir_function_t *func = hashmap_get(&state->ir->functions, string);
+
+#ifdef VERBOSE
+    log_update_color();
+    log_write(string_format(get_temporary_allocator(), STRING(" Calling: %s\n"), string));
+#endif
 
     if (func->is_external) {
         // actually call it here
@@ -64,7 +75,11 @@ static inline b32 push_function(interpreter_state_t *state, string_t string) {
             str.data = (u8*)&value;
 
             log_write(string_format(get_temporary_allocator(), STRING("%s"), str));
+        } else if (string_compare(string, STRING("debug_break")) == 0) {
+            debug_break();
         }
+
+
         return true;
     }
 
@@ -155,6 +170,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         case IR_LOAD: {
             s64 addr = stack_pop(&state->exec_stack);
             if ((u64)addr > state->data_stack.index) {
+                print_ir_opcode(op);
                 log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
                 state->running = false;
                 break;
@@ -168,6 +184,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
             s64 val  = stack_pop(&state->exec_stack);
 
             if ((u64)addr > state->data_stack.index) {
+                print_ir_opcode(op);
                 log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
                 state->running = false;
                 break;
@@ -246,12 +263,9 @@ void interop_func(ir_t *ir, string_t func_name) {
         if (i != state.curr_func.index) {
             i = state.curr_func.index;
             func = stack_peek(&state.curr_func);
-#ifdef VERBOSE
-        log_update_color();
-        fprintf(stderr, " SWITCH");
-#endif
         }
         ir_opcode_t op = func->code[state.ip++];
+
 #ifdef VERBOSE
         log_update_color();
         fprintf(stderr, " %4llu - about to: ", state.ip);
