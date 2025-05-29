@@ -2,12 +2,12 @@
 #define IR_H
 
 #include "stddefines.h"
-#include "list.h"
-#include "array.h"
-#include "compiler.h"
-#include "analyzer.h"
 #include "stack.h"
 #include "hashmap.h"
+#include "list.h"
+#include "array.h"
+
+#include "compiler.h"
 #include "scanner.h"
 
 // 
@@ -123,7 +123,6 @@ struct ir_t {
     allocator_t code;
     hashmap_t<string_t, ir_function_t> functions;
     list_t<ir_variable_t>              globals;
-    // hashmap_t<string_t, u8> strings;
 };
 
 void print_ir_opcode(ir_opcode_t op);

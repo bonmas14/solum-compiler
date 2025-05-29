@@ -14,7 +14,6 @@
 #define INIT_NODES_SIZE 2048
 
 struct scanner_t;
-struct codegen_t;
 struct ast_node_t;
 
 struct source_file_t {
@@ -28,7 +27,6 @@ struct compiler_t {
     allocator_t *strings;
     allocator_t *nodes;
 
-    codegen_t   *codegen;
     string_t     modules_path;
 
     array_t<hashmap_t<string_t, scope_entry_t>> scopes;

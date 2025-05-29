@@ -5,8 +5,8 @@
 #include "scanner.h"
 #include "parser.h"
 #include "analyzer.h"
+#include "ir.h"
 
-codegen_t *codegen_create(allocator_t *allocator);
-void generate_code(compiler_t *compiler);
+void nasm_compile_program(ir_t *state);
 
 #endif // BACKEND_H

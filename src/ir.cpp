@@ -1,12 +1,14 @@
-#include "compiler.h"
-#include "array.h"
-#include "parser.h"
 #include "ir.h"
 
-#include "profiler.h"
+#include "analyzer.h"
+#include "parser.h"
+
 #include "allocator.h"
 #include "talloc.h"
 #include "arena.h"
+
+#include "profiler.h"
+
 #include "strings.h"
 #include "memctl.h"
 

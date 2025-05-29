@@ -61,9 +61,7 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
 
 	compiler.nodes   = preserve_allocator_from_stack(create_arena_allocator(sizeof(ast_node_t) * INIT_NODES_SIZE));
     compiler.strings = preserve_allocator_from_stack(create_arena_allocator(4096));
-
-    compiler.codegen  = codegen_create(alloc);
-    compiler.valid = true;
+    compiler.valid   = true;
 
     array_create(&compiler.scopes, 32, create_arena_allocator(32 * sizeof(hashmap_t<string_t, scope_entry_t>)));
 
@@ -109,6 +107,7 @@ void compile(string_t filename) {
     // or there is an error
 
     if (result.is_valid) {
+        nasm_compile_program(&result);
         interop_func(&result, STRING("main"));
     } else {
         log_error(STRING("NOT COMPILED"));
