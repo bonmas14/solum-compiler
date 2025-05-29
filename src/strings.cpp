@@ -335,6 +335,11 @@ string_t string_format(allocator_t *alloc, string_t buffer...) {
         }
 
         switch (buffer[++i]) {
+            case '%':
+            {
+                o = string_concat(o, { 1, buffer.data + i }, talloc);
+            } break;
+
             case 'u':
             {
                 o = string_concat(o, format_u64(va_arg(args, u64)), talloc);
@@ -455,7 +460,7 @@ void string_tests(void) {
 
     assert(!string_compare(string_swap(STRING("/path/from/unix/systems/"), (u8)'/', (u8) '\\', alloc), STRING("\\path\\from\\unix\\systems\\"))); 
 
-    assert(!string_compare(string_format(alloc, STRING("/path/%s/unix/a %d %u"), STRING("test"), (s64)-100, (u64)404), STRING("/path/test/unix/a -100 404"))); 
+    assert(!string_compare(string_format(alloc, STRING("/path/%s/unix/a %d %u %%"), STRING("test"), (s64)-100, (u64)404), STRING("/path/test/unix/a -100 404 %"))); 
 
     temp_reset();
 #endif
