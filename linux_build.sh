@@ -36,7 +36,7 @@ cflags="$arch -std=c++14 -I./include -g -Wall -Wno-format $defines"
 if [ "$config" == "Release" ]; then
     name="$name-r"
     obj="$obj/Release"
-    cflags="$cflags -O3 -DVERBOSE -DNDEBUG"
+    cflags="$cflags -O3 -DNDEBUG"
 else 
     name="$name-d"
     obj="$obj/Debug"
