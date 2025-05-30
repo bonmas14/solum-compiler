@@ -99,6 +99,12 @@ void print_ir_opcode(ir_opcode_t op) {
     printf("[IR] | %-14s | %lld\n", op_name, (long long) op.s_operand);
 }
 
+string_t get_ir_opcode_info(ir_opcode_t op) {
+    const char* op_name = ir_code_to_string(op.operation);
+    
+    return string_format(get_temporary_allocator(), STRING(" --- %s | %d"), STRING(op_name), op.s_operand);
+}
+
 #ifdef NDEBUG
 #define print_ir_opcode(...)
 #endif
@@ -194,7 +200,7 @@ b32 add_identifier_type_to_search(ir_state_t *state, string_t key) {
 struct ir_expression_t {
     b32            accessable;
     type_info_t    type;
-    u32            offset;
+    s64            offset;
     ir_opcode_t   *emmited_op;
     stack_t<hashmap_t<string_t, scope_entry_t>*> search_info;
 };
@@ -463,14 +469,14 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
     return expr;
 }
 
-void compile_block(ir_state_t *state, ast_node_t *node) {
+void compile_block(ir_state_t *state, ast_node_t *node, u64 prealloc = 0) {
     hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, node->scope_index);
     stack_push(&state->search_scopes, block);
     u64 si = state->current_function->stack_index;
 
     ast_node_t *stmt = node->list_start;
 
-    u64 alloc_count = 0;
+    u64 alloc_count = prealloc;
     for (u64 i = 0; i < node->child_count; i++) {
         alloc_count += compile_statement(state, stmt, alloc_count);
         
@@ -508,8 +514,8 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
         entry->info.pointer_depth += 1;
     }
 
-    entry->offset   = state->current_function->stack_index;
     state->current_function->stack_index += size;
+    entry->offset   = state->current_function->stack_index;
     entry->on_stack = true;
 
 
@@ -542,8 +548,8 @@ u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
             entry->info.pointer_depth += 1;
         }
 
-        entry->offset   = state->current_function->stack_index;
         state->current_function->stack_index += size;
+        entry->offset   = state->current_function->stack_index;
         entry->on_stack = true;
 
         emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
@@ -667,15 +673,24 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         ast_node_t *node = entry->node->left->left;
         ast_node_t *next = node->list_start;
 
+        u64 alloc_count = 0;
         for (u64 i = 0; i < node->child_count; i++) {
             scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
-            entry->offset   = state->current_function->stack_index++;
+            u64 size = 1;
+
+            if (entry->info.is_array) { 
+                size *= 100 * 100;
+                entry->info.pointer_depth += 1;
+            }
+
+            state->current_function->stack_index += size;
+            entry->offset   = state->current_function->stack_index;
             entry->on_stack = true;
 
-            emit_op(state, IR_ALLOC, node->token, 1); 
+            emit_op(state, IR_ALLOC, node->token, size); 
             emit_op(state, IR_STORE, next->token, entry->offset);
-
+            alloc_count += size;
             next = next->list_next;
         }
 

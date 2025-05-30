@@ -125,6 +125,7 @@ struct ir_t {
     list_t<ir_variable_t>              globals;
 };
 
+string_t get_ir_opcode_info(ir_opcode_t op);
 void print_ir_opcode(ir_opcode_t op);
 ir_t compile_program(compiler_t *compiler);
 

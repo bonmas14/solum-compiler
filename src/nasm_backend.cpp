@@ -113,7 +113,7 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
     for (u64 i = 0; i < state->func->code.count; i++) {
         ir_opcode_t op = state->func->code[i];
 
-        nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u:"), i), 0);
+        nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u: ; %s"), i, get_ir_opcode_info(op)), 0);
 
         INSERT_LINE();
         nasm_add_line(state, STRING("nop"), 1);

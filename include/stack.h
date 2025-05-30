@@ -20,6 +20,14 @@ struct stack_t {
 
     u64 current_size;
     u64 grow_size;
+
+    DataType operator[](u64 i) {
+        if (i >= index) {
+            return {};
+        }
+
+        return data[i];
+    }
 };
 
 // ----------- Initialization 

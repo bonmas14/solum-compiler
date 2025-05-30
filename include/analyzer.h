@@ -72,8 +72,8 @@ struct scope_entry_t {
 
     // -------- info for IR
 
+    s64 offset;
     b32 on_stack;
-    u32 offset;
 };
 
 enum entry_type_t {

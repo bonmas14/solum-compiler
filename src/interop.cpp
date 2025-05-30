@@ -10,6 +10,10 @@
 #include "profiler.h"
 #include <math.h>
 
+struct memory_block_t {
+    s64 size;
+    s64 start;
+};
 struct interpreter_state_t {
     b32 running;
     ir_t *ir;
@@ -17,6 +21,7 @@ struct interpreter_state_t {
     stack_t<u64> fp;
     stack_t<s64> exec_stack;
     stack_t<s64> data_stack;
+    stack_t<memory_block_t> allocations;
     stack_t<ir_function_t*> curr_func;
 };
 
@@ -38,22 +43,43 @@ struct interpreter_state_t {
     else        stack_push(&state->exec_stack, (s64) 0);\
 } break;
 
-static inline s64 allocate_memory(interpreter_state_t *state, u64 size) {
+static inline s64 allocate_memory(interpreter_state_t *state, s64 size) {
     UNUSED(size);
 
-    u64 start = state->data_stack.index;
+    memory_block_t block = {};
+    block.start = state->data_stack.index;
+    block.size  = size;
 
-    for (u64 i = 0; i < size; i++) {
+    for (s64 i = 0; i < size; i++) {
         stack_push(&state->data_stack, (s64) 0);
     }
 
-    return start;
+    stack_push(&state->allocations, block);
+    return state->data_stack.index - 1;
 }
 
-static inline void free_memory(interpreter_state_t *state, u64 size) {
-    for (u64 i = 0; i < size; i++) {
-        stack_pop(&state->data_stack);
+static inline void free_memory(interpreter_state_t *state, s64 size) {
+    while (size > 0) {
+        memory_block_t block = stack_pop(&state->allocations);
+        state->data_stack.index = block.start;
+        size -= block.size;
     }
+}
+
+static inline s64 get_variable_address(interpreter_state_t *state, s64 address) {
+    address = stack_peek(&state->fp) + address;
+
+    for (u64 i = 0; i < state->allocations.index; i++) {
+        memory_block_t block = state->allocations[i];
+
+        s64 stop_address = block.start + (block.size - 1);
+        if (address >= block.start && address <= stop_address) {
+            return block.start;
+        }
+    }
+
+    assert(false);
+    return -1;
 }
 
 static inline b32 push_function(interpreter_state_t *state, string_t string) {
@@ -74,7 +100,7 @@ static inline b32 push_function(interpreter_state_t *state, string_t string) {
             str.size = 1;
             str.data = (u8*)&value;
 
-            log_write(string_format(get_temporary_allocator(), STRING("%s"), str));
+            log_write(str);
         } else if (string_compare(string, STRING("debug_break")) == 0) {
             debug_break();
         }
@@ -123,17 +149,19 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         case IR_STACK_FRAME_PUSH: 
                              stack_push(&state->fp, state->data_stack.index); 
                              break;
-        case IR_STACK_FRAME_POP:
-                             state->data_stack.index = stack_pop(&state->fp);
-                             break;
+        case IR_STACK_FRAME_POP: 
+                             {
+                                 u64 fp = stack_pop(&state->fp);
+                                 free_memory(state, state->data_stack.index - fp);
+                             } break;
 
         case IR_PUSH_SIGN:   stack_push(&state->exec_stack, op.s_operand); 
                              break;
         case IR_PUSH_UNSIGN: stack_push(&state->exec_stack, op.s_operand);
                              break;
-        case IR_PUSH_STACK:  stack_push(&state->exec_stack, state->data_stack.data[stack_peek(&state->fp) + op.u_operand]); 
+        case IR_PUSH_STACK:  stack_push(&state->exec_stack, state->data_stack.data[(u64)get_variable_address(state, (op.s_operand - 1))]); 
                              break;
-        case IR_PUSH_SEA:    stack_push(&state->exec_stack, (s64)(stack_peek(&state->fp) + op.u_operand));
+        case IR_PUSH_SEA:    stack_push(&state->exec_stack, (s64)get_variable_address(state, (op.s_operand - 1)));
                              break;
 
         case IR_PUSH_GLOBAL: 
@@ -157,21 +185,19 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         } break;
             
         case IR_ALLOC: {
-            s64 size = op.u_operand;
-            s64 addr = allocate_memory(state, size);
+            s64 addr = allocate_memory(state, op.s_operand);
             stack_push(&state->exec_stack, addr);
         } break;
             
         case IR_FREE: {
-            s64 size = op.u_operand;
-            if (size) free_memory(state, op.u_operand);
+            free_memory(state, op.s_operand);
         } break;
             
         case IR_LOAD: {
             s64 addr = stack_pop(&state->exec_stack);
             if ((u64)addr > state->data_stack.index) {
                 print_ir_opcode(op);
-                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
+                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %d"), addr), op.info);
                 state->running = false;
                 break;
             }
@@ -185,7 +211,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
 
             if ((u64)addr > state->data_stack.index) {
                 print_ir_opcode(op);
-                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %u"), (u64)addr), op.info);
+                log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %d"), addr), op.info);
                 state->running = false;
                 break;
             }
