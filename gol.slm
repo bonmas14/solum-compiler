@@ -1,7 +1,7 @@
 use: "core";
 
 main: () -> s64 = {
-    array: [30 * 30]u8;
+    array: [60 * 30]u8;
     i : s64 = 0;
 
     console_clear();
@@ -13,19 +13,19 @@ main: () -> s64 = {
     halfw: s64 = w / 2 - 3;
     halfh: s64 = h / 2 - 1;
 
-    @(array + (halfw + 1) + (halfh + 0) * w) = 0x80;
+    @(^array + (halfw + 1) + (halfh + 0) * w) = 0x80;
 
-    @(array + (halfw + 0) + (halfh + 2) * w) = 0x80;
-    @(array + (halfw + 1) + (halfh + 2) * w) = 0x80;
-    @(array + (halfw + 3) + (halfh + 1) * w) = 0x80;
+    @(^array + (halfw + 0) + (halfh + 2) * w) = 0x80;
+    @(^array + (halfw + 1) + (halfh + 2) * w) = 0x80;
+    @(^array + (halfw + 3) + (halfh + 1) * w) = 0x80;
 
-    @(array + (halfw + 4) + (halfh + 2) * w) = 0x80;
-    @(array + (halfw + 5) + (halfh + 2) * w) = 0x80;
-    @(array + (halfw + 6) + (halfh + 2) * w) = 0x80;
+    @(^array + (halfw + 4) + (halfh + 2) * w) = 0x80;
+    @(^array + (halfw + 5) + (halfh + 2) * w) = 0x80;
+    @(^array + (halfw + 6) + (halfh + 2) * w) = 0x80;
 
     while i < 256 {
-        draw(w, h, array);
-        step(w, h, array);
+        draw(w, h, ^array);
+        step(w, h, ^array);
         i = i + 1;
     }
 
@@ -88,6 +88,7 @@ check_neighbour: (array: ^u8, w: s64, h: s64, cx: s64, cy: s64) -> s64 = {
         cell : ^u8 = array + cx + cy * w;
 
         if @cell & 0x80 {
+            debug_break();
             return 1;
         }
     }

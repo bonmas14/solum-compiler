@@ -40,23 +40,23 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
 
+#define STORE(reg)\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], " reg), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("inc r15"), 1);
+
 #define BINOP(action)\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("xor rcx, rcx"), 1);\
                 LOAD("rax");\
+                LOAD("rbx");\
                 INSERT_LINE();\
-                nasm_add_line(state, STRING(action" rcx, rax"), 1);\
-                LOAD("rax");\
+                nasm_add_line(state, STRING(action" rax, rbx"), 1);\
                 INSERT_LINE();\
-                nasm_add_line(state, STRING(action" rcx, rax"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rcx"), 1);\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("inc r15"), 1);
 
 #define DIVOP(result_reg)\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("xor rcx, rcx"), 1);\
                 LOAD("rax");\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("cqo"), 1);\
@@ -68,7 +68,20 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("inc r15"), 1);
 
+#define SHIFTOP(action)\
+                LOAD("rax");\
+                LOAD("rcx");\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING(action" rax, cl"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("inc r15"), 1);
+
+
 #define BINCMPOP(cmov)\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("xor rcx, rcx"), 1);\
                 LOAD("rax");\
                 LOAD("rbx");\
                 INSERT_LINE();\
@@ -83,30 +96,23 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 nasm_add_line(state, STRING("inc r15"), 1);
 
 void nasm_compile_func(string_t name, nasm_state_t *state) {
-    nasm_add_string(state, string_format(get_temporary_allocator(), STRING("%s:\n"), name));
 
     if (!state->func->code.count) {
         if (state->func->is_external) {
-
             if (string_compare(name, STRING("putchar")) == 0) {
-                // LOAD
-                nasm_add_line(state, STRING("dec r15"), 1);
-                nasm_add_line(state, STRING("mov rax, QWORD[r14 + r15 * 8]"), 1);
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
+                return;
             }
 
             if (string_compare(name, STRING("debug_break")) == 0) {
-                nasm_add_line(state, STRING("int3"), 1);
+                return;
             }
-
-            nasm_add_line(state, STRING("ret"), 1);
-            return;
         }
 
         assert(false);
         return;
     }
 
+    nasm_add_string(state, string_format(get_temporary_allocator(), STRING("%s:\n"), name));
 
     allocator_t *talloc = get_temporary_allocator();
 
@@ -154,19 +160,23 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 INSERT_LINE();
                 t = string_format(talloc, STRING("mov rax, QWORD[rbp - %u * 8]"), op.u_operand);
                 nasm_add_line(state, t, 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE("rax");
                 break;
             case IR_PUSH_SEA:
                 INSERT_LINE();
                 t = string_format(talloc, STRING("lea rax, QWORD[rbp - %u * 8]"), op.u_operand);
                 nasm_add_line(state, t, 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE("rax");
+                break;
+
+            case IR_POP:
+                LOAD("rax");
+                break;
+
+            case IR_CLONE:
+                LOAD("rax");
+                STORE("rax");
+                STORE("rax");
                 break;
 
             case IR_ALLOC:
@@ -187,10 +197,8 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                     INSERT_LINE();
                     nasm_add_line(state, STRING("mov QWORD[rsp], 0"), 1);
                 }
-                INSERT_LINE();
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rsp"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("inc r15"), 1);
+
+                STORE("rsp");
                 break;
 
             case IR_ADD: BINOP("add"); break;
@@ -207,18 +215,31 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_CMP_LTE: BINCMPOP("cmovle"); break;
             case IR_CMP_GTE: BINCMPOP("cmovge"); break;
 
-            /*
             case IR_BIT_AND:     BINOP("and"); break;
             case IR_BIT_OR:      BINOP("or");  break;
             case IR_BIT_XOR:     BINOP("xor"); break;
-            case IR_SHIFT_LEFT:  BINOP("sal"); break;
-            case IR_SHIFT_RIGHT: BINOP("sar"); break;
-            */
+            case IR_SHIFT_LEFT:  SHIFTOP("sal"); break;
+            case IR_SHIFT_RIGHT: SHIFTOP("sar"); break;
                              
             // case IR_BIT_NOT:
 
             case IR_JUMP: 
+                INSERT_LINE();
                 nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jmp .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                break;
+            case IR_JUMP_IF: 
+                LOAD("rax");
+                INSERT_LINE();
+                nasm_add_line(state, STRING("cmp rax, 0"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jnz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                break;
+            case IR_JUMP_IF_NOT: 
+                LOAD("rax");
+                INSERT_LINE();
+                nasm_add_line(state, STRING("cmp rax, 0"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
                 break;
 
             case IR_FREE:
@@ -228,11 +249,17 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 break;
 
             case IR_STORE:
-                LOAD("rbx");
+                LOAD("rbx"); // first... address
                 LOAD("rax");
                 INSERT_LINE();
-                t = string_format(talloc, STRING("mov QWORD[rbx], rax"), op.u_operand);
-                nasm_add_line(state, t, 1);
+                nasm_add_line(state, STRING("mov QWORD[rbx], rax"), 1);
+                break;
+
+            case IR_LOAD:
+                LOAD("rbx");
+                INSERT_LINE();
+                nasm_add_line(state, STRING("mov rax, QWORD[rbx]"), 1);
+                STORE("rax");
                 break;
 
             case IR_CALL:
@@ -256,6 +283,7 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 break;
 
             default:
+                assert(false);
                 INSERT_LINE();
                 nasm_add_line(state, STRING("ud2"), 1);
                 break;
@@ -276,49 +304,99 @@ void nasm_compile_program(ir_t *state) {
     nasm.is_valid = true;
     array_create(&nasm.code, (u64) 1024, create_arena_allocator(PG(4)));
 
-    
-    nasm_add_line(&nasm, STRING("; Created by bonmas14."));
-    nasm_add_line(&nasm, STRING("; "));
-    nasm_add_line(&nasm, STRING("; solum-compiler auto generated code"));
-    nasm_add_line(&nasm, STRING("; nasm-win-x64"));
-    nasm_add_line(&nasm, STRING(""));
-    nasm_add_line(&nasm, STRING("default rel"));
-    nasm_add_line(&nasm, STRING(""));
-    nasm_add_line(&nasm, STRING("section .bss"));
-    nasm_add_line(&nasm, STRING("exec_stack: resq 4096"));
-    nasm_add_line(&nasm, STRING(""));
-    
-    nasm_add_line(&nasm, STRING("section .text"));
-    nasm_add_line(&nasm, STRING(""));
-    nasm_add_line(&nasm, STRING("global mainCRTStartup"));
-    nasm_add_line(&nasm, STRING(""));
-    nasm_add_line(&nasm, STRING("mainCRTStartup:"));
-    
-    nasm_add_line(&nasm, STRING("lea r14, [exec_stack]"), 1);
-    nasm_add_line(&nasm, STRING("xor r15, r15"), 1);
-    
-    nasm_add_line(&nasm, STRING("call main"), 1);
-    nasm_add_line(&nasm, STRING("ret"), 1);
-    nasm_add_line(&nasm, STRING(""));
+    { // header and RT   
+        nasm_add_line(&nasm, STRING("; Created by bonmas14."));
+        nasm_add_line(&nasm, STRING("; "));
+        nasm_add_line(&nasm, STRING("; solum-compiler auto generated code"));
+        nasm_add_line(&nasm, STRING("; nasm-win-x64"));
+        nasm_add_line(&nasm, STRING(""));
+        nasm_add_line(&nasm, STRING("default rel"));
+        nasm_add_line(&nasm, STRING(""));
+        nasm_add_line(&nasm, STRING("section .bss"));
+        nasm_add_line(&nasm, STRING("exec_stack: resq 4096"));
+        nasm_add_line(&nasm, STRING("putchar_buffer: resb 1"));
+        nasm_add_line(&nasm, STRING("putchar_handle: resq 1"));
+        nasm_add_line(&nasm, STRING(""));
 
-    nasm_add_line(&nasm, STRING("__stack_probe: ; rax = allocation size"), 1);
-    nasm_add_line(&nasm, STRING("test rax, rax"), 1);
-    nasm_add_line(&nasm, STRING("jz .done               ; skip if size=0"), 1);
-    nasm_add_line(&nasm, STRING("mov r10, rsp"), 1);
-    nasm_add_line(&nasm, STRING("sub r10, rax           ; r10 = allocation start"), 1);
-    nasm_add_line(&nasm, STRING("mov r11, r10"), 1);
-    nasm_add_line(&nasm, STRING("and r11, -4096         ; align start down to page boundary"), 1);
-    nasm_add_line(&nasm, STRING("lea rcx, [rsp-1]"), 1);
-    nasm_add_line(&nasm, STRING("and rcx, -4096         ; align current page down"), 1);
-    nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
-    nasm_add_line(&nasm, STRING("jb .done               ; no pages to touch"), 1);
-    nasm_add_line(&nasm, STRING(".loop:"), 1);
-    nasm_add_line(&nasm, STRING("test dword [rcx], 0    ; touch page"), 1);
-    nasm_add_line(&nasm, STRING("sub rcx, 4096          ; move to next page"), 1);
-    nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
-    nasm_add_line(&nasm, STRING("jae .loop"), 1);
-    nasm_add_line(&nasm, STRING(".done:"), 1);
-    nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING("section .text"));
+        nasm_add_line(&nasm, STRING(""));
+        nasm_add_line(&nasm, STRING("global mainCRTStartup"));
+        nasm_add_line(&nasm, STRING("extern GetStdHandle, WriteConsoleA"));
+        nasm_add_line(&nasm, STRING(""));
+        nasm_add_line(&nasm, STRING("mainCRTStartup:"));
+
+        nasm_add_line(&nasm, STRING("lea r14, [exec_stack]"), 1);
+        nasm_add_line(&nasm, STRING("xor r15, r15"), 1);
+
+        nasm_add_line(&nasm, STRING("call putchar_setup"));
+        nasm_add_line(&nasm, STRING("call main"), 1);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
+    }
+
+    { // stack probe function
+        nasm_add_line(&nasm, STRING("__stack_probe: ; rax = allocation size"), 0);
+        nasm_add_line(&nasm, STRING("test rax, rax"), 1);
+        nasm_add_line(&nasm, STRING("jz .done               ; skip if size=0"), 1);
+        nasm_add_line(&nasm, STRING("mov r10, rsp"), 1);
+        nasm_add_line(&nasm, STRING("sub r10, rax           ; r10 = allocation start"), 1);
+        nasm_add_line(&nasm, STRING("mov r11, r10"), 1);
+        nasm_add_line(&nasm, STRING("and r11, -4096         ; align start down to page boundary"), 1);
+        nasm_add_line(&nasm, STRING("lea rcx, [rsp-1]"), 1);
+        nasm_add_line(&nasm, STRING("and rcx, -4096         ; align current page down"), 1);
+        nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
+        nasm_add_line(&nasm, STRING("jb .done               ; no pages to touch"), 1);
+        nasm_add_line(&nasm, STRING(".loop:"), 0);
+        nasm_add_line(&nasm, STRING("test dword [rcx], 0    ; touch page"), 1);
+        nasm_add_line(&nasm, STRING("sub rcx, 4096          ; move to next page"), 1);
+        nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
+        nasm_add_line(&nasm, STRING("jae .loop"), 1);
+        nasm_add_line(&nasm, STRING(".done:"), 0);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+    }
+
+    { // putchar code
+        nasm_add_line(&nasm, STRING("putchar_setup:"));
+        nasm_add_line(&nasm, STRING("push rbp"), 1);
+        nasm_add_line(&nasm, STRING("mov rbp, rsp"), 1);
+        nasm_add_line(&nasm, STRING("and rsp, -16"), 1);
+        nasm_add_line(&nasm, STRING("mov rcx, -11"), 1);
+        nasm_add_line(&nasm, STRING("sub rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("call GetStdHandle"), 1);
+        nasm_add_line(&nasm, STRING("add rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("mov [putchar_handle], rax"), 1);
+        nasm_add_line(&nasm, STRING("mov rsp, rbp"), 1);
+        nasm_add_line(&nasm, STRING("pop rbp"), 1);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+
+        nasm_add_line(&nasm, STRING("putchar:"));
+        nasm_add_line(&nasm, STRING("push rbp"), 1);
+        nasm_add_line(&nasm, STRING("mov rbp, rsp"), 1);
+        nasm_add_line(&nasm, STRING("and rsp, -16"), 1);
+
+        nasm_add_line(&nasm, STRING("dec r15"), 1);
+        nasm_add_line(&nasm, STRING("mov rax, QWORD[r14 + r15 * 8]"), 1);
+        nasm_add_line(&nasm, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
+        nasm_add_line(&nasm, STRING("mov BYTE[putchar_buffer], al"), 1);
+
+        nasm_add_line(&nasm, STRING("mov rcx, [putchar_handle]"), 1);
+        nasm_add_line(&nasm, STRING("lea rdx, [putchar_buffer]"), 1);
+        nasm_add_line(&nasm, STRING("mov r8, 1"), 1);
+        nasm_add_line(&nasm, STRING("mov r9, 0 "), 1);
+        nasm_add_line(&nasm, STRING("push 0   "), 1);
+        nasm_add_line(&nasm, STRING("sub rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("call WriteConsoleA"), 1);
+        nasm_add_line(&nasm, STRING("add rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("mov rsp, rbp"), 1);
+        nasm_add_line(&nasm, STRING("pop rbp"), 1);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+    }
+
+    { // debug break
+        nasm_add_line(&nasm, STRING("debug_break:"));
+        nasm_add_line(&nasm, STRING("int3"), 1);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+    }
 
     for (u64 i = 0; i < state->functions.capacity; i++) {
         kv_pair_t<string_t, ir_function_t> *pair = state->functions.entries + i;

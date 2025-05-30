@@ -73,8 +73,6 @@ enum ir_codes_t {
     IR_CMP_GTE,    
 
     // Logical operations
-    IR_LOG_AND,    
-    IR_LOG_OR,     
     IR_LOG_NOT,    
 
     // Control flow (offset)

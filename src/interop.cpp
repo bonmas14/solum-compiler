@@ -142,8 +142,6 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         BINOP(IR_CMP_LTE, (s64)(a <= b));
         BINOP(IR_CMP_GTE, (s64)(a >= b));
             
-        BINOP(IR_LOG_AND, (s64)(a && b));
-        BINOP(IR_LOG_OR,  (s64)(a || b));
         UNOP (IR_LOG_NOT, (s64)(!a));
 
         case IR_STACK_FRAME_PUSH: 
@@ -171,7 +169,8 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
 
         case IR_PUSH_GEA:
         {
-            log_warning("push addr from global");
+            //log_warning("push addr from global");
+            stack_push(&state->exec_stack, (s64) 0);
         } break;
 
         case IR_POP: {

@@ -1356,7 +1356,7 @@ b32 analyze_struct(analyzer_state_t *state, ast_node_t *node) {
 
     node->analyzed = true;
 
-    u64 size = 0;
+    // u64 size = 0;
 
     return result;
 }

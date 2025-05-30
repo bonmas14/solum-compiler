@@ -78,8 +78,6 @@ const char* ir_code_to_string(u64 code) {
         case IR_CMP_GT:      return "CMP_GT";
         case IR_CMP_LTE:     return "CMP_LTE";
         case IR_CMP_GTE:     return "CMP_GTE";
-        case IR_LOG_AND:     return "LOG_AND";
-        case IR_LOG_OR:      return "LOG_OR";
         case IR_LOG_NOT:     return "LOG_NOT";
         case IR_JUMP:        return "JUMP";
         case IR_JUMP_IF:     return "JUMP_IF";
@@ -223,8 +221,6 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
         EXPR_CASE(AST_BIN_LEQ, IR_CMP_LTE);
         EXPR_CASE(AST_BIN_EQ,  IR_CMP_EQ);
         EXPR_CASE(AST_BIN_NEQ, IR_CMP_NEQ);
-        EXPR_CASE(AST_BIN_LOG_OR,  IR_LOG_OR);
-        EXPR_CASE(AST_BIN_LOG_AND, IR_LOG_AND);
         EXPR_CASE(AST_BIN_ADD, IR_ADD);
         EXPR_CASE(AST_BIN_SUB, IR_SUB);
         EXPR_CASE(AST_BIN_MUL, IR_MUL);
@@ -315,6 +311,32 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
 
             expr.emmited_op = emit_op(state, IR_LOAD, node->token, 0);
             expr.accessable = true;
+        } break;
+
+
+        case AST_BIN_LOG_OR: 
+        {
+            expr = compile_expression(state, node->left,  shadow);
+
+            emit_op(state, IR_CLONE, node->token, 0);
+            ir_opcode_t *end = emit_op(state, IR_JUMP_IF, node->token, 0);
+            emit_op(state, IR_POP, node->token, 0);
+
+            ir_expression_t rhs = compile_expression(state, node->right, shadow);
+            UNUSED(rhs);
+            end->s_operand = state->current_function->code.count - 1 - end->index;
+        } break;
+        case AST_BIN_LOG_AND:
+        {
+            expr = compile_expression(state, node->left,  shadow);
+
+            emit_op(state, IR_CLONE, node->token, 0);
+            ir_opcode_t *end = emit_op(state, IR_JUMP_IF_NOT, node->token, 0);
+            emit_op(state, IR_POP, node->token, 0);
+
+            ir_expression_t rhs = compile_expression(state, node->right, shadow);
+            UNUSED(rhs);
+            end->s_operand = state->current_function->code.count - 1 - end->index;
         } break;
 
         case AST_BIN_CAST:
@@ -469,14 +491,14 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
     return expr;
 }
 
-void compile_block(ir_state_t *state, ast_node_t *node, u64 prealloc = 0) {
+void compile_block(ir_state_t *state, ast_node_t *node) {
     hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, node->scope_index);
     stack_push(&state->search_scopes, block);
     u64 si = state->current_function->stack_index;
 
     ast_node_t *stmt = node->list_start;
 
-    u64 alloc_count = prealloc;
+    u64 alloc_count = 0;
     for (u64 i = 0; i < node->child_count; i++) {
         alloc_count += compile_statement(state, stmt, alloc_count);
         
@@ -673,7 +695,6 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         ast_node_t *node = entry->node->left->left;
         ast_node_t *next = node->list_start;
 
-        u64 alloc_count = 0;
         for (u64 i = 0; i < node->child_count; i++) {
             scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
 
@@ -690,7 +711,6 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
             emit_op(state, IR_ALLOC, node->token, size); 
             emit_op(state, IR_STORE, next->token, entry->offset);
-            alloc_count += size;
             next = next->list_next;
         }
 
