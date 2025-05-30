@@ -30,40 +30,75 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
 }
 
 
+#define INSERT_LINE() nasm_add_line(state, string_format(get_temporary_allocator(), STRING("%%line %u \"%s\""), op.info.l0, op.info.from->filename), 1)
+
 #define LOAD(reg)\
                 INSERT_LINE();\
-                nasm_add_line(state, STRING("sub r15, 1"), 1);\
+                nasm_add_line(state, STRING("dec r15"), 1);\
                 INSERT_LINE();\
-                t = string_format(talloc, STRING("mov " reg ", QWORD[r14 + r15 * 8]"));\
-                nasm_add_line(state, t, 1);
+                nasm_add_line(state, STRING("mov " reg ", QWORD[r14 + r15 * 8]"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
 
 #define BINOP(action)\
                 INSERT_LINE();\
-                nasm_add_line(state, t, 1);\
-                t = string_format(talloc, STRING("xor rcx, rcx"));\
-                \
+                nasm_add_line(state, STRING("xor rcx, rcx"), 1);\
                 LOAD("rax");\
                 INSERT_LINE();\
-                nasm_add_line(state, t, 1);\
-                t = string_format(talloc, STRING(action" rcx, rax"));\
-                \
+                nasm_add_line(state, STRING(action" rcx, rax"), 1);\
                 LOAD("rax");\
                 INSERT_LINE();\
-                nasm_add_line(state, t, 1);\
-                t = string_format(talloc, STRING(action" rcx, rax"));\
-                \
+                nasm_add_line(state, STRING(action" rcx, rax"), 1);\
                 INSERT_LINE();\
-                t = string_format(talloc, STRING("mov QWORD[r14 + r15 * 8], rcx"));\
-                nasm_add_line(state, t, 1);\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rcx"), 1);\
                 INSERT_LINE();\
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
 
+#define DIVOP(result_reg)\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("xor rcx, rcx"), 1);\
+                LOAD("rax");\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("cqo"), 1);\
+                LOAD("rbx");\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("idiv rbx"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], " result_reg), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("inc r15"), 1);
+
+#define BINCMPOP(cmov)\
+                LOAD("rax");\
+                LOAD("rbx");\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("cmp rax, rbx"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov rax, 1"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING(cmov" rcx, rax"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rcx"), 1);\
+                INSERT_LINE();\
+                nasm_add_line(state, STRING("inc r15"), 1);
 
 void nasm_compile_func(string_t name, nasm_state_t *state) {
     nasm_add_string(state, string_format(get_temporary_allocator(), STRING("%s:\n"), name));
 
     if (!state->func->code.count) {
         if (state->func->is_external) {
+
+            if (string_compare(name, STRING("putchar")) == 0) {
+                // LOAD
+                nasm_add_line(state, STRING("dec r15"), 1);
+                nasm_add_line(state, STRING("mov rax, QWORD[r14 + r15 * 8]"), 1);
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
+            }
+
+            if (string_compare(name, STRING("debug_break")) == 0) {
+                nasm_add_line(state, STRING("int3"), 1);
+            }
+
             nasm_add_line(state, STRING("ret"), 1);
             return;
         }
@@ -75,12 +110,13 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
 
     allocator_t *talloc = get_temporary_allocator();
 
-    #define INSERT_LINE() nasm_add_line(state, string_format(get_temporary_allocator(), STRING("%%line %u \"%s\""), op.info.l0, op.info.from->filename), 1)
-
     for (u64 i = 0; i < state->func->code.count; i++) {
         ir_opcode_t op = state->func->code[i];
 
-        nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u:"), i), 1);
+        nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u:"), i), 0);
+
+        INSERT_LINE();
+        nasm_add_line(state, STRING("nop"), 1);
 
         // @todo, for jumps we need to create auto labels!
 
@@ -105,14 +141,14 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 t = string_format(talloc, STRING("mov QWORD[r14 + r15 * 8], %u"), op.u_operand);
                 nasm_add_line(state, t, 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
                 break;
             case IR_PUSH_UNSIGN:
                 INSERT_LINE();
                 t = string_format(talloc, STRING("mov QWORD[r14 + r15 * 8], %u"), op.u_operand);
                 nasm_add_line(state, t, 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
                 break;
             case IR_PUSH_STACK:
                 INSERT_LINE();
@@ -121,7 +157,7 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 INSERT_LINE();
                 nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
                 break;
             case IR_PUSH_SEA:
                 INSERT_LINE();
@@ -130,32 +166,56 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 INSERT_LINE();
                 nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
                 break;
 
             case IR_ALLOC:
                 // Stack probe...
+                
+                if ((op.u_operand * 8) > PG(1)) {
+                    INSERT_LINE();
+                    t = string_format(talloc, STRING("mov rax, %u * 8"), op.u_operand);
+                    nasm_add_line(state, t, 1);
+                    INSERT_LINE();
+                    nasm_add_line(state, STRING("call __stack_probe"), 1);
+                    INSERT_LINE();
+                    nasm_add_line(state, STRING("sub rsp, rax"), 1);
+                } else {
+                    INSERT_LINE();
+                    t = string_format(talloc, STRING("sub rsp, %u * 8"), op.u_operand);
+                    nasm_add_line(state, t, 1);
+                    INSERT_LINE();
+                    nasm_add_line(state, STRING("mov QWORD[rsp], 0"), 1);
+                }
                 INSERT_LINE();
-                t = string_format(talloc, STRING("mov rax, %u * 8"), op.u_operand);
-                nasm_add_line(state, t, 1);
+                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rsp"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("call __stack_probe"), 1);
-
-                INSERT_LINE();
-                nasm_add_line(state, STRING("sub rsp, rax"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("mov rax, rsp"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
-                INSERT_LINE();
-                nasm_add_line(state, STRING("add r15, 1"), 1);
+                nasm_add_line(state, STRING("inc r15"), 1);
                 break;
 
             case IR_ADD: BINOP("add"); break;
             case IR_SUB: BINOP("sub"); break;
             case IR_MUL: BINOP("imul"); break;
-            case IR_DIV: BINOP("idiv"); break;
-            // case IR_MOD: BINOP("idiv"); break; // cause mod result in different register!
+
+            case IR_DIV: DIVOP("rax"); break;
+            case IR_MOD: DIVOP("rdx"); break;
+
+            case IR_CMP_EQ:  BINCMPOP("cmove");  break;
+            case IR_CMP_NEQ: BINCMPOP("cmovne"); break;
+            case IR_CMP_LT:  BINCMPOP("cmovl"); break;
+            case IR_CMP_GT:  BINCMPOP("cmovg"); break;
+            case IR_CMP_LTE: BINCMPOP("cmovle"); break;
+            case IR_CMP_GTE: BINCMPOP("cmovge"); break;
+
+            /*
+            case IR_BIT_AND:     BINOP("and"); break;
+            case IR_BIT_OR:      BINOP("or");  break;
+            case IR_BIT_XOR:     BINOP("xor"); break;
+            case IR_SHIFT_LEFT:  BINOP("sal"); break;
+            case IR_SHIFT_RIGHT: BINOP("sar"); break;
+            */
+                             
+            // case IR_BIT_NOT:
 
             case IR_JUMP: 
                 nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jmp .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
@@ -170,12 +230,8 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_STORE:
                 LOAD("rbx");
                 LOAD("rax");
-
                 INSERT_LINE();
-                t = string_format(talloc, STRING("mov rax, QWORD[r14 + r15 * 8]"), op.u_operand);
-                nasm_add_line(state, t, 1);
-                INSERT_LINE();
-                t = string_format(talloc, STRING("add QWORD[rbx], rax"), op.u_operand);
+                t = string_format(talloc, STRING("mov QWORD[rbx], rax"), op.u_operand);
                 nasm_add_line(state, t, 1);
                 break;
 
@@ -229,8 +285,7 @@ void nasm_compile_program(ir_t *state) {
     nasm_add_line(&nasm, STRING("default rel"));
     nasm_add_line(&nasm, STRING(""));
     nasm_add_line(&nasm, STRING("section .bss"));
-    nasm_add_line(&nasm, STRING("exec_stack:"));
-    nasm_add_line(&nasm, STRING("resb 4096 * 8"), 1);
+    nasm_add_line(&nasm, STRING("exec_stack: resq 4096"));
     nasm_add_line(&nasm, STRING(""));
     
     nasm_add_line(&nasm, STRING("section .text"));
