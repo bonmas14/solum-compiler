@@ -2,6 +2,7 @@
 #include "scanner.h"
 #include "talloc.h"
 #include "strings.h"
+#include "stdio.h"
 
 // @todo for scanner:
 // create string builder and replace all of defines
@@ -650,7 +651,7 @@ b32 scanner_open(string_t *filename, string_t *string, scanner_t *state) {
     return true;
 }
 
-void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 left_pad) {
+void print_lines_of_code(FILE *fp, token_t token, s64 start_shift, s64 stop_shift, u64 left_pad) {
     assert(token.l1 >= token.l0);
     scanner_t *state = token.from;
 
@@ -679,11 +680,11 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
             continue;
         }
 
-        add_left_pad(stderr, left_pad);
+        add_left_pad(fp, left_pad);
 
         if (i < token.l0 || i > token.l1) {
             log_update_color();
-            fprintf(stderr, "%4llu | %.*s\n", i + 1, (int)line_length - 1, start_pos);
+            fprintf(fp, "%4llu | %.*s\n", i + 1, (int)line_length - 1, start_pos);
         } else {
             u64 token_size = token.c1 - token.c0;
 
@@ -692,42 +693,42 @@ void print_lines_of_code(token_t token, s64 start_shift, s64 stop_shift, u64 lef
 
                 if (i > token.l0 && i < token.l1) {
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)line_length, start_pos);
+                    fprintf(fp, "%4llu | %.*s", i + 1, (int)line_length, start_pos);
                     log_pop_color();
                 } else if (i == token.l0) {
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
+                    fprintf(fp, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
                     line_length -= token.c0;
                     log_push_color(ERROR_COLOR); 
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int)line_length, start_pos + token.c0);
+                    fprintf(fp, "%.*s", (int)line_length, start_pos + token.c0);
                     log_pop_color();
                 } else if (i == token.l1) {
                     log_update_color();
-                    fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c1, start_pos);
+                    fprintf(fp, "%4llu | %.*s", i + 1, (int)token.c1, start_pos);
                     line_length -= token.c1;
 
                     log_pop_color();
                     log_update_color();
-                    fprintf(stderr, "%.*s", (int) line_length, start_pos + token.c1);
+                    fprintf(fp, "%.*s", (int) line_length, start_pos + token.c1);
                 } else {
                     log_pop_color();
                 }
             } else {
                 log_update_color();
-                fprintf(stderr, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
+                fprintf(fp, "%4llu | %.*s", i + 1, (int)token.c0, start_pos);
                 line_length -= token.c0;
 
                 log_push_color(255, 64, 64); 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int)token_size, start_pos + token.c0);
+                fprintf(fp, "%.*s", (int)token_size, start_pos + token.c0);
                 log_pop_color();
 
                 line_length -= token_size;
 
                 log_update_color();
-                fprintf(stderr, "%.*s", (int) line_length, start_pos + token.c0 + token_size);
+                fprintf(fp, "%.*s", (int) line_length, start_pos + token.c0 + token_size);
             }
         }
     }
@@ -745,7 +746,7 @@ void log_info_token(string_t text, token_t token) {
     log_push_color(255, 255, 255);
     log_info(text);
     print_info(token);
-    print_lines_of_code(token, 1, 1, 0);
+    print_lines_of_code(stderr, token, 1, 1, 0);
     log_write(STRING("\n"));
     log_pop_color();
 }
@@ -756,7 +757,7 @@ void log_warning_token(string_t text, token_t token) {
     print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(token, 1, 1, 0);
+    print_lines_of_code(stderr, token, 1, 1, 0);
     log_write(STRING("\n"));
 
     log_pop_color();
@@ -769,7 +770,7 @@ void log_error_token(string_t text, token_t token) {
     print_info(token);
 
     log_push_color(255, 255, 255);
-    print_lines_of_code(token, 1, 1, 0);
+    print_lines_of_code(stderr, token, 1, 1, 0);
     log_write(STRING("\n"));
 
     log_pop_color();

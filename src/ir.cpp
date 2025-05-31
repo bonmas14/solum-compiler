@@ -12,9 +12,6 @@
 #include "strings.h"
 #include "memctl.h"
 
-// just for now this will be here
-// #define VERBOSE
-
 #define EXPR_CASE(cs, tok) case cs: {\
             ir_expression_t rhs = compile_expression(state, node->right, shadow);\
             ir_expression_t lhs = compile_expression(state, node->left,  shadow);\
@@ -94,8 +91,7 @@ const char* ir_code_to_string(u64 code) {
 void print_ir_opcode(ir_opcode_t op) {
     const char* op_name = ir_code_to_string(op.operation);
     
-    log_update_color();
-    printf("[IR] | %-14s | %lld\n", op_name, (long long) op.s_operand);
+    fprintf(stdout, "[IR] | %-14s | %lld\n", op_name, (long long) op.s_operand);
 }
 
 string_t get_ir_opcode_info(ir_opcode_t op) {
@@ -708,19 +704,19 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             emit_op(state, IR_INVALID, entry->node->token, 0);
         }
 
-#ifdef VERBOSE
-        u64 last_line = 0;
+        if (compiler_config.verbose) {
+            u64 last_line = 0;
 
-        for (u64 i = 0; i < state->current_function->code.count; i++) {
-            if (last_line != state->current_function->code[i].info.l0) {
-                log_write("\n");
-                print_lines_of_code(state->current_function->code[i].info, 0, 0, 0);
-                last_line = state->current_function->code[i].info.l0;
+            for (u64 i = 0; i < state->current_function->code.count; i++) {
+                if (last_line != state->current_function->code[i].info.l0) {
+                    printf("\n");
+                    print_lines_of_code(stdout, state->current_function->code[i].info, 0, 0, 0);
+                    last_line = state->current_function->code[i].info.l0;
+                }
+
+                print_ir_opcode(state->current_function->code[i]);
             }
-
-            print_ir_opcode(state->current_function->code[i]);
         }
-#endif
     }
     stack_pop(&state->search_scopes);
     state->current_function = NULL;
@@ -771,21 +767,21 @@ void compile_globals(ir_state_t *state) {
         emit_op(state, IR_STACK_FRAME_POP, {}, 0);
         emit_op(state, IR_RET,             {}, 0);
 
-// #ifdef VERBOSE
-        u64 last_line = 0;
+        if (compiler_config.verbose) {
+            u64 last_line = 0;
 
-        for (u64 i = 0; i < state->current_function->code.count; i++) {
-            if (last_line != state->current_function->code[i].info.l0) {
-                if (state->current_function->code[i].info.from != NULL) {
-                    log_write("\n");
-                    print_lines_of_code(state->current_function->code[i].info, 0, 0, 0);
-                    last_line = state->current_function->code[i].info.l0;
+            for (u64 i = 0; i < state->current_function->code.count; i++) {
+                if (last_line != state->current_function->code[i].info.l0) {
+                    if (state->current_function->code[i].info.from != NULL) {
+                        log_write("\n");
+                        print_lines_of_code(stdout, state->current_function->code[i].info, 0, 0, 0);
+                        last_line = state->current_function->code[i].info.l0;
+                    }
                 }
-            }
 
-            print_ir_opcode(state->current_function->code[i]);
+                print_ir_opcode(state->current_function->code[i]);
+            }
         }
-// #endif
     }
     state->current_function = NULL;
 }

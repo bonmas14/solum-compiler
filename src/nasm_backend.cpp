@@ -2,7 +2,6 @@
 #include "arena.h"
 #include "array.h"
 #include "talloc.h"
-
 #include "strings.h"
 
 struct nasm_state_t {
@@ -310,7 +309,7 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_add_line(&nasm, STRING("lea r14, [exec_stack]"), 1);
         nasm_add_line(&nasm, STRING("xor r15, r15"), 1);
 
-        nasm_add_line(&nasm, STRING("call putchar_setup"));
+        nasm_add_line(&nasm, STRING("call putchar_setup"), 1);
         nasm_add_line(&nasm, STRING("call main"), 1);
         nasm_add_line(&nasm, STRING("ret"), 1);
         nasm_add_line(&nasm, STRING(""));
@@ -319,18 +318,18 @@ backend_t nasm_compile_program(ir_t *state) {
     { // stack probe function
         nasm_add_line(&nasm, STRING("__stack_probe: ; rax = allocation size"), 0);
         nasm_add_line(&nasm, STRING("test rax, rax"), 1);
-        nasm_add_line(&nasm, STRING("jz .done               ; skip if size=0"), 1);
+        nasm_add_line(&nasm, STRING("jz .done"), 1);
         nasm_add_line(&nasm, STRING("mov r10, rsp"), 1);
-        nasm_add_line(&nasm, STRING("sub r10, rax           ; r10 = allocation start"), 1);
+        nasm_add_line(&nasm, STRING("sub r10, rax"), 1);
         nasm_add_line(&nasm, STRING("mov r11, r10"), 1);
-        nasm_add_line(&nasm, STRING("and r11, -4096         ; align start down to page boundary"), 1);
+        nasm_add_line(&nasm, STRING("and r11, -4096"), 1);
         nasm_add_line(&nasm, STRING("lea rcx, [rsp-1]"), 1);
-        nasm_add_line(&nasm, STRING("and rcx, -4096         ; align current page down"), 1);
+        nasm_add_line(&nasm, STRING("and rcx, -4096"), 1);
         nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
-        nasm_add_line(&nasm, STRING("jb .done               ; no pages to touch"), 1);
+        nasm_add_line(&nasm, STRING("jb .done"), 1);
         nasm_add_line(&nasm, STRING(".loop:"), 0);
-        nasm_add_line(&nasm, STRING("test dword [rcx], 0    ; touch page"), 1);
-        nasm_add_line(&nasm, STRING("sub rcx, 4096          ; move to next page"), 1);
+        nasm_add_line(&nasm, STRING("test dword [rcx], 0"), 1);
+        nasm_add_line(&nasm, STRING("sub rcx, 4096"), 1);
         nasm_add_line(&nasm, STRING("cmp rcx, r11"), 1);
         nasm_add_line(&nasm, STRING("jae .loop"), 1);
         nasm_add_line(&nasm, STRING(".done:"), 0);

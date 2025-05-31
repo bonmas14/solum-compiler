@@ -23,6 +23,7 @@ void log_pop_color(void) {
 }
 
 void log_update_color(void) {
+    if (compiler_config.no_ansi_codes) return;
     if (!update_requested) return;
     update_requested = false;
 
@@ -75,19 +76,3 @@ void log_write(const   char *text) { log_write(STRING(text));   }
 void log_info(const    char *text) { log_info(STRING(text));    }
 void log_warning(const char *text) { log_warning(STRING(text)); }
 void log_error(const   char *text) { log_error(STRING(text));   }
-/*
-string_t log_sprintf(string_t string, void * data, ...) {
-    va_list parameters;
-}
-
-string_t log_sprintf(string_t string, void * data, ...) {
-    va_list parameters;
-
-    va_start(parameters, data);
-    
-    long p1 = va_arg(parameters, char);
-    va_arg(parameters, long long);
-
-    va_end();
-}
-*/

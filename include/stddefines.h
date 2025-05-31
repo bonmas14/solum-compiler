@@ -49,8 +49,15 @@ struct string_t {
     }
 };
 
+struct compiler_configuration_t {
+    string_t filename;
+    b32      verbose;
+    b32      no_ansi_codes;
+};
+
 struct allocator_t;
 extern allocator_t * default_allocator;
+extern compiler_configuration_t compiler_config;
 
 u64 c_string_length(const char *c_str);
 #define STR(s) reinterpret_cast<u8*>(const_cast<char*>(s))

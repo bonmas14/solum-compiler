@@ -19,6 +19,8 @@
 
 #define MODULES_PATH "SOLUM_MODULES"
 
+compiler_configuration_t compiler_config = {};
+
 string_t get_global_modules_search_path(void) {
     assert(default_allocator != NULL);
 
@@ -71,37 +73,23 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
     return compiler;
 }
 
-void compile(string_t filename) {
-    compiler_t state = create_compiler_instance(NULL);
-
-    if (!state.valid) {
-        log_error(STRING("Initialization of compiler is failed"));
-        return;
-    }
-
-    profiler_block_start(STRING("Load and process"));
-    if (!load_and_process_file(&state, filename)) {
-        profiler_block_end();
-        return;
-    }
-    profiler_block_end();
-
+void compile(compiler_t *state) {
     profiler_block_start(STRING("Preload all files"));
-    if (!analyzer_preload_all_files(&state)) {
+    if (!analyzer_preload_all_files(state)) {
         profiler_block_end();
         return;
     }
     profiler_block_end();
 
     profiler_block_start(STRING("Analyze"));
-    if (!analyze(&state)) {
+    if (!analyze(state)) {
         profiler_block_end();
         return;
     }
     profiler_block_end();
 
     profiler_block_start(STRING("IR gen"));
-    ir_t result = compile_program(&state);
+    ir_t result = compile_program(state);
     profiler_block_end();
 
     if (result.is_valid) {
