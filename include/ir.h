@@ -108,6 +108,7 @@ struct ir_opcode_t {
 struct ir_function_t {
     b32 is_external;
     u64 stack_index;
+    u64 global_index;
     array_t<ir_opcode_t> code;
 };
 

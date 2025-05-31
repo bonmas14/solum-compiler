@@ -104,10 +104,6 @@ string_t get_ir_opcode_info(ir_opcode_t op) {
     return string_format(get_temporary_allocator(), STRING(" --- %s | %d"), STRING(op_name), op.s_operand);
 }
 
-#ifdef NDEBUG
-#define print_ir_opcode(...)
-#endif
-
 ir_opcode_t *emit_op(ir_state_t *state, u64 op, token_t debug, u64 data) {
     ir_opcode_t o = {};
     o.operation = op;
@@ -541,8 +537,8 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node, b32 is_global = false)
     }
 
     if (is_global) {
-        entry->offset   = state->current_function->stack_index;
-        state->current_function->stack_index += size;
+        entry->offset   = state->current_function->global_index;
+        state->current_function->global_index += size;
         entry->on_stack = false;
         emit_op(state, IR_SETUP_GLOBAL, node->token, 0);
     } else {
