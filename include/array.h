@@ -23,10 +23,8 @@ struct array_t {
 
     list_t<array_entry_t<DataType>> entries;
 
-    DataType operator[](u64 index) {
-        if (index >= count) {
-            return {};
-        }
+    DataType& operator[](u64 index) {
+        assert(index < count);
 
         u64 index_offset = 0;
         u64 ei = 0;
@@ -79,8 +77,6 @@ void array_create(array_t<DataType> *array, u64 size, allocator_t alloc) {
 
 template<typename DataType>
 void array_delete(array_t<DataType> *array) {
-    if (array->alloc.proc == NULL) return;
-
     list_delete(&array->entries);
 }
 

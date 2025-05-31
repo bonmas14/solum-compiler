@@ -6,7 +6,7 @@
 #include "memctl.h"
 #include "allocator.h"
 
-#define STANDART_LIST_SIZE 10
+#define STANDARD_LIST_SIZE 10
 
 template<typename DataType>
 struct list_t {
@@ -17,10 +17,8 @@ struct list_t {
     u64 current_size;
     u64 grow_size;
 
-    DataType operator[](u64 index) {
-        if (index >= count) {
-            return {};
-        }
+    DataType& operator[](u64 index) {
+        assert(index < count);
 
         return data[index];
     }
@@ -103,7 +101,7 @@ list_t<DataType> list_clone(list_t<DataType> *list) {
     if (!list_create(&clone, list->current_size, list->alloc))
         return {};
 
-    mem_copy((u8*)clone.data, (u8*)list->data, sizeof(list_t<DataType>) * list->count);
+    mem_copy((u8*)clone.data, (u8*)list->data, sizeof(DataType) * list->count);
     clone.count = list->count;
 
     return clone;
@@ -124,6 +122,9 @@ b32 list_delete(list_t<DataType> *list) {
     assert(list->alloc != NULL);
     mem_free(list->alloc, list->data); 
     list->data = NULL;
+    list->count = 0;
+    list->current_size = 0;
+    list->grow_size = 0;
 
     return true;
 }
@@ -187,7 +188,9 @@ DataType *list_get(list_t<DataType> *list, u64 index) {
 template<typename DataType>
 void list_create_if_needed(list_t<DataType> *list) {
     assert(default_allocator);
-    if (list->data == NULL && !list_create(list, STANDART_LIST_SIZE, default_allocator)) {
+
+    allocator_t *alloc = list->alloc ? list->alloc : default_allocator;
+    if (list->data == NULL && !list_create(list, STANDARD_LIST_SIZE, alloc)) {
         log_error(STRING("tried to create list but failed."));
     }
 }
@@ -201,8 +204,6 @@ b32 list_grow(list_t<DataType> *list) {
         log_error(STRING("List: Couldn't grow list."));
         return false;
     }
-
-    (void)mem_set((u8*)data, 0, list->grow_size * sizeof(DataType));
 
     (void)mem_copy((u8*)data, (u8*)list->data, list->current_size * sizeof(DataType));
 

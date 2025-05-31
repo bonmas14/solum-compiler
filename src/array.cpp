@@ -1,4 +1,5 @@
 #include "array.h"
+#include "arena.h"
 #include "allocator.h"
 #include "talloc.h"
 
@@ -33,6 +34,22 @@ void array_tests(void) {
         }
 
         array_delete(&values);
+    }
+    {
+        array_t<u64> values = {};
+        allocator_t alloc = create_arena_allocator(128);
+        array_create(&values, 128, alloc);
+
+        for (u64 i = 0; i < 384; i++) {
+            array_add(&values, i);
+        }
+
+        for (u64 i = 0; i < 384; i++) {
+            assert(*array_get(&values, i) == i);
+        }
+
+        array_delete(&values);
+        delete_arena_allocator(alloc);
     }
 #endif//
 }

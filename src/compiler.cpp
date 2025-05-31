@@ -102,19 +102,25 @@ void compile(string_t filename) {
 
     ir_t result = compile_program(&state);
 
-    // result will return final IR
-    // everything should be compiled 
-    // or there is an error
-
     if (result.is_valid) {
-        nasm_compile_program(&result);
+
+        string_t key = STRING("compile_globals");
+
+        ir_function_t *func = result.functions[key];
+
+        assert(func);
+
         // @todo fix pointer math, because we do unaligned stuff and it is automatically aligned in interpreter!
-        // interop_func(&result, STRING("main"));
+        interop_func(&result, key);
+
+        if (hashmap_remove(&result.functions, STRING("compile_globals"))) {
+            array_delete(&func->code);
+        }
+
+        nasm_compile_program(&result);
     } else {
         log_error(STRING("NOT COMPILED"));
     }
-
-    // codegen from IR here
     return;
 }
 

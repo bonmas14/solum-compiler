@@ -1,5 +1,7 @@
 use: "core";
 
+test: s32 = 100 + 23;
+
 main: () -> s64 = {
     array: [60 * 30]u8;
     i : s64 = 0;

@@ -106,11 +106,6 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
 
         nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u: ; %s"), i, get_ir_opcode_info(op)), 0);
 
-        // INSERT_LINE();
-        // nasm_add_line(state, STRING("nop"), 1);
-
-        // @todo, for jumps we need to create auto labels!
-
         string_t t = {};
         switch (op.operation) {
             case IR_STACK_FRAME_PUSH:
@@ -205,7 +200,13 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_SHIFT_LEFT:  SHIFTOP("sal"); break;
             case IR_SHIFT_RIGHT: SHIFTOP("sar"); break;
                              
-            // case IR_BIT_NOT:
+             case IR_BIT_NOT:
+                LOAD("rax");
+                nasm_add_line(state, STRING("mov rbx, -1"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, STRING("xor rax, rbx"), 1);
+                STORE("rax");
+                break;
 
             case IR_JUMP: 
                 INSERT_LINE();

@@ -46,6 +46,7 @@ struct ir_state_t {
 const char* ir_code_to_string(u64 code) {
     switch (code) {
         case IR_NOP:         return "NOP";
+        case IR_SETUP_GLOBAL: return "SETUP_GLOBAL";
         case IR_PUSH_SIGN:   return "PUSH_SIGN";
         case IR_PUSH_UNSIGN: return "PUSH_UNSIGN";
         case IR_PUSH_STACK:  return "PUSH_STACK";
@@ -358,6 +359,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             log_error("Structs TODO:");
             break;
 
+            /*
             assert(node->left->type       == AST_PRIMARY);
             assert(node->left->token.type == TOKEN_IDENT);
 
@@ -382,12 +384,13 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                 break;
             }
 
+            */
+
             // TODO: here we set code for loading real address,
             // because before we added offset of variable in type!
             // not the real offset
             //
             // so get (struct addr) + (offset, size)
-
 
             return expr;
 
@@ -395,6 +398,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             // log_error("Cant use arrays");
             break;
 
+            /*
             compile_expression(state, node->right, shadow);
             expr = compile_expression(state, node->left, shadow);
 
@@ -404,6 +408,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             } else {
                 expr.emmited_op->operation = IR_STORE;
             }
+            */
             return expr;
 
         case AST_BIN_ASSIGN:
@@ -420,12 +425,13 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     expr.emmited_op->operation = IR_PUSH_SEA;
                 } else if (expr.emmited_op->operation == IR_LOAD) {
                     expr.emmited_op->operation = IR_STORE;
+                    expr.emmited_op->u_operand = 0;
                     break;
                 } else {
                     expr.emmited_op->operation = IR_INVALID;
                 }
 
-                emit_op(state, IR_STORE, node->left->token, expr.offset);
+                emit_op(state, IR_STORE, node->left->token, 0);
             }
             break;
 
@@ -452,7 +458,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                             expr.emmited_op->operation = IR_INVALID;
                         }
 
-                        emit_op(state, IR_STORE, next->token, expr.offset);
+                        emit_op(state, IR_STORE, next->token, 0);
                     }
 
                     next = next->list_next;
@@ -511,12 +517,11 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
         emit_op(state, IR_FREE, stmt->token, alloc_count);
     }
 
-
     state->current_function->stack_index = si;
     stack_pop(&state->search_scopes);
 }
 
-u64 compile_variable(ir_state_t *state, ast_node_t *node) {
+u64 compile_variable(ir_state_t *state, ast_node_t *node, b32 is_global = false) {
     assert(state->current_function != NULL);
 
     scope_entry_t *entry = search_identifier(state, node->token.data.string, {});
@@ -528,7 +533,6 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
         emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
     }
 
-    // u64 size = entry->info.size;
     u64 size = 1;
 
     if (entry->info.is_array) { 
@@ -536,48 +540,30 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node) {
         entry->info.pointer_depth += 1;
     }
 
-    state->current_function->stack_index += size;
-    entry->offset   = state->current_function->stack_index;
-    entry->on_stack = true;
-
-
-    emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
-    emit_op(state, IR_STORE, node->token, 0);
+    if (is_global) {
+        entry->offset   = state->current_function->stack_index;
+        state->current_function->stack_index += size;
+        entry->on_stack = false;
+        emit_op(state, IR_SETUP_GLOBAL, node->token, 0);
+    } else {
+        state->current_function->stack_index += size;
+        entry->offset   = state->current_function->stack_index;
+        entry->on_stack = true;
+        emit_op(state, IR_ALLOC, node->token, size);
+        emit_op(state, IR_STORE, node->token, 0);
+    }
 
     return size;
 }
 
-u64 compile_mul_variables(ir_state_t *state, ast_node_t *node) {
+u64 compile_mul_variables(ir_state_t *state, ast_node_t *node, b32 is_global = false) {
     assert(state->current_function != NULL);
 
     u64 alloc_count = 0;
     ast_node_t *next = node->left->list_start;
     
     for (u64 i = 0; i < node->left->child_count; i++) {
-        scope_entry_t *entry = search_identifier(state, next->token.data.string, {});
-
-        if (entry->expr) {
-            ir_expression_t expr = compile_expression(state, entry->expr, next->token.data.string);
-            UNUSED(expr);
-        } else {
-            emit_op(state, IR_PUSH_UNSIGN, node->token, 0);
-        }
-
-        u64 size = 1;
-
-        if (entry->info.is_array) { 
-            size *= 100 * 100;
-            entry->info.pointer_depth += 1;
-        }
-
-        state->current_function->stack_index += size;
-        entry->offset   = state->current_function->stack_index;
-        entry->on_stack = true;
-
-        emit_op(state, IR_ALLOC, node->token, size); // here we get the type size
-        emit_op(state, IR_STORE, next->token, 0);
-        alloc_count += size;
-
+        alloc_count += compile_variable(state, next, is_global);
         next = next->list_next;
     }
 
@@ -676,17 +662,20 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
     assert(state->current_function == NULL);
 
-    ir_function_t func = {};
-
-    array_create(&func.code, 8, state->ir.code);
-    if (entry->is_external) {
-        func.is_external = true;
+    {
+        ir_function_t func = {};
         hashmap_add(&state->ir.functions, key, &func);
+    }
+
+    state->current_function = hashmap_get(&state->ir.functions, key);
+
+    array_create(&state->current_function->code, 8, state->ir.code);
+    if (entry->is_external) {
+        state->current_function->is_external = true;
         profiler_func_end();
+        state->current_function = NULL;
         return;
     }  
-
-    state->current_function = &func;
 
     stack_push(&state->search_scopes, &entry->func_params);
     {
@@ -710,7 +699,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             entry->on_stack = true;
 
             emit_op(state, IR_ALLOC, node->token, size); 
-            emit_op(state, IR_STORE, next->token, entry->offset);
+            emit_op(state, IR_STORE, next->token, 0);
             next = next->list_next;
         }
 
@@ -726,54 +715,83 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 #ifdef VERBOSE
         u64 last_line = 0;
 
-        for (u64 i = 0; i < func.code.count; i++) {
-            if (last_line != func.code[i].info.l0) {
+        for (u64 i = 0; i < state->current_function->code.count; i++) {
+            if (last_line != state->current_function->code[i].info.l0) {
                 log_write("\n");
-                print_lines_of_code(func.code[i].info, 0, 0, 0);
-                last_line = func.code[i].info.l0;
+                print_lines_of_code(state->current_function->code[i].info, 0, 0, 0);
+                last_line = state->current_function->code[i].info.l0;
             }
 
-            print_ir_opcode(func.code[i]);
+            print_ir_opcode(state->current_function->code[i]);
         }
 #endif
     }
     stack_pop(&state->search_scopes);
     state->current_function = NULL;
-    hashmap_add(&state->ir.functions, key, &func);
     profiler_func_end();
 }
 
-void evaluate_variable(ir_state_t *state, scope_entry_t *entry) {
-    if (entry->expr) {
-        // ir_expression_t expr = evaluate_expression(state, entry->expr, node->token.data.string);
-        // UNUSED(expr);
+void compile_globals(ir_state_t *state) {
+    string_t key = string_copy(STRING("compile_globals"), default_allocator);
+    hashmap_t<string_t, scope_entry_t> *scope = stack_peek(&state->search_scopes);
+    
+    {
+        ir_function_t func = {};
+        hashmap_add(&state->ir.functions, key, &func);
     }
 
-    ir_variable_t var = {};
-    entry->offset   = state->ir.globals.count;
-    entry->on_stack = false;
-    var.size      = 8;
-    var.alignment = 8;
-    var.entry     = entry;
-    state->ir.globals += var;
-}
+    state->current_function = hashmap_get(&state->ir.functions, key);
 
-void compile_global_statement(ir_state_t *state, string_t key, scope_entry_t *entry) {
-    switch (entry->stmt->type) {
-        case AST_BIN_UNKN_DEF: 
-            if (entry->type == ENTRY_FUNC) {
-                compile_function(state, key, entry);
-                break;
+    array_create(&state->current_function->code, 8, state->ir.code);
+    {
+        emit_op(state, IR_STACK_FRAME_PUSH, {}, 0);
+
+        u64 global_size = 0;
+
+        for (u64 i = 0; i < scope->capacity; i++) {
+            kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
+        
+            if (!pair->occupied) continue;
+            if (pair->deleted)   continue;
+
+            if (pair->value.type != ENTRY_VAR) {
+                continue;
             }
-            
-            evaluate_variable(state, entry); // also evaluate expression...
-            break;
 
-        case AST_UNARY_VAR_DEF: evaluate_variable(state, entry); break;
-        case AST_BIN_MULT_DEF:  evaluate_variable(state, entry); break;
-        case AST_TERN_MULT_DEF: evaluate_variable(state, entry); break;
-        default: break;
+            switch (pair->value.stmt->type) {
+                case AST_BIN_UNKN_DEF:  global_size += compile_variable(state,      pair->value.node, true); break;
+                case AST_UNARY_VAR_DEF: global_size += compile_variable(state,      pair->value.node, true); break;
+                case AST_BIN_MULT_DEF:  global_size += compile_mul_variables(state, pair->value.node, true); break;
+                case AST_TERN_MULT_DEF: global_size += compile_mul_variables(state, pair->value.node, true); break;
+                default: assert(false); break;
+            }
+        }
+    
+        for (u64 i = 0; i < global_size; i++) {
+            array_add(&state->ir.globals, (s64) 0);
+        }
+
+        // code for initing the globals
+        emit_op(state, IR_STACK_FRAME_POP, {}, 0);
+        emit_op(state, IR_RET,             {}, 0);
+
+// #ifdef VERBOSE
+        u64 last_line = 0;
+
+        for (u64 i = 0; i < state->current_function->code.count; i++) {
+            if (last_line != state->current_function->code[i].info.l0) {
+                if (state->current_function->code[i].info.from != NULL) {
+                    log_write("\n");
+                    print_lines_of_code(state->current_function->code[i].info, 0, 0, 0);
+                    last_line = state->current_function->code[i].info.l0;
+                }
+            }
+
+            print_ir_opcode(state->current_function->code[i]);
+        }
+// #endif
     }
+    state->current_function = NULL;
 }
 
 ir_t compile_program(compiler_t *compiler) {
@@ -789,22 +807,10 @@ ir_t compile_program(compiler_t *compiler) {
     state.ir.is_valid = true;
 
     hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
-
     stack_push(&state.search_scopes, scope);
 
     // compiling globals
-    for (u64 i = 0; i < scope->capacity; i++) {
-        kv_pair_t<string_t, scope_entry_t> *pair = scope->entries + i;
-    
-        if (!pair->occupied) continue;
-        if (pair->deleted)   continue;
-
-        if (pair->value.type != ENTRY_VAR) {
-            continue;
-        }
-
-        compile_global_statement(&state, pair->key, &pair->value);
-    }
+    compile_globals(&state);
 
     // compiling code, functions
     for (u64 i = 0; i < scope->capacity; i++) {
@@ -813,12 +819,13 @@ ir_t compile_program(compiler_t *compiler) {
         if (!pair->occupied) continue;
         if (pair->deleted)   continue;
 
-        if (pair->value.type == ENTRY_TYPE
-        ||  pair->value.type == ENTRY_VAR) {
+        if (pair->value.type == ENTRY_TYPE || pair->value.type == ENTRY_VAR) {
             continue;
         }
 
-        compile_global_statement(&state, pair->key, &pair->value);
+        assert(pair->value.stmt->type == AST_BIN_UNKN_DEF);
+        assert(pair->value.type == ENTRY_FUNC);
+        compile_function(&state, pair->key, &pair->value);
     }
 
     stack_delete(&state.search_scopes);

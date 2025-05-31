@@ -20,6 +20,7 @@ struct interpreter_state_t {
     ir_t *ir;
     u64 ip;
     stack_t<u64> fp;
+    stack_t<u64> ip_stack;
     stack_t<s64> exec_stack;
     stack_t<s64> data_stack;
     stack_t<memory_block_t> allocations;
@@ -81,6 +82,14 @@ static inline s64 get_variable_address(interpreter_state_t *state, s64 address) 
 
     assert(false);
     return -1;
+}
+
+static inline s64 get_variable(interpreter_state_t *state, s64 address) {
+    return state->data_stack.data[address];
+}
+
+static inline void set_variable(interpreter_state_t *state, s64 address, s64 value) {
+    state->data_stack.data[address] = value;
 }
 
 static inline b32 push_function(interpreter_state_t *state, string_t string) {
@@ -146,31 +155,42 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         UNOP (IR_LOG_NOT, (s64)(!a));
 
         case IR_STACK_FRAME_PUSH: 
-                             stack_push(&state->fp, state->data_stack.index); 
-                             break;
+            stack_push(&state->fp, state->data_stack.index); 
+            break;
         case IR_STACK_FRAME_POP: 
-                             {
-                                 u64 fp = stack_pop(&state->fp);
-                                 free_memory(state, state->data_stack.index - fp);
-                             } break;
-
-        case IR_PUSH_SIGN:   stack_push(&state->exec_stack, op.s_operand); 
-                             break;
-        case IR_PUSH_UNSIGN: stack_push(&state->exec_stack, op.s_operand);
-                             break;
-        case IR_PUSH_STACK:  stack_push(&state->exec_stack, state->data_stack.data[(u64)get_variable_address(state, (op.s_operand - 1))]); 
-                             break;
-        case IR_PUSH_SEA:    stack_push(&state->exec_stack, (s64)get_variable_address(state, (op.s_operand - 1)));
-                             break;
-
-        case IR_PUSH_GLOBAL: 
         {
+                u64 fp = stack_pop(&state->fp);
+                free_memory(state, state->data_stack.index - fp);
+        } break;
+
+        case IR_SETUP_GLOBAL: 
+        {
+            s64 val   = stack_pop(&state->exec_stack);
+            s64 *addr = array_get(&state->ir->globals, op.u_operand);
+            if (addr) *addr = val;
+        } break;
+
+        case IR_PUSH_SIGN: {
+            stack_push(&state->exec_stack, op.s_operand); 
+        } break;
+
+        case IR_PUSH_UNSIGN: {
+            stack_push(&state->exec_stack, op.s_operand);
+        } break;
+
+        case IR_PUSH_STACK: {
+            stack_push(&state->exec_stack, get_variable(state, get_variable_address(state, (op.s_operand - 1)))); 
+        } break;
+
+        case IR_PUSH_SEA: {
+            stack_push(&state->exec_stack, get_variable_address(state, (op.s_operand - 1)));
+        } break;
+
+        case IR_PUSH_GLOBAL: {
             stack_push(&state->exec_stack, (s64) 0);
         } break;
 
-        case IR_PUSH_GEA:
-        {
-            //log_warning("push addr from global");
+        case IR_PUSH_GEA: {
             stack_push(&state->exec_stack, (s64) 0);
         } break;
 
@@ -201,7 +221,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
                 state->running = false;
                 break;
             }
-            s64 val  = state->data_stack.data[addr];
+            s64 val  = get_variable(state, addr);
             stack_push(&state->exec_stack, val);
         } break;
             
@@ -216,7 +236,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
                 break;
             }
 
-            state->data_stack.data[addr] = val;
+            set_variable(state, addr, val);
         } break;
 
         case IR_JUMP: {
@@ -238,19 +258,18 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         } break;
 
         case IR_RET: {
-            if (state->data_stack.index == 0) {
+            if (state->ip_stack.index == 0) {
                 state->running = false;
             } else {
-                s64 ip_addr = stack_pop(&state->data_stack);
-                state->ip = (u64)ip_addr; // assume that it will be not too big...
+                u64 ip_addr = stack_pop(&state->ip_stack);
+                state->ip = ip_addr; // assume that it will be not too big...
                 pop_function(state);
             }
         } break;
 
-        case IR_CALL:
-        {
+        case IR_CALL: {
             if (!push_function(state, op.string)) {
-                stack_push(&state->data_stack, (s64)state->ip);
+                stack_push(&state->ip_stack, state->ip);
                 state->ip = 0;
             }
         } break;
@@ -277,13 +296,13 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
 void interop_func(ir_t *ir, string_t func_name) {
     profiler_func_start();
     interpreter_state_t state = {};
+
     state.running = true;
-
     state.ir = ir;
+    ir_function_t *func = ir->functions[func_name];
+    assert(func);
+    stack_push(&state.curr_func, func);
 
-    stack_push(&state.curr_func, ir->functions[func_name]);
-
-    ir_function_t *func = {};
     u64 i = 0;
     while (state.running) {
         if (i != state.curr_func.index) {
@@ -300,6 +319,5 @@ void interop_func(ir_t *ir, string_t func_name) {
         execute_ir_opcode(&state, op);
     }
 
-    log_info(string_format(get_temporary_allocator(), STRING("%d"), (s64)stack_pop(&state.exec_stack)));
     profiler_func_end();
 }

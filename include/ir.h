@@ -26,6 +26,8 @@
 enum ir_codes_t {
     IR_NOP = 0x0,
 
+    IR_SETUP_GLOBAL, // (address of global) [value]
+
     // Stack manipulation
     IR_PUSH_SIGN,   // Push s64 integer
     IR_PUSH_UNSIGN, // Push u64 integer
@@ -103,13 +105,7 @@ struct ir_opcode_t {
     string_t string;
 };
 
-struct ir_variable_t {
-    u32 size, alignment;
-    scope_entry_t *entry;
-};
-
 struct ir_function_t {
-    b32 is_valid;
     b32 is_external;
     u64 stack_index;
     array_t<ir_opcode_t> code;
@@ -120,7 +116,7 @@ struct ir_t {
 
     allocator_t code;
     hashmap_t<string_t, ir_function_t> functions;
-    list_t<ir_variable_t>              globals;
+    array_t<s64>                       globals;
 };
 
 string_t get_ir_opcode_info(ir_opcode_t op);
