@@ -50,6 +50,9 @@ template<typename DataType>
 void array_delete(array_t<DataType> *array);
 
 template<typename DataType>
+list_t<DataType> array_to_list(array_t<DataType> *array);
+
+template<typename DataType>
 void array_add(array_t<DataType> *array, DataType data);
 
 template<typename DataType>
@@ -78,6 +81,28 @@ void array_create(array_t<DataType> *array, u64 size, allocator_t alloc) {
 template<typename DataType>
 void array_delete(array_t<DataType> *array) {
     list_delete(&array->entries);
+}
+
+template<typename DataType>
+list_t<DataType> array_to_list(array_t<DataType> *array) {
+    if (array->count == 0) return {};
+
+    list_t<DataType> list = {};
+    list_create(&list, array->count, &array->alloc);
+
+    u64 offset = 0;
+    for (u64 i = 0; i < array->entries.count; i++) {
+        array_entry_t<DataType> *entry = list_get(&array->entries, i);
+        assert(entry);
+        assert(entry->data);
+
+        mem_copy((u8*)(list.data + offset), (u8*)entry->data, entry->size * sizeof(DataType));
+
+        list.count += entry->size;
+        offset += entry->size;
+    }
+
+    return list;
 }
 
 template<typename DataType>
@@ -115,7 +140,6 @@ void array_add(array_t<DataType> *array, DataType data) {
     mem_copy((u8*)(e->data + (array->count - index_offset)), (u8*)&data, sizeof(DataType));
     array->count++;
 }
-
 
 template<typename DataType>
 DataType *array_get(array_t<DataType> *array, u64 index) {

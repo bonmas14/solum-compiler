@@ -6,7 +6,6 @@
 #include "strings.h"
 
 struct nasm_state_t {
-    b32         is_valid;
     ir_t       *ir;
     array_t<u8> code;
     ir_function_t    *func;
@@ -281,12 +280,10 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
     nasm_add_line(state, STRING(""), 0);
 }
 
-void nasm_compile_program(ir_t *state) {
+backend_t nasm_compile_program(ir_t *state) {
     nasm_state_t nasm = {};
 
-
     nasm.ir = state;
-    nasm.is_valid = true;
     array_create(&nasm.code, (u64) 1024, create_arena_allocator(PG(4)));
 
     { // header and RT   
@@ -393,13 +390,7 @@ void nasm_compile_program(ir_t *state) {
         nasm_compile_func(pair->key, &nasm);
     }
 
-    FILE *file = fopen("output.nasm", "wb");
+    list_t<u8> list = array_to_list(&nasm.code);
 
-    for (u64 i = 0; i < nasm.code.count; i++) {
-        log_update_color();
-        fprintf(file, "%c", nasm.code[i]);
-    }
-
-    fflush(file);
-    fclose(file);
+    return {list.alloc, list};
 }

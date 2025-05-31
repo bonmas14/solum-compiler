@@ -84,6 +84,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
     if (output->data == NULL) {
         log_error(STRING("Couldn't allocate memory for file contents."));
         CloseHandle(file);
+        return false;
     }
 
     DWORD bytes_read = 0;
@@ -95,6 +96,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
             NULL)) {
         log_error(STRING("Couldn't read file."));
         CloseHandle(file);
+        return false;
     }
 
     if ((u64)bytes_read < file_size) {
@@ -108,4 +110,71 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
     return true;
 }
 
+b32 platform_write_file(string_t name, string_t content) {
+    assert(content.data != NULL);
+    assert(name.data    != NULL);
+    assert(name.size > 0);
 
+    if (name.size > MAX_PATH) return false;
+
+    LPSTR filename = string_to_c_string(name, get_temporary_allocator());
+
+    HANDLE file = CreateFileA(filename, 
+            GENERIC_WRITE,
+            0,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL, 
+            NULL);
+
+    if (file == INVALID_HANDLE_VALUE) {
+        log_error(STRING("Couldn't open file for writing."));
+        return false;
+    }
+
+    DWORD bytes_written = 0;
+
+    if (!WriteFile(file, 
+            (LPVOID)content.data,
+            (DWORD)content.size, 
+            &bytes_written,
+            NULL)) {
+        log_error(STRING("Couldn't write a file."));
+        CloseHandle(file);
+        return false;
+    }
+
+    if ((u64)bytes_written < content.size) {
+        log_error(STRING("Corrupted writing."));
+        CloseHandle(file);
+        return false;
+    }
+
+    CloseHandle(file);
+    return true;
+}
+
+b32 platform_run_process(string_t exec_name, string_t args) {
+    PROCESS_INFORMATION info  = {};
+    STARTUPINFOA startup_info = {};
+    startup_info.cb = sizeof(STARTUPINFOA);
+
+    allocator_t *talloc = get_temporary_allocator();
+
+    string_t command_line = string_concat(exec_name, STRING(" "), talloc);
+    command_line = string_concat(command_line, args, talloc);
+
+    b32 status = CreateProcessA(
+            NULL,
+            string_to_c_string(command_line, talloc),
+            NULL,
+            NULL, 
+            false,
+            NORMAL_PRIORITY_CLASS,
+            NULL,
+            NULL,
+            &startup_info,
+            &info);
+
+    return false;
+}

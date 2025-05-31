@@ -83,3 +83,15 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
     return true;
 }
 
+
+b32 platform_write_file(string_t name, string_t content) {
+    const char *filename = string_to_c_string(name, get_temporary_allocator());
+
+    FILE *file = fopen(filename, "wb");
+    if (content.data) {
+        fwrite(content.data, 1, content.size, "%c", file);
+    }
+    fflush(file);
+    fclose(file);
+}
+

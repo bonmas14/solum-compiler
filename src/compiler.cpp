@@ -103,7 +103,6 @@ void compile(string_t filename) {
     ir_t result = compile_program(&state);
 
     if (result.is_valid) {
-
         string_t key = STRING("compile_globals");
 
         ir_function_t *func = result.functions[key];
@@ -117,10 +116,13 @@ void compile(string_t filename) {
             array_delete(&func->code);
         }
 
-        nasm_compile_program(&result);
+        backend_t backend = nasm_compile_program(&result);
+
+        string_t content = { c_string_length((char*)backend.code.data), backend.code.data };
+
+        platform_write_file(STRING("output.nasm"), content);
     } else {
-        log_error(STRING("NOT COMPILED"));
+        log_error(STRING("Compilation error"));
     }
-    return;
 }
 
