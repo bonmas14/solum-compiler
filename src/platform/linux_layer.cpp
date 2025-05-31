@@ -53,7 +53,7 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
     FILE *file = fopen(string_temp_to_c_string(filename), "rb");
 
     if (file == NULL) {
-        log_error(STRING("Scanner: Could not open file."));
+        log_error("Could not open file.");
         log_error(filename); 
         return false;
     }
@@ -72,7 +72,7 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
     u64 bytes_read = fread(output->data, sizeof(u8), file_size, file);
 
     if (bytes_read < file_size) {
-        log_error(STRING("Scanner: Could not read file."));
+        log_error("Could not read file.");
         log_error(filename); 
         fclose(file);
         return false;
@@ -88,10 +88,15 @@ b32 platform_write_file(string_t name, string_t content) {
     const char *filename = string_to_c_string(name, get_temporary_allocator());
 
     FILE *file = fopen(filename, "wb");
+    if (!file) {
+        log_error("Could not write file.");
+        return false;
+    }
     if (content.data) {
         fwrite(content.data, 1, content.size, file);
     }
     fflush(file);
     fclose(file);
+    return true; // we dont check if write was corrupted...
 }
 
