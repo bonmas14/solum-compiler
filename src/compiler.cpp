@@ -108,7 +108,8 @@ void compile(string_t filename) {
 
     if (result.is_valid) {
         nasm_compile_program(&result);
-        interop_func(&result, STRING("main"));
+        // @todo fix pointer math, because we do unaligned stuff and it is automatically aligned in interpreter!
+        // interop_func(&result, STRING("main"));
     } else {
         log_error(STRING("NOT COMPILED"));
     }

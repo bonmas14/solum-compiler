@@ -13,16 +13,17 @@ main: () -> s64 = {
     halfw: s64 = w / 2 - 3;
     halfh: s64 = h / 2 - 1;
 
-    @(^array + (halfw + 1) + (halfh + 0) * w) = 0x80;
+    @(^array + ((halfw + 1) + (halfh + 0) * w) * 8) = 0x80;
 
-    @(^array + (halfw + 0) + (halfh + 2) * w) = 0x80;
-    @(^array + (halfw + 1) + (halfh + 2) * w) = 0x80;
-    @(^array + (halfw + 3) + (halfh + 1) * w) = 0x80;
+    @(^array + ((halfw + 0) + (halfh + 2) * w) * 8) = 0x80;
+    @(^array + ((halfw + 1) + (halfh + 2) * w) * 8) = 0x80;
+    @(^array + ((halfw + 3) + (halfh + 1) * w) * 8) = 0x80;
 
-    @(^array + (halfw + 4) + (halfh + 2) * w) = 0x80;
-    @(^array + (halfw + 5) + (halfh + 2) * w) = 0x80;
-    @(^array + (halfw + 6) + (halfh + 2) * w) = 0x80;
+    @(^array + ((halfw + 4) + (halfh + 2) * w) * 8) = 0x80;
+    @(^array + ((halfw + 5) + (halfh + 2) * w) * 8) = 0x80;
+    @(^array + ((halfw + 6) + (halfh + 2) * w) * 8) = 0x80;
 
+    i = 0;
     while i < 256 {
         draw(w, h, ^array);
         step(w, h, ^array);
@@ -38,7 +39,7 @@ step: (w: s64, h: s64, array: ^u8) = {
     // cleaning state
     while i < w * h {
         x, y : s64 = i % w, i / w;
-        cell : ^u8 = array + i;
+        cell : ^u8 = array + i * 8;
 
         @cell = @cell & 0x80;
         i     = i + 1;
@@ -49,7 +50,7 @@ step: (w: s64, h: s64, array: ^u8) = {
     // calculating neignbours
     while i < w * h {
         x, y : s64 = i % w, i / w;
-        cell : ^u8 = array + i;
+        cell : ^u8 = array + i * 8;
 
         @cell = @cell + check_neighbour(array, w, h, x - 1, y - 1);
         @cell = @cell + check_neighbour(array, w, h, x,     y - 1);
@@ -70,7 +71,7 @@ step: (w: s64, h: s64, array: ^u8) = {
     while i < w * h {
         x, y: s64 = i % w, i / w;
 
-        cell: ^u8 = array + i;
+        cell: ^u8 = array + i * 8;
         alive, n: b8, u8 = @cell & 0x80 >> 7, @cell & 0x7F;
 
         if alive && (n > 3 || n < 2) {
@@ -85,10 +86,10 @@ step: (w: s64, h: s64, array: ^u8) = {
 
 check_neighbour: (array: ^u8, w: s64, h: s64, cx: s64, cy: s64) -> s64 = {
     if (cx >= 0 && cx < w) && (cy >= 0 && cy < h) {
-        cell : ^u8 = array + cx + cy * w;
+        cell : ^u8 = array + (cx + cy * w) * 8;
 
         if @cell & 0x80 {
-            debug_break();
+            // debug_break();
             return 1;
         }
     }
@@ -103,7 +104,7 @@ draw: (w: s64, h: s64, array: ^u8) = {
     while i < w * h {
         x, y: s64 = i % w, i / w;
 
-        cell: u8 = @(array + i) & 0x80;
+        cell: u8 = @(array + i * 8) & 0x80;
 
         if cell {
             putchar(0x23);

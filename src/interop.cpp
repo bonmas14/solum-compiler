@@ -14,6 +14,7 @@ struct memory_block_t {
     s64 size;
     s64 start;
 };
+
 struct interpreter_state_t {
     b32 running;
     ir_t *ir;

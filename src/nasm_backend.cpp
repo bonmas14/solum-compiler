@@ -36,9 +36,7 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("dec r15"), 1);\
                 INSERT_LINE();\
-                nasm_add_line(state, STRING("mov " reg ", QWORD[r14 + r15 * 8]"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
+                nasm_add_line(state, STRING("mov " reg ", QWORD[r14 + r15 * 8]"), 1);
 
 #define STORE(reg)\
                 INSERT_LINE();\
@@ -51,10 +49,7 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 LOAD("rbx");\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING(action" rax, rbx"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE("rax");
 
 #define DIVOP(result_reg)\
                 LOAD("rax");\
@@ -63,20 +58,14 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 LOAD("rbx");\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("idiv rbx"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], " result_reg), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE(result_reg);
 
 #define SHIFTOP(action)\
                 LOAD("rax");\
                 LOAD("rcx");\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING(action" rax, cl"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE("rax");
 
 
 #define BINCMPOP(cmov)\
@@ -90,13 +79,9 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 nasm_add_line(state, STRING("mov rax, 1"), 1);\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING(cmov" rcx, rax"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("mov QWORD[r14 + r15 * 8], rcx"), 1);\
-                INSERT_LINE();\
-                nasm_add_line(state, STRING("inc r15"), 1);
+                STORE("rcx");
 
 void nasm_compile_func(string_t name, nasm_state_t *state) {
-
     if (!state->func->code.count) {
         if (state->func->is_external) {
             if (string_compare(name, STRING("putchar")) == 0) {
@@ -121,8 +106,8 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
 
         nasm_add_line(state, string_format(get_temporary_allocator(), STRING(".IROP_%u: ; %s"), i, get_ir_opcode_info(op)), 0);
 
-        INSERT_LINE();
-        nasm_add_line(state, STRING("nop"), 1);
+        // INSERT_LINE();
+        // nasm_add_line(state, STRING("nop"), 1);
 
         // @todo, for jumps we need to create auto labels!
 
@@ -204,20 +189,19 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_ADD: BINOP("add"); break;
             case IR_SUB: BINOP("sub"); break;
             case IR_MUL: BINOP("imul"); break;
-
             case IR_DIV: DIVOP("rax"); break;
             case IR_MOD: DIVOP("rdx"); break;
 
             case IR_CMP_EQ:  BINCMPOP("cmove");  break;
             case IR_CMP_NEQ: BINCMPOP("cmovne"); break;
-            case IR_CMP_LT:  BINCMPOP("cmovl"); break;
-            case IR_CMP_GT:  BINCMPOP("cmovg"); break;
+            case IR_CMP_LT:  BINCMPOP("cmovl");  break;
+            case IR_CMP_GT:  BINCMPOP("cmovg");  break;
             case IR_CMP_LTE: BINCMPOP("cmovle"); break;
             case IR_CMP_GTE: BINCMPOP("cmovge"); break;
 
-            case IR_BIT_AND:     BINOP("and"); break;
-            case IR_BIT_OR:      BINOP("or");  break;
-            case IR_BIT_XOR:     BINOP("xor"); break;
+            case IR_BIT_AND:     BINOP("and");   break;
+            case IR_BIT_OR:      BINOP("or");    break;
+            case IR_BIT_XOR:     BINOP("xor");   break;
             case IR_SHIFT_LEFT:  SHIFTOP("sal"); break;
             case IR_SHIFT_RIGHT: SHIFTOP("sar"); break;
                              
@@ -232,14 +216,14 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 INSERT_LINE();
                 nasm_add_line(state, STRING("cmp rax, 0"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jnz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jne .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
                 break;
             case IR_JUMP_IF_NOT: 
                 LOAD("rax");
                 INSERT_LINE();
                 nasm_add_line(state, STRING("cmp rax, 0"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("je .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
                 break;
 
             case IR_FREE:

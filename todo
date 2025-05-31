@@ -1,42 +1,13 @@
-- create allocator functions that will check if pointer inside of theirs function
-for debug purposes
-
+- pointer math or it wont work normally in interop/compile
+- add globals! evaluate value by running through interpreter!
 - constants
 
-- we have complie flag... just validate a node and try to compile function body
-then if you cant add or evaluate something, you just dont put compiled bool to true on entity
-
-- change types from flags to just enum as in good training language.
-because its superior way of dealing with types
-
-ideas:
+- allocators shouldn't be pointers!
+- harmonize names
+- create allocator functions that will check if pointer inside of theirs function
+for debug purposes
 
 - soft inlining - is when compiler generates output source code but inlines all of functions on source level. 
 could be great for debug purposes?
 
-- global variables
-
-- allocators shouldn't be pointers!
-
-- harmonize names
-
-
 X- fix the alignment and make structs alignment.
-
-simple algoritm:
-
-we start at 0 size and alignment
-
-read variable and get its size
-
-
-
-add size of it to a size and set alignment
-
-s, a := 0
-
-foreach v : elements {
-    if a < v.a {
-        a = v.a;
-    }
-}
