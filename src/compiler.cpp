@@ -16,6 +16,8 @@
 
 #include "strings.h"
 #include "profiler.h"
+#include "allocator.h"
+#include "talloc.h"
 
 #define MODULES_PATH "SOLUM_MODULES"
 
@@ -95,22 +97,54 @@ void compile(compiler_t *state) {
     if (result.is_valid) {
         string_t key = STRING("compile_globals");
 
-        ir_function_t *func = result.functions[key];
+        {
+            profiler_block_start(STRING("Interpretation"));
+            ir_function_t *func = result.functions[key];
 
-        assert(func);
+            assert(func);
 
-        // @todo fix pointer math, because we do unaligned stuff and it is automatically aligned in interpreter!
-        interop_func(&result, key);
+            // @todo fix pointer math, because we do unaligned stuff and it is automatically aligned in interpreter!
+            interop_func(&result, key);
 
-        if (hashmap_remove(&result.functions, STRING("compile_globals"))) {
-            array_delete(&func->code);
+            if (hashmap_remove(&result.functions, STRING("compile_globals"))) {
+                array_delete(&func->code);
+            }
+            profiler_block_end();
         }
 
         backend_t backend = nasm_compile_program(&result);
 
         string_t content = { c_string_length((char*)backend.code.data), backend.code.data };
 
-        platform_write_file(STRING("output.nasm"), content);
+
+        string_t filename = compiler_config.filename.data ? compiler_config.filename : STRING("output");
+
+        string_t backend_config = string_format(get_temporary_allocator(), STRING("%s.nasm"), filename);
+
+        string_t nasm_config = string_format(get_temporary_allocator(), STRING("-g -f win64 %s.nasm -o %s.obj"), filename, filename);
+
+        string_t link_config = STRING("/MACHINE:X64 /DYNAMICBASE /SUBSYSTEM:CONSOLE /DEBUG:FULL /ENTRY:mainCRTStartup kernel32.lib");
+
+        link_config          = string_format(get_temporary_allocator(), 
+                                    STRING("%s /OUT:%s.exe %s.obj %s"), 
+                                    link_config, filename, filename,
+                                    compiler_config.show_link_time ? STRING("/TIME") : STRING(" "));
+
+        string_t del_config  = string_format(get_temporary_allocator(), STRING("/c del %s.nasm %s.obj"), filename, filename);
+
+        profiler_block_start(STRING("Nasm"));
+        platform_write_file(backend_config, content);
+        if (platform_run_process(STRING("nasm.exe"),     nasm_config) != 0) { profiler_block_end(); return; }
+        profiler_block_end();
+
+        profiler_block_start(STRING("Linking"));
+        if (platform_run_process(STRING("lld-link.exe"), link_config) != 0) { profiler_block_end(); return; }
+        profiler_block_end();
+
+        profiler_block_start(STRING("Finalizing"));
+        if (platform_run_process(STRING("cmd.exe"),      del_config)  != 0) { profiler_block_end(); return; }
+        profiler_block_end();
+
     } else {
         log_error(STRING("Compilation error"));
     }

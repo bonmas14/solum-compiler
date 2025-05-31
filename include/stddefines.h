@@ -53,6 +53,7 @@ struct compiler_configuration_t {
     string_t filename;
     b32      verbose;
     b32      no_ansi_codes;
+    b32      show_link_time;
 };
 
 struct allocator_t;

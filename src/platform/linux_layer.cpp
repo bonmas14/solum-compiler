@@ -83,7 +83,6 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
     return true;
 }
 
-
 b32 platform_write_file(string_t name, string_t content) {
     const char *filename = string_to_c_string(name, get_temporary_allocator());
 
@@ -98,5 +97,10 @@ b32 platform_write_file(string_t name, string_t content) {
     fflush(file);
     fclose(file);
     return true; // we dont check if write was corrupted...
+}
+
+u32 platform_run_process(string_t exec_name, string_t args) {
+    log_error("TODO: Run process on linux");
+    return -100;
 }
 

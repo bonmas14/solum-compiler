@@ -9,6 +9,7 @@
 #include "compiler.h"
 #include "arg_parser.h"
 #include "profiler.h"
+#include "platform.h"
 
 #define COMPILER_VERSION "1.0a"
 
@@ -56,7 +57,8 @@ void showhelp(void) {
     log_write("    --no-ansi\n");
     log_write("    --verbose\n");
     log_write("    --version\n");
-    log_write("    --output [filename]\n");
+    log_write("    --link-time\n");
+    log_write("    --output [filename, no file extension]\n");
     log_pop_color();
 }
 
@@ -109,6 +111,10 @@ int main(int argc, char **argv) {
 
             case ARG_NO_ANSI:
                 compiler_config.no_ansi_codes = true;
+                break;
+
+            case ARG_SHOW_LINK_TIME:
+                compiler_config.show_link_time = true;
                 break;
 
             case ARG_VERBOSE:

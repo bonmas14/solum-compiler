@@ -154,7 +154,7 @@ b32 platform_write_file(string_t name, string_t content) {
     return true;
 }
 
-b32 platform_run_process(string_t exec_name, string_t args) {
+u32 platform_run_process(string_t exec_name, string_t args) {
     PROCESS_INFORMATION info  = {};
     STARTUPINFOA startup_info = {};
     startup_info.cb = sizeof(STARTUPINFOA);
@@ -176,5 +176,25 @@ b32 platform_run_process(string_t exec_name, string_t args) {
             &startup_info,
             &info);
 
-    return false;
+    if (info.hProcess == INVALID_HANDLE_VALUE) {
+        log_error(STRING("Couldn't create process."));
+        return 10000;
+    }
+
+    DWORD result = WaitForSingleObject(info.hProcess, INFINITE);
+    switch (result) {
+        case WAIT_OBJECT_0:
+            break;
+        case WAIT_FAILED:
+            log_error("Waiting failed");
+            break;
+        default:
+            log_error("!!!!!");
+            break;
+    }
+    DWORD exit_code = 0;
+    GetExitCodeProcess(info.hProcess, &exit_code);
+    CloseHandle(info.hProcess);
+    CloseHandle(info.hThread);
+    return exit_code;
 }

@@ -10,6 +10,7 @@ enum argument_types_t {
     ARG_VERSION,
     ARG_NO_ANSI,
     ARG_VERBOSE,
+    ARG_SHOW_LINK_TIME,
     ARG_OUTPUT_FILE_NAME,
 };
 
