@@ -89,7 +89,7 @@ b32 platform_write_file(string_t name, string_t content) {
 
     FILE *file = fopen(filename, "wb");
     if (content.data) {
-        fwrite(content.data, 1, content.size, "%c", file);
+        fwrite(content.data, 1, content.size, file);
     }
     fflush(file);
     fclose(file);
