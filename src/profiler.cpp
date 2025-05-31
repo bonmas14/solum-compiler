@@ -28,6 +28,10 @@ struct {
     stack_t<profiler_entry_t> start_time;
 } profiler;
 
+void profiler_init(void) {
+    profiler = {};
+}
+
 void profiler_begin(void) {
     assert(!profiler.running);
 

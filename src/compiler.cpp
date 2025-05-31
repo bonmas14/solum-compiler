@@ -100,7 +100,9 @@ void compile(string_t filename) {
     }
     profiler_block_end();
 
+    profiler_block_start(STRING("IR gen"));
     ir_t result = compile_program(&state);
+    profiler_block_end();
 
     if (result.is_valid) {
         string_t key = STRING("compile_globals");

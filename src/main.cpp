@@ -40,6 +40,7 @@ void init(void) {
     log_push_color(255, 255, 255);
     alloc_init();
     debug_init();
+    profiler_init();
     debug_tests();
 }
 
