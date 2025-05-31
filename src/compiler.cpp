@@ -112,10 +112,11 @@ void compile(compiler_t *state) {
             profiler_block_end();
         }
 
+        profiler_block_start(STRING("Nasm backend generation"));
         backend_t backend = nasm_compile_program(&result);
+        profiler_block_end();
 
         string_t content = { c_string_length((char*)backend.code.data), backend.code.data };
-
 
         string_t filename = compiler_config.filename.data ? compiler_config.filename : STRING("output");
 
@@ -130,19 +131,13 @@ void compile(compiler_t *state) {
                                     link_config, filename, filename,
                                     compiler_config.show_link_time ? STRING("/TIME") : STRING(" "));
 
-        string_t del_config  = string_format(get_temporary_allocator(), STRING("/c del %s.nasm %s.obj"), filename, filename);
-
-        profiler_block_start(STRING("Nasm"));
+        profiler_block_start(STRING("Assembling"));
         platform_write_file(backend_config, content);
         if (platform_run_process(STRING("nasm.exe"),     nasm_config) != 0) { profiler_block_end(); return; }
         profiler_block_end();
 
         profiler_block_start(STRING("Linking"));
         if (platform_run_process(STRING("lld-link.exe"), link_config) != 0) { profiler_block_end(); return; }
-        profiler_block_end();
-
-        profiler_block_start(STRING("Finalizing"));
-        if (platform_run_process(STRING("cmd.exe"),      del_config)  != 0) { profiler_block_end(); return; }
         profiler_block_end();
 
     } else {
