@@ -11,7 +11,7 @@
 #include "profiler.h"
 #include "platform.h"
 
-#define COMPILER_VERSION "1.0a"
+#define COMPILER_VERSION "1.0b"
 
 allocator_t * default_allocator;
 allocator_t __allocator;
