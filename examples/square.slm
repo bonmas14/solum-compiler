@@ -1,0 +1,75 @@
+use: "core";
+
+// Draw a square at given position with specified rotation
+draw_square: (size: s64, angle: s64, buffer: ^u8) = {
+    half: s64 = size / 2;
+    sin: s64 = sin_lookup(angle);
+    cos: s64 = cos_lookup(angle);
+    
+    i: s64 = -half;
+    while i <= half {
+        j: s64 = -half;
+        while j <= half {
+            // Rotate point
+            x: s64 = (j * cos - i * sin) >> 8;
+            y: s64 = (j * sin + i * cos) >> 8;
+            
+            // Position in center of screen
+            px: s64 = 20 + x;
+            py: s64 = 10 + y;
+            
+            // Set pixel in buffer
+            if (px >= 0 && px < 40) && (py >= 0 && py < 20) {
+                @(^buffer + (px + py * 40) * 8) = 0x23; // '#'
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+
+// Fixed-point sin approximation (256 = 1.0)
+sin_lookup: (angle: s64) -> s64 = {
+    angle = angle & 0xFF; // Wrap at 256
+    if angle < 64 { return angle * 4; }
+    if angle < 192 { return 256 - (angle - 64) * 4; }
+    return (angle - 192) * 4 - 256;
+}
+
+// Fixed-point cos approximation
+cos_lookup: (angle: s64) -> s64 = {
+    return sin_lookup(angle + 64);
+}
+
+main: () -> s64 = {
+    buffer: [40*20]u8; // Screen buffer: 40x20 characters
+    angle: s64 = 0;
+    
+    console_clear();
+    
+    // Animation loop
+    while angle < 256 {
+        // Clear buffer
+        i: s64 = 0;
+        while i < 40*20 {
+            @(^buffer + i * 8) = 0x20; // Space
+            i = i + 1;
+        }
+        
+        // Draw rotating square
+        draw_square(10, angle, ^buffer);
+        
+        // Draw to screen
+        console_cursor_reset();
+        i = 0;
+        while i < 40*20 {
+            putchar(@(^buffer + i * 8));
+            if (i % 40) == 39 { putchar(0x0A); } // Newline
+            i = i + 1;
+        }
+        
+        angle = angle + 8;
+    }
+    
+    return 0;
+}
