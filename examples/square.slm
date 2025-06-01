@@ -1,6 +1,5 @@
 use: "core";
 
-// Draw a square at given position with specified rotation
 draw_square: (size: s64, angle: s64, buffer: ^u8) = {
     half: s64 = size / 2;
     sin: s64 = sin_lookup(angle);
@@ -14,7 +13,6 @@ draw_square: (size: s64, angle: s64, buffer: ^u8) = {
             x: s64 = (j * cos - i * sin) >> 8;
             y: s64 = (j * sin + i * cos) >> 8;
             
-            // Position in center of screen
             px: s64 = 20 + x;
             py: s64 = 10 + y;
             
@@ -30,22 +28,23 @@ draw_square: (size: s64, angle: s64, buffer: ^u8) = {
 
 // Fixed-point sin approximation (256 = 1.0)
 sin_lookup: (angle: s64) -> s64 = {
-    angle = angle & 0xFF; // Wrap at 256
+    angle = angle & 0xFF;
     if angle < 64 { return angle * 4; }
     if angle < 192 { return 256 - (angle - 64) * 4; }
     return (angle - 192) * 4 - 256;
 }
 
-// Fixed-point cos approximation
+// Fixed-point cos ap
 cos_lookup: (angle: s64) -> s64 = {
     return sin_lookup(angle + 64);
 }
 
 main: () -> s64 = {
-    buffer: [40*20]u8; // Screen buffer: 40x20 characters
+    buffer: [40*20]u8;
     angle: s64 = 0;
     
     console_clear();
+    console_cursor_disable();
     
     // Animation loop
     while angle < 256 {
@@ -57,19 +56,21 @@ main: () -> s64 = {
         }
         
         // Draw rotating square
-        draw_square(10, angle, ^buffer);
+        draw_square(15, angle, ^buffer);
         
         // Draw to screen
         console_cursor_reset();
         i = 0;
         while i < 40*20 {
             putchar(@(^buffer + i * 8));
-            if (i % 40) == 39 { putchar(0x0A); } // Newline
+            putchar(0x20);
+            if i % 40 == 39 { putchar(0x0A); } // Newline
             i = i + 1;
         }
         
-        angle = angle + 8;
+        angle = angle + 1;
     }
     
+    console_cursor_enable();
     return 0;
 }

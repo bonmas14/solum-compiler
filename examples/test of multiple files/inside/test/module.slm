@@ -1,4 +1,0 @@
-
-// this is module declaration
-
-load : () -> s32 = { return -4; }

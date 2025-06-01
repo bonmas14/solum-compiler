@@ -1,0 +1,101 @@
+use: "core";
+
+// Particle structure simulation (using arrays)
+main: () -> s32 = {
+    particles, frames: s64 = 20, 1000;
+    pos_x:  [10000]s64;
+    pos_y:  [10000]s64;
+    vel_x:  [10000]s64;
+    vel_y:  [10000]s64;
+    
+    i: s64 = 0;
+    while i < particles {
+        @(^pos_x + i * 8) = (i * 37) % 50 + 10;
+        @(^pos_y + i * 8) = (i * 23) % 15 + 5;
+        @(^vel_x + i * 8) = (i % 3) - 1;
+        @(^vel_y + i * 8) = 0;
+        i = i + 1;
+    }
+    
+    console_clear();
+    console_cursor_disable();
+    
+    frame: s64 = 0;
+    while frame < frames {
+        i = 0;
+        while i < particles {
+            new_vel_y: s64 = @(^vel_y + i * 8) + 1;
+            @(^vel_y + i * 8) = new_vel_y;
+            
+            new_x: s64 = @(^pos_x + i * 8) + @(^vel_x + i * 8);
+            new_y: s64 = @(^pos_y + i * 8) + new_vel_y;
+            
+            if new_x < 0 || new_x > 60 {
+                @(^vel_x + i * 8) = -@(^vel_x + i * 8);
+                new_x = @(^pos_x + i * 8);
+            }
+            
+            if new_y < 0 || new_y > 29 {
+                @(^vel_y + i * 8) = -(new_vel_y *11) / 10; // Bounce damping
+                new_y = @(^pos_y + i * 8);
+            }
+            
+            @(^pos_x + i * 8) = new_x;
+            @(^pos_y + i * 8) = new_y;
+            
+            i = i + 1;
+        }
+        
+        draw_particles(particles, ^pos_x, ^pos_y);
+        frame = frame + 1;
+    }
+    
+    console_cursor_enable();
+    return 0;
+}
+
+// Draw all particles
+draw_particles: (count: s64, pos_x: ^s64, pos_y: ^s64) = {
+    console_cursor_reset();
+    
+    // Clear buffer
+    buffer: [60*30]u8;
+    i: s64 = 0;
+    while i < 60*30 {
+        @(^buffer + i * 8) = 0x2e;
+        i = i + 1;
+    }
+    
+    // Draw particles to buffer
+    i = 0;
+    while i < count {
+        px: s64 = @(pos_x + i * 8);
+        py: s64 = @(pos_y + i * 8);
+        
+        // Only draw if in bounds
+        if (px >= 0 && px < 60) && (py >= 0 && py < 30) {
+            @(^buffer + (px + py * 60) * 8) = 0x2b;
+        }
+        i = i + 1;
+    }
+    
+    // Draw buffer to screen
+    i = 0;
+    while i < 60*30 {
+        putchar(@(^buffer + i * 8));
+        
+        if i % 60 == 59 {
+            putchar(0x7c);
+            putchar(0x0a);
+        }
+        
+        i = i + 1;
+    }
+
+    i = 0;
+    while i < 60 {
+        if i % 60 == 59 { putchar(0x5f); putchar(0x7c); }
+        else            { putchar(0x5f); }
+        i = i + 1;
+    }
+}

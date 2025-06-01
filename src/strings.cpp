@@ -103,7 +103,16 @@ s32 string_compare(string_t a, string_t b) {
     if (a.size == 0) return -1;
     if (b.size == 0) return 1;
 
-    return mem_compare(a.data, b.data, a.size);
+
+    s32 result = mem_compare(a.data, b.data, a.size);
+
+    if (result == 0) {
+        if (a.size > b.size) return 1;
+        if (a.size < b.size) return -1;
+        return 0;
+    } else {
+        return result;
+    }
 }
 
 string_t string_join(list_t<string_t> input, string_t separator, allocator_t *alloc) {

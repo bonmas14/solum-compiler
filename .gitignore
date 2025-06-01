@@ -17,6 +17,7 @@ obj
 *.out
 
 /temp/output.cpp
+/examples/bin
 /output.nasm
 /output.exe
 /output.o

@@ -1,4 +1,0 @@
-test_enum : enum(s32) = { 
-    TEST_A = 1,
-    TEST_C = 2
-}

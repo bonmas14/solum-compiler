@@ -1,0 +1,88 @@
+use: "core";
+
+spinner_animation: (frames: s64) = {
+    console_cursor_disable();
+    
+    angle, color: s64 = 0, 31;
+    
+    i: s64 = 0;
+    while i < frames {
+        // Update spinner state
+        angle = (angle + 15) % 360;
+        color = (color + 1) % 231;
+        
+        draw_spinner(angle, color);
+
+        delay(1);
+        
+        i = i + 1;
+    }
+    
+    console_cursor_enable();
+}
+
+draw_spinner: (angle: s64, color: s64) = {
+    console_cursor_reset();
+    console_set_color(color);
+
+    size: s64 = 0;
+    y: s64 = 0;
+    while y < 2*size + 1 {
+        x: s64 = 0;
+        while x < 2*size + 1 {
+            dx: s64 = x - size;
+            dy: s64 = y - size;
+            
+            // Rotate point
+            rx: s64 = (dx * cos(angle) - dy * sin(angle)) / 100;
+            ry: s64 = (dx * sin(angle) + dy * cos(angle)) / 100;
+            
+            // Check if in spinner area
+            if rx*rx + ry*ry <= size*size {
+                seg: s64 = (atan2(dy, dx) + 360 - angle) % 360;
+                if seg < 90  { putchar(0x2F); } // /
+                if seg >= 90 && seg < 180 { putchar(0x7C); } // |
+                if seg >= 180 && seg < 270 { putchar(0x5C); } // \
+                if seg >= 270 { putchar(0x2D); } // -
+            } else {
+                putchar(0x20);
+            }
+            x = x + 1;
+        }
+        putchar(0x0A);
+        y = y + 1;
+    }
+    console_reset_color();
+}
+
+sin: (deg: s64) -> s64 = {
+    rad: s64 = deg * 1745 / 100;  // deg*pi/180
+    return rad - (rad*rad*rad)/60000 + (rad*rad*rad*rad*rad)/120000000;
+}
+
+cos: (deg: s64) -> s64 = {
+    return sin(deg + 90);
+}
+
+atan2: (y: s64, x: s64) -> s64 = {
+    if x == 0 {
+        if y > 0 { return 90;  }
+        else     { return 270; }
+    }
+    ratio: s64 = (y * 100) / x;
+    angle: s64 = ratio * 573 / 100; // ratio * 180/pi
+    
+    if x < 0 {
+        angle = angle + 180;
+    }
+    if angle < 0 {
+        angle = angle + 360;
+    }
+    return angle % 360;
+}
+
+main: () -> s64 = {
+    console_clear();
+    spinner_animation(250);
+    return 0;
+}

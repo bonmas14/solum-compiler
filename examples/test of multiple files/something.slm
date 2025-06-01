@@ -1,3 +1,0 @@
-some_function : () -> s32 = {
-    return 100;
-}

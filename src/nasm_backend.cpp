@@ -185,6 +185,12 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_DIV: DIVOP("rax"); break;
             case IR_MOD: DIVOP("rdx"); break;
 
+            case IR_NEG: LOAD("rax");
+                         INSERT_LINE();
+                         nasm_add_line(state, STRING("neg rax"), 1);
+                         STORE("rax");
+                         break;
+
             case IR_CMP_EQ:  BINCMPOP("cmove");  break;
             case IR_CMP_NEQ: BINCMPOP("cmovne"); break;
             case IR_CMP_LT:  BINCMPOP("cmovl");  break;
@@ -200,9 +206,8 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                              
              case IR_BIT_NOT:
                 LOAD("rax");
-                nasm_add_line(state, STRING("mov rbx, -1"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, STRING("xor rax, rbx"), 1);
+                nasm_add_line(state, STRING("not rax"), 1);
                 STORE("rax");
                 break;
 

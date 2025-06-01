@@ -1,13 +1,12 @@
 use: "core";
 
-test: s32 = 100 + 23;
-
 main: () -> s64 = {
     array: [60 * 30]u8;
     i : s64 = 0;
 
     console_clear();
     console_cursor_reset();
+    console_cursor_disable();
 
     w: s64 = 60;
     h: s64 = 30;
@@ -32,6 +31,7 @@ main: () -> s64 = {
         i = i + 1;
     }
 
+    console_cursor_enable();
     return 0;
 }
 

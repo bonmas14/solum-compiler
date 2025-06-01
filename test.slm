@@ -1,8 +1,0 @@
-main: () -> s32 = {
-    test1 : s32 = 42;
-    test2 : s64 = 7;
-    test3 : s32 = 4;
-    p1: ^s32 = ^test2;
-    @p1 = 10000;
-    return test2;
-}

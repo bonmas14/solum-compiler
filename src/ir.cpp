@@ -489,7 +489,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
     return expr;
 }
 
-void compile_block(ir_state_t *state, ast_node_t *node) {
+void compile_block(ir_state_t *state, ast_node_t *node, b32 frame_pointer_free = false) {
     hashmap_t<string_t, scope_entry_t> *block = array_get(&state->compiler->scopes, node->scope_index);
     stack_push(&state->search_scopes, block);
     u64 si = state->current_function->stack_index;
@@ -505,7 +505,7 @@ void compile_block(ir_state_t *state, ast_node_t *node) {
         }
     }
 
-    if (alloc_count) {
+    if (alloc_count && !frame_pointer_free) {
         emit_op(state, IR_FREE, stmt->token, alloc_count);
     }
 
@@ -695,7 +695,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
             next = next->list_next;
         }
 
-        compile_block(state, entry->expr);
+        compile_block(state, entry->expr, true);
 
         if (entry->return_typenames.count == 0) {
             emit_op(state, IR_STACK_FRAME_POP, node->token, 0);

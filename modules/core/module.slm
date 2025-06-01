@@ -1,8 +1,18 @@
-// This is core module for our compiler
+use: "printing";
 
 putchar: (char: u32) = external "compiler";
 
 debug_break: () = external "compiler";
+
+delay: (t: s64) = {
+    while t > 0 {
+        x: s64 = 1000000;
+        while x > 0 {
+            x = x - 1;
+        }
+        t = t - 1;
+    }
+}
 
 console_clear: () = {
     putchar(0x1b);
@@ -18,4 +28,41 @@ console_cursor_reset: () = {
     putchar(0x3b);
     putchar(0x31);
     putchar(0x48);
+}
+
+console_cursor_disable: () = {
+    putchar(0x1b);
+    putchar(0x5b);
+    putchar(0x3f);
+    putchar(0x32);
+    putchar(0x35);
+    putchar(0x6c);
+}
+
+console_cursor_enable: () = {
+    putchar(0x1b);
+    putchar(0x5b);
+    putchar(0x3f);
+    putchar(0x32);
+    putchar(0x35);
+    putchar(0x68);
+}
+
+console_set_color: (color: s64) = {
+    putchar(0x1B); 
+    putchar(0x5B); 
+    putchar(0x33); 
+    putchar(0x38);
+    putchar(0x3B); 
+    putchar(0x35); 
+    putchar(0x3B); 
+    print_number(color);
+    putchar(0x6D); 
+}
+
+console_reset_color: () = {
+    putchar(0x1B); 
+    putchar(0x5B);
+    putchar(0x30);
+    putchar(0x6D); 
 }

@@ -502,6 +502,11 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
             }
             */
 
+            /*
+             *  It doesnt work
+             *  @fix @bug we need to rewrite analyzer for that check,
+             *  or rewrite it so it will pass something like ir_expression_t
+             *
             if (expected_count_of_expressions >= 0) {
                 if (expr->child_count != (u64)expected_count_of_expressions) {
                     log_error_token("Not expected count of elements", expr->token);
@@ -509,6 +514,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
                     break;
                 }
             }
+            */
 
             // element count should match other size or amount of return argumets
             for (u64 i = 0; i < expr->child_count; i++) {

@@ -1,0 +1,87 @@
+use: "core";
+
+// Physics constants
+gravity: s64 = 1;
+damping: s64 = 8; // 0.875 fixed-point (8/10)
+
+// Ball state
+ball_x: s64 = 15;
+ball_y: s64 = 5;
+vel_x: s64 = 1;
+vel_y: s64 = 0;
+
+// Screen dimensions
+width: s64 = 30;
+height: s64 = 15;
+
+// Draw frame with ball
+draw_frame: () = {
+    console_cursor_reset();
+    
+    y: s64 = 0;
+    while y < height {
+        x: s64 = 0;
+        while x < width {
+            // Draw walls
+            if y == 0 || y == height-1 {
+                putchar(0x3D); // '='
+            } else if x == 0 || x == width-1 {
+                putchar(0x7C); // '|'
+            } 
+            // Draw ball
+            else if x == ball_x && y == ball_y {
+                putchar(0x4F); // 'O'
+            }
+            // Empty space
+            else {
+                putchar(0x20); // ' '
+            }
+            x = x + 1;
+        }
+        putchar(0x0A); // Newline
+        y = y + 1;
+    }
+}
+
+// Update ball physics
+update_physics: () = {
+    // Apply gravity
+    vel_y = vel_y + gravity;
+    
+    // Update position
+    ball_x = ball_x + vel_x;
+    ball_y = ball_y + vel_y;
+    
+    // Wall collisions
+    if ball_x <= 1 {
+        ball_x = 1;
+        vel_x = -vel_x;
+    } else if ball_x >= width-2 {
+        ball_x = width-2;
+        vel_x = -vel_x;
+    }
+    
+    // Floor collision with damping
+    if ball_y >= height-2 {
+        ball_y = height-2;
+        vel_y = -(vel_y * damping) / 10;
+        if vel_y > -2 && vel_y < 0 { vel_y = 0; }
+    }
+}
+
+main: () -> s64 = {
+    console_clear();
+    console_cursor_disable();
+    
+    frames: s64 = 500;
+    while frames > 0 {
+        draw_frame();
+        update_physics();
+        frames = frames - 1;
+    }
+    
+    console_cursor_enable();
+    return 0;
+}
+
+

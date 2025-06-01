@@ -1,8 +1,0 @@
-// #run main
-
-main : (args : [0] string) -> s32 = {
-    a, b, c : s32, s64, u32 = 1, 232, 3;
-}
-
-same : () = {}
-same : () = {}

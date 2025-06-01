@@ -1,0 +1,23 @@
+print_number: (num: s64) = {
+    if num == 0 {
+        putchar(48); // '0'
+        return;
+    }
+
+    digits: [20]u8;
+    count: s64 = 0;
+    temp: s64 = num;
+    
+    while temp > 0 {
+        digit: u8 = (temp % 10) + 48;
+        @(^digits + count * 8) = digit;
+        temp = temp / 10;
+        count = count + 1;
+    }
+
+    i: s64 = count - 1;
+    while i >= 0 {
+        putchar(@(^digits + i * 8));
+        i = i - 1;
+    }
+}

@@ -61,13 +61,13 @@ static void panic_skip_until_token(u32 value, parser_state_t *state) {
 }
 
 
-static void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static b32 add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
-        return;
+        return false;
     }
 
     root->left = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
@@ -77,15 +77,16 @@ static void add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    return true;
 }
 
-static void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static b32 add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
-        return;
+        return false;
     }
 
     root->right = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
@@ -95,15 +96,16 @@ static void add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    return true;
 }
 
-static void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static b32 add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
-        return;
+        return false;
     }
 
     root->center = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
@@ -113,22 +115,23 @@ static void add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t 
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    return true;
 }
 
-static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+static b32 add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
-        return;
+        return false;
     }
 
     if (root->list_start == NULL) {
         root->list_start = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
         *root->list_start = *node;
         root->child_count++;
-        return;
+        return true;
     }
 
     ast_node_t *list_node = root->list_start;
@@ -145,6 +148,7 @@ static void add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    return true;
 }
 
 /* parsing */
@@ -338,7 +342,9 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
                 result.type     = get_ast_type_based_on_prefix_token(left);
                 bind_power_t bp = get_prefix_bind_power(left);
                 ast_node_t lhs  = parse_expression(state, bp.right);
-                add_left_node(state, &result, &lhs);
+                if (!add_left_node(state, &result, &lhs)) {
+                    result.type = AST_ERROR;
+                }
             } break; // prefix operations
 
         case '(':
@@ -367,8 +373,8 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
                 bind_power_t bp = get_prefix_bind_power(left);
                 ast_node_t rhs = parse_expression(state, bp.right);
 
-                add_left_node(state,  &result, &lhs);
-                add_right_node(state, &result, &rhs);
+                if (!add_left_node(state, &result, &lhs))  { result.type = AST_ERROR; } 
+                if (!add_right_node(state, &result, &rhs)) { result.type = AST_ERROR; } 
             } break;
 
         default:
@@ -412,8 +418,8 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
                 assert(false);
             }
 
-            add_left_node(state,  &result, &lhs);
-            add_right_node(state, &result, &rhs);
+            if (!add_left_node(state, &result, &lhs))  { result.type = AST_ERROR; } 
+            if (!add_right_node(state, &result, &rhs)) { result.type = AST_ERROR; } 
             continue;
         }
 
@@ -432,8 +438,8 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
             result.token = op;
             result.type  = get_ast_type_based_on_infix_token(op);
 
-            add_left_node(state,  &result, &lhs);
-            add_right_node(state, &result, &rhs);
+            if (!add_left_node(state, &result, &lhs))  { result.type = AST_ERROR; } 
+            if (!add_right_node(state, &result, &rhs)) { result.type = AST_ERROR; } 
             continue;
         }
 
