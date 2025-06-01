@@ -1,0 +1,72 @@
+use: "core";
+
+// Function to calculate factorial iteratively
+factorial: (n: s64) -> s64 = {
+    result: s64 = 1;
+    i: s64 = 1;
+    
+    while i <= n {
+        result = result * i;
+        i = i + 1;
+    }
+    return result;
+}
+
+// Function to print a number digit-by-digit
+print_number: (num: s64) = {
+    // Handle zero case
+    if num == 0 {
+        putchar(48); // '0'
+        return;
+    }
+
+    digits: [20]u8;  // Buffer to store digits
+    count: s64 = 0;
+    temp: s64 = num;
+    
+    // Extract digits
+    while temp > 0 {
+        digit: u8 = (temp % 10) + 48; // Convert to ASCII
+        // Store with pointer arithmetic (accounting for s64-sized steps)
+        @(^digits + count * 8) = digit;
+        temp = temp / 10;
+        count = count + 1;
+    }
+
+    // Print in reverse order
+    i: s64 = count - 1;
+    while i >= 0 {
+        putchar(@(^digits + i * 8));
+        i = i - 1;
+    }
+}
+
+main: () -> s64 = {
+    console_clear();
+    console_cursor_reset();
+
+    // Calculate factorials 0-5
+    n: s64 = 0;
+    while n <= 5 {
+        putchar(70); // 'F'
+        putchar(97); // 'a'
+        putchar(99); // 'c'
+        putchar(116); // 't'
+        putchar(58);  // ':'
+        putchar(32);  // ' '
+        
+        print_number(n);
+        
+        putchar(33); // '!'
+        putchar(32); // ' '
+        putchar(61); // '='
+        putchar(32); // ' '
+        
+        print_number(factorial(n));
+        
+        putchar(10); // Newline
+        n = n + 1;
+    }
+
+    return 0;
+}
