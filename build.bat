@@ -103,7 +103,7 @@ echo logs:
 
 :: Logging out everything so we dont have race conditions on stdout
 for %%f in ("%src_dir%*.cpp") do (
-    cat %log_dir%\log_%%~nxf.txt
+    type %log_dir%\log_%%~nxf.txt
 )
 
 echo:
