@@ -82,6 +82,10 @@ void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
 void nasm_compile_func(string_t name, nasm_state_t *state) {
     if (!state->func->code.count) {
         if (state->func->is_external) {
+            if (string_compare(name, STRING("getchar")) == 0) {
+                return;
+            }
+
             if (string_compare(name, STRING("putchar")) == 0) {
                 return;
             }
@@ -106,6 +110,9 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
 
         string_t t = {};
         switch (op.operation) {
+            case IR_NOP:
+                nasm_add_line(state, STRING("nop"), 1);
+                break;
             case IR_STACK_FRAME_PUSH:
                 INSERT_LINE();
                 nasm_add_line(state, STRING("push rbp"), 1);
@@ -143,6 +150,19 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
             case IR_PUSH_SEA:
                 INSERT_LINE();
                 t = string_format(talloc, STRING("lea rax, QWORD[rbp - %u * 8]"), op.u_operand);
+                nasm_add_line(state, t, 1);
+                STORE("rax");
+                break;
+
+            case IR_PUSH_GLOBAL:
+                INSERT_LINE();
+                t = string_format(talloc, STRING("mov rax, QWORD[global_variables + %u * 8]"), op.u_operand);
+                nasm_add_line(state, t, 1);
+                STORE("rax");
+                break;
+            case IR_PUSH_GEA:
+                INSERT_LINE();
+                t = string_format(talloc, STRING("lea rax, QWORD[global_variables - %u * 8]"), op.u_operand);
                 nasm_add_line(state, t, 1);
                 STORE("rax");
                 break;
@@ -208,6 +228,21 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 LOAD("rax");
                 INSERT_LINE();
                 nasm_add_line(state, STRING("not rax"), 1);
+                STORE("rax");
+                break;
+
+             case IR_LOG_NOT:
+                LOAD("rax");
+                INSERT_LINE();
+                nasm_add_line(state, STRING("cmp rax, 0"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, STRING("setne al"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, STRING("xor al, -1"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, STRING("and al, 1"), 1);
+                INSERT_LINE();
+                nasm_add_line(state, STRING("movzx rax, al"), 1);
                 STORE("rax");
                 break;
 
@@ -300,22 +335,38 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_add_line(&nasm, STRING(""));
         nasm_add_line(&nasm, STRING("section .bss"));
         nasm_add_line(&nasm, STRING("exec_stack: resq 4096"));
-        nasm_add_line(&nasm, STRING("putchar_buffer: resb 1"));
         nasm_add_line(&nasm, STRING("putchar_handle: resq 1"));
+        nasm_add_line(&nasm, STRING("getchar_handle: resq 1"));
+        nasm_add_line(&nasm, STRING("char_buffer:    resb 1000"));
+        nasm_add_line(&nasm, STRING("scratch_buffer: resq 100"));
+        nasm_add_line(&nasm, STRING(""));
+
+        nasm_add_line(&nasm, STRING("section .data"));
+        nasm_add_line(&nasm, STRING("global_variables:"), 1);
+
+        for (u64 i = 0; i < state->globals.count; i++) {
+            nasm_add_line(&nasm,
+                    string_format(get_temporary_allocator(), 
+                        STRING("dq    %d"),
+                        state->globals[i]),
+                    2);
+        }
         nasm_add_line(&nasm, STRING(""));
 
         nasm_add_line(&nasm, STRING("section .text"));
         nasm_add_line(&nasm, STRING(""));
         nasm_add_line(&nasm, STRING("global mainCRTStartup"));
-        nasm_add_line(&nasm, STRING("extern GetStdHandle, WriteConsoleA"));
+        nasm_add_line(&nasm, STRING("extern SetConsoleMode, GetStdHandle, ReadConsoleA, WriteConsoleA"));
         nasm_add_line(&nasm, STRING(""));
         nasm_add_line(&nasm, STRING("mainCRTStartup:"));
 
         nasm_add_line(&nasm, STRING("lea r14, [exec_stack]"), 1);
         nasm_add_line(&nasm, STRING("xor r15, r15"), 1);
 
-        nasm_add_line(&nasm, STRING("call putchar_setup"), 1);
+        nasm_add_line(&nasm, STRING("call runtime_setup"), 1);
         nasm_add_line(&nasm, STRING("call main"), 1);
+        nasm_add_line(&nasm, STRING("dec r15"), 1);
+        nasm_add_line(&nasm, STRING("mov rax, QWORD[r14 + r15 * 8]"), 1);
         nasm_add_line(&nasm, STRING("ret"), 1);
         nasm_add_line(&nasm, STRING(""));
     }
@@ -339,22 +390,68 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_add_line(&nasm, STRING("jae .loop"), 1);
         nasm_add_line(&nasm, STRING(".done:"), 0);
         nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
     }
 
-    { // putchar code
-        nasm_add_line(&nasm, STRING("putchar_setup:"));
+    { // setup
+        nasm_add_line(&nasm, STRING("runtime_setup:"));
         nasm_add_line(&nasm, STRING("push rbp"), 1);
         nasm_add_line(&nasm, STRING("mov rbp, rsp"), 1);
         nasm_add_line(&nasm, STRING("and rsp, -16"), 1);
+
         nasm_add_line(&nasm, STRING("mov rcx, -11"), 1);
         nasm_add_line(&nasm, STRING("sub rsp, 32"), 1);
         nasm_add_line(&nasm, STRING("call GetStdHandle"), 1);
         nasm_add_line(&nasm, STRING("add rsp, 32"), 1);
+
         nasm_add_line(&nasm, STRING("mov [putchar_handle], rax"), 1);
+
+        nasm_add_line(&nasm, STRING("mov rcx, -10"), 1);
+        nasm_add_line(&nasm, STRING("sub rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("call GetStdHandle"), 1);
+        nasm_add_line(&nasm, STRING("add rsp, 32"), 1);
+
+        nasm_add_line(&nasm, STRING("mov [getchar_handle], rax"), 1);
+
+        nasm_add_line(&nasm, STRING("mov rcx, [getchar_handle]"), 1);
+        nasm_add_line(&nasm, STRING("mov rdx, 0x0009"), 1);
+        nasm_add_line(&nasm, STRING("sub rsp, 32"), 1);
+        nasm_add_line(&nasm, STRING("call SetConsoleMode"), 1);
+        nasm_add_line(&nasm, STRING("add rsp, 32"), 1);
+
         nasm_add_line(&nasm, STRING("mov rsp, rbp"), 1);
         nasm_add_line(&nasm, STRING("pop rbp"), 1);
         nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
+    }
+    { // getchar
+        nasm_add_line(&nasm, STRING("getchar:"));
 
+        nasm_add_line(&nasm, STRING("push rbp"), 1);
+        nasm_add_line(&nasm, STRING("mov rbp, rsp"), 1);
+        nasm_add_line(&nasm, STRING("and rsp, -16"), 1);
+
+        nasm_add_line(&nasm, STRING("and rsp, -16"), 1);
+        nasm_add_line(&nasm, STRING("mov rcx, [getchar_handle]"), 1);
+        nasm_add_line(&nasm, STRING("lea rdx, [char_buffer]"), 1);
+        nasm_add_line(&nasm, STRING("mov r8, 1"), 1);
+        nasm_add_line(&nasm, STRING("lea r9, [scratch_buffer]"), 1);
+
+        nasm_add_line(&nasm, STRING("sub rsp, 0x30"), 1);
+        nasm_add_line(&nasm, STRING("mov QWORD[rsp + 32], 0x00"), 1);
+        nasm_add_line(&nasm, STRING("call ReadConsoleA"), 1);
+        nasm_add_line(&nasm, STRING("add rsp, 0x30"), 1);
+
+        nasm_add_line(&nasm, STRING("movzx rax, BYTE[char_buffer]"), 1);
+        nasm_add_line(&nasm, STRING("mov QWORD[r14 + r15 * 8], rax"), 1);
+        nasm_add_line(&nasm, STRING("inc r15"), 1);
+
+        nasm_add_line(&nasm, STRING("mov rsp, rbp"), 1);
+        nasm_add_line(&nasm, STRING("pop rbp"), 1);
+        nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
+    }
+    { // putchar
         nasm_add_line(&nasm, STRING("putchar:"));
         nasm_add_line(&nasm, STRING("push rbp"), 1);
         nasm_add_line(&nasm, STRING("mov rbp, rsp"), 1);
@@ -363,10 +460,10 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_add_line(&nasm, STRING("dec r15"), 1);
         nasm_add_line(&nasm, STRING("mov rax, QWORD[r14 + r15 * 8]"), 1);
         nasm_add_line(&nasm, STRING("mov QWORD[r14 + r15 * 8], 0"), 1);
-        nasm_add_line(&nasm, STRING("mov BYTE[putchar_buffer], al"), 1);
+        nasm_add_line(&nasm, STRING("mov BYTE[char_buffer], al"), 1);
 
         nasm_add_line(&nasm, STRING("mov rcx, [putchar_handle]"), 1);
-        nasm_add_line(&nasm, STRING("lea rdx, [putchar_buffer]"), 1);
+        nasm_add_line(&nasm, STRING("lea rdx, [char_buffer]"), 1);
         nasm_add_line(&nasm, STRING("mov r8, 1"), 1);
         nasm_add_line(&nasm, STRING("mov r9, 0 "), 1);
         nasm_add_line(&nasm, STRING("push 0   "), 1);
@@ -376,19 +473,31 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_add_line(&nasm, STRING("mov rsp, rbp"), 1);
         nasm_add_line(&nasm, STRING("pop rbp"), 1);
         nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
     }
 
     { // debug break
         nasm_add_line(&nasm, STRING("debug_break:"));
         nasm_add_line(&nasm, STRING("int3"), 1);
         nasm_add_line(&nasm, STRING("ret"), 1);
+        nasm_add_line(&nasm, STRING(""));
     }
 
+    b32 valid      = true;
+    b32 found_main = false;
     for (u64 i = 0; i < state->functions.capacity; i++) {
         kv_pair_t<string_t, ir_function_t> *pair = state->functions.entries + i;
 
         if (!pair->occupied) continue;
         if (pair->deleted)   continue;
+
+        if (string_compare(pair->key, STRING("main")) == 0) {
+            found_main = true;
+            if (pair->value.entry->return_typenames.count < 1) {
+                log_error("main should return at least one argument!");
+                valid = false;
+            }
+        }
 
         nasm.func = &pair->value;
         nasm_compile_func(pair->key, &nasm);
@@ -396,5 +505,9 @@ backend_t nasm_compile_program(ir_t *state) {
 
     list_t<u8> list = array_to_list(&nasm.code);
 
-    return {list.alloc, list};
+    if (!found_main) {
+        log_error("Couldn't find main in code.");
+    }
+
+    return {valid, list.alloc, list};
 }

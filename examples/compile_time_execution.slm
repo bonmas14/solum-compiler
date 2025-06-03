@@ -1,0 +1,43 @@
+use: "core";
+
+version : s64 = compute_global();
+
+main: () -> s64 = {
+    putchar(0x56); // V
+    putchar(0x45 | 0x20); // E
+    putchar(0x52 | 0x20); // R
+    putchar(0x53 | 0x20); // S
+    putchar(0x49 | 0x20); // I
+    putchar(0x4f | 0x20); // O
+    putchar(0x4e | 0x20); // N
+    putchar(0x3a); // :
+
+    putchar(0x20); // 
+    print_number(version);
+    putchar(0x0A); // \n
+    return 0;
+}
+
+compute_global: () = {
+    putchar(0x50); // P
+    putchar(0x52 | 0x20); // R
+    putchar(0x49 | 0x20); // I
+    putchar(0x4e | 0x20); // N
+    putchar(0x54 | 0x20); // T
+
+    putchar(0x20); // 
+
+    putchar(0x56); // V
+    putchar(0x45 | 0x20); // E
+    putchar(0x52 | 0x20); // R
+    putchar(0x53 | 0x20); // S
+    putchar(0x49 | 0x20); // I
+    putchar(0x4f | 0x20); // O
+    putchar(0x4e | 0x20); // N
+    putchar(0x3a | 0x20); // :
+
+    putchar(0x20); // 
+    v: s64 = 0;// read_number();
+    putchar(0x0A); // \n
+    return v;
+}

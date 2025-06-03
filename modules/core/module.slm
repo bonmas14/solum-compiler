@@ -1,6 +1,7 @@
 use: "printing";
 
-putchar: (char: u32) = external "compiler";
+putchar: (char: s64) = external "compiler";
+getchar: () -> s64   = external "compiler";
 
 debug_break: () = external "compiler";
 

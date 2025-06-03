@@ -287,6 +287,8 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     expr.emmited_op->operation = IR_PUSH_GEA;
                 } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
                     expr.emmited_op->operation = IR_PUSH_SEA;
+                } else if (expr.emmited_op->operation == IR_LOAD) {
+                    expr.emmited_op->operation = IR_NOP;
                 } else {
                     expr.emmited_op->operation = IR_INVALID;
                 }
@@ -383,25 +385,41 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
             // not the real offset
             //
             // so get (struct addr) + (offset, size)
-
-            return expr;
-
-        case AST_ARRAY_ACCESS: // @todo finish
-            // log_error("Cant use arrays");
             break;
 
-            /*
+        case AST_ARRAY_ACCESS: // @todo finish
+
+            // loading offset
             compile_expression(state, node->right, shadow);
+            // @todo arithmetics based on type
+            
+            // multiply by * because we are using type s64 everywhere (and it breaks interop rn) 
+            emit_op(state, IR_PUSH_SIGN, node->left->token, 8);
+            emit_op(state, IR_MUL, node->left->token, 0);
+
+            // get base address
             expr = compile_expression(state, node->left, shadow);
 
             if (!expr.accessable) {
-                log_error_token("Bad array access expression: ", node->left->token);
+                log_error_token("Cant get address of unknown variable", node->left->token);
                 state->ir.is_valid = false;
             } else {
-                expr.emmited_op->operation = IR_STORE;
+                if (expr.type.pointer_depth == 0) {
+                    if (expr.emmited_op->operation == IR_PUSH_GLOBAL) {
+                        expr.emmited_op->operation = IR_PUSH_GEA;
+                    } else if (expr.emmited_op->operation == IR_PUSH_STACK) {
+                        expr.emmited_op->operation = IR_PUSH_SEA;
+                    } else {
+                        expr.emmited_op->operation = IR_INVALID;
+                    }
+                }
             }
-            */
-            return expr;
+
+            expr.type.pointer_depth++;
+            // add offset to address
+            emit_op(state, IR_ADD, node->left->token, 0);
+            expr.emmited_op = emit_op(state, IR_LOAD, node->left->token, 0);
+            break;
 
         case AST_BIN_ASSIGN:
             compile_expression(state, node->right, shadow);
@@ -421,6 +439,7 @@ ir_expression_t compile_expression(ir_state_t *state, ast_node_t *node, string_t
                     break;
                 } else {
                     expr.emmited_op->operation = IR_INVALID;
+                    break;
                 }
 
                 emit_op(state, IR_STORE, node->left->token, 0);
@@ -529,14 +548,13 @@ u64 compile_variable(ir_state_t *state, ast_node_t *node, b32 is_global = false)
 
     if (entry->info.is_array) { 
         size *= 100 * 100;
-        entry->info.pointer_depth += 1;
     }
 
     if (is_global) {
         entry->offset   = state->current_function->global_index;
         state->current_function->global_index += size;
         entry->on_stack = false;
-        emit_op(state, IR_SETUP_GLOBAL, node->token, 0);
+        emit_op(state, IR_SETUP_GLOBAL, node->token, entry->offset);
     } else {
         state->current_function->stack_index += size;
         entry->offset   = state->current_function->stack_index;
@@ -660,14 +678,16 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
     }
 
     state->current_function = hashmap_get(&state->ir.functions, key);
+    state->current_function->entry = entry;
 
-    array_create(&state->current_function->code, 8, state->ir.code);
     if (entry->is_external) {
         state->current_function->is_external = true;
         profiler_func_end();
         state->current_function = NULL;
         return;
     }  
+
+    array_create(&state->current_function->code, 8, state->ir.code);
 
     stack_push(&state->search_scopes, &entry->func_params);
     {
@@ -683,7 +703,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 
             if (entry->info.is_array) { 
                 size *= 100 * 100;
-                entry->info.pointer_depth += 1;
+                // entry->info.pointer_depth += 1;
             }
 
             state->current_function->stack_index += size;
@@ -724,7 +744,7 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
 }
 
 void compile_globals(ir_state_t *state) {
-    string_t key = string_copy(STRING("compile_globals"), default_allocator);
+    string_t key = string_copy(STRING("__internal_compile_globals"), default_allocator);
     hashmap_t<string_t, scope_entry_t> *scope = stack_peek(&state->search_scopes);
     
     {
@@ -753,8 +773,8 @@ void compile_globals(ir_state_t *state) {
             switch (pair->value.stmt->type) {
                 case AST_BIN_UNKN_DEF:  global_size += compile_variable(state,      pair->value.node, true); break;
                 case AST_UNARY_VAR_DEF: global_size += compile_variable(state,      pair->value.node, true); break;
-                case AST_BIN_MULT_DEF:  global_size += compile_mul_variables(state, pair->value.node, true); break;
-                case AST_TERN_MULT_DEF: global_size += compile_mul_variables(state, pair->value.node, true); break;
+                case AST_BIN_MULT_DEF:  global_size += compile_mul_variables(state, pair->value.stmt, true); break;
+                case AST_TERN_MULT_DEF: global_size += compile_mul_variables(state, pair->value.stmt, true); break;
                 default: assert(false); break;
             }
         }
@@ -792,11 +812,13 @@ ir_t compile_program(compiler_t *compiler) {
 
     assert(compiler != NULL);
 
-    ir_state_t state = {};
+    ir_state_t state  = {};
 
-    state.ir.code     = create_arena_allocator(1024 * sizeof(ir_opcode_t));
-    state.compiler    = compiler;
-    state.ir.is_valid = true;
+    hashmap_create(&state.ir.functions, 1, NULL, NULL);
+
+    state.ir.code      = create_arena_allocator(1024 * sizeof(ir_opcode_t));
+    state.compiler     = compiler;
+    state.ir.is_valid  = true;
 
     hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
     stack_push(&state.search_scopes, scope);

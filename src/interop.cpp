@@ -10,12 +10,15 @@
 #include "profiler.h"
 #include <math.h>
 
+#define GLOBALS_OFFSET 0x20000000LL
+
 struct memory_block_t {
     s64 size;
     s64 start;
 };
 
 struct interpreter_state_t {
+    b32 had_error;
     b32 running;
     ir_t *ir;
     u64 ip;
@@ -110,9 +113,11 @@ static inline b32 push_function(interpreter_state_t *state, string_t string) {
             str.size = 1;
             str.data = (u8*)&value;
 
-            log_write(str);
+            putchar((char)value);
         } else if (string_compare(string, STRING("debug_break")) == 0) {
             debug_break();
+        } else if (string_compare(string, STRING("getchar")) == 0) {
+            stack_push(&state->exec_stack, (s64)getchar());
         }
 
 
@@ -183,15 +188,15 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         } break;
 
         case IR_PUSH_SEA: {
-            stack_push(&state->exec_stack, get_variable_address(state, (op.s_operand - 1)));
+            stack_push(&state->exec_stack, (s64)get_variable_address(state, (op.s_operand - 1)));
         } break;
 
         case IR_PUSH_GLOBAL: {
-            stack_push(&state->exec_stack, (s64) 0);
+            stack_push(&state->exec_stack, op.s_operand); 
         } break;
 
         case IR_PUSH_GEA: {
-            stack_push(&state->exec_stack, (s64) 0);
+            stack_push(&state->exec_stack, GLOBALS_OFFSET + (op.s_operand << 3)); 
         } break;
 
         case IR_POP: {
@@ -215,28 +220,36 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
             
         case IR_LOAD: {
             s64 addr = stack_pop(&state->exec_stack);
-            if ((u64)addr > state->data_stack.index) {
+
+            if (addr >= GLOBALS_OFFSET) {
+                addr -= GLOBALS_OFFSET;
+                stack_push(&state->exec_stack, *array_get(&state->ir->globals, addr));
+            } else if ((u64)addr < state->data_stack.index) {
+                s64 val  = get_variable(state, addr);
+                stack_push(&state->exec_stack, val);
+            } else {
                 print_ir_opcode(op);
                 log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %d"), addr), op.info);
                 state->running = false;
-                break;
+                state->had_error = true;
             }
-            s64 val  = get_variable(state, addr);
-            stack_push(&state->exec_stack, val);
         } break;
             
         case IR_STORE: {
             s64 addr = stack_pop(&state->exec_stack);
             s64 val  = stack_pop(&state->exec_stack);
 
-            if ((u64)addr > state->data_stack.index) {
+            if (addr >= GLOBALS_OFFSET) {
+                addr -= GLOBALS_OFFSET;
+                stack_push(&state->exec_stack, *array_get(&state->ir->globals, addr));
+            } else if ((u64)addr < state->data_stack.index) {
+                set_variable(state, addr, val);
+            } else {
                 print_ir_opcode(op);
                 log_error_token(string_format(get_temporary_allocator(), STRING("Access violation, address: %d"), addr), op.info);
                 state->running = false;
-                break;
+                state->had_error = true;
             }
-
-            set_variable(state, addr, val);
         } break;
 
         case IR_JUMP: {
@@ -262,7 +275,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
                 state->running = false;
             } else {
                 u64 ip_addr = stack_pop(&state->ip_stack);
-                state->ip = ip_addr; // assume that it will be not too big...
+                state->ip = ip_addr;
                 pop_function(state);
             }
         } break;
@@ -282,6 +295,7 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
         case IR_INVALID: {
             log_error("Invalid opcode!");
             state->running = false;
+            state->had_error = true;
             assert(false);
         } break;
             
@@ -289,11 +303,12 @@ static inline void execute_ir_opcode(interpreter_state_t *state, ir_opcode_t op)
             log_error("Unknown IR opcode.");
             print_ir_opcode(op);
             state->running = false;
+            state->had_error = true;
             break;
     }
 }
 
-void interop_func(ir_t *ir, string_t func_name) {
+b32 interop_func(ir_t *ir, string_t func_name) {
     profiler_func_start();
     interpreter_state_t state = {};
 
@@ -311,13 +326,15 @@ void interop_func(ir_t *ir, string_t func_name) {
         }
         ir_opcode_t op = func->code[state.ip++];
 
-#ifdef VERBOSE
-        log_update_color();
-        fprintf(stderr, " %4llu - about to: ", state.ip);
-        print_ir_opcode(op);
-#endif
+        if (compiler_config.verbose) {
+            log_update_color();
+            fprintf(stderr, " %4llu - about to: ", state.ip);
+            print_ir_opcode(op);
+        }
+
         execute_ir_opcode(&state, op);
     }
 
     profiler_func_end();
+    return !state.had_error;
 }

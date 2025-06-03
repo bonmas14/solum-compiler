@@ -4,6 +4,6 @@
 #include "stddefines.h"
 #include "ir.h"
 
-void interop_func(ir_t *state, string_t func_name);
+b32 interop_func(ir_t *state, string_t func_name);
 
 #endif

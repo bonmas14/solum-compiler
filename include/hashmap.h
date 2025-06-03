@@ -147,6 +147,7 @@ hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map) {
 template<typename KeyType, typename DataType>
 b32 hashmap_delete(hashmap_t<KeyType, DataType> *map) {
     FREE(map->entries);
+    *map = {};
     return true;
 }
 

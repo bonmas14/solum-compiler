@@ -9,8 +9,9 @@
 #include "ir.h"
 
 struct backend_t {
-    allocator_t *alloc;
-    list_t<u8>   code;
+    b32         is_valid;
+    allocator_t alloc;
+    list_t<u8>  code;
 };
 
 backend_t nasm_compile_program(ir_t *state);

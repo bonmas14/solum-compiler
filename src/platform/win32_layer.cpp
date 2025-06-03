@@ -176,7 +176,7 @@ u32 platform_run_process(string_t exec_name, string_t args) {
             &startup_info,
             &info);
 
-    if (info.hProcess == INVALID_HANDLE_VALUE) {
+    if (!status || info.hProcess == INVALID_HANDLE_VALUE) {
         log_error(STRING("Couldn't create process."));
         return 10000;
     }

@@ -74,7 +74,7 @@ void array_create(array_t<DataType> *array, u64 size, allocator_t alloc) {
     array->grow_size *= 2;
     assert(entry.data != NULL);
 
-    list_create(&array->entries, 16, &array->alloc); 
+    list_create(&array->entries, 16, array->alloc); 
     list_add(&array->entries, &entry);
 }
 
@@ -88,7 +88,7 @@ list_t<DataType> array_to_list(array_t<DataType> *array) {
     if (array->count == 0) return {};
 
     list_t<DataType> list = {};
-    list_create(&list, array->count, &array->alloc);
+    list_create(&list, array->count, array->alloc);
 
     u64 offset = 0;
     for (u64 i = 0; i < array->entries.count; i++) {

@@ -33,7 +33,7 @@ struct compiler_t {
     hashmap_t<string_t, source_file_t> files;
 };
 
-source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc);
+source_file_t create_source_file(allocator_t *alloc);
 compiler_t create_compiler_instance(allocator_t *alloc);
 void compile(compiler_t *state);
 

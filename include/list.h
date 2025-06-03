@@ -10,7 +10,7 @@
 
 template<typename DataType>
 struct list_t {
-    allocator_t *alloc;
+    allocator_t alloc;
     u64 count;
     DataType *data;
 
@@ -31,7 +31,7 @@ struct list_t {
 // ----------- Initialization 
 
 template<typename DataType>
-b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t *alloc);
+b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t alloc);
 template<typename DataType>
 list_t<DataType> list_clone(list_t<DataType> *list);
 template<typename DataType>
@@ -73,14 +73,13 @@ void list_create_if_needed(list_t<DataType> *list);
 // ----------- Implementation
 
 template<typename DataType>
-b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t *alloc) {
-    if (alloc == NULL) alloc = default_allocator;
+b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t alloc) {
     list->count        = 0;
     list->current_size = init_size;
 
     list->alloc     = alloc;
     list->grow_size = init_size * 2;
-    list->data      = (DataType*)mem_alloc(alloc, init_size * sizeof(DataType));
+    list->data      = (DataType*)mem_alloc(&alloc, init_size * sizeof(DataType));
 
     if (list->data == NULL) {
         log_error(STRING("List: Couldn't create list."));
@@ -92,7 +91,6 @@ b32 list_create(list_t<DataType> *list, u64 init_size, allocator_t *alloc) {
 
 template<typename DataType>
 list_t<DataType> list_clone(list_t<DataType> *list) {
-    assert(list->alloc != NULL);
     list_t<DataType> clone = {};
 
     if (list->current_size == 0)
@@ -119,8 +117,7 @@ b32 list_delete(list_t<DataType> *list) {
         return false;
     }
 
-    assert(list->alloc != NULL);
-    mem_free(list->alloc, list->data); 
+    mem_free(&list->alloc, list->data); 
     list->data = NULL;
     list->count = 0;
     list->current_size = 0;
@@ -189,7 +186,7 @@ template<typename DataType>
 void list_create_if_needed(list_t<DataType> *list) {
     assert(default_allocator);
 
-    allocator_t *alloc = list->alloc ? list->alloc : default_allocator;
+    allocator_t alloc = list->alloc.proc ? list->alloc : *default_allocator;
     if (list->data == NULL && !list_create(list, STANDARD_LIST_SIZE, alloc)) {
         log_error(STRING("tried to create list but failed."));
     }
@@ -198,7 +195,7 @@ void list_create_if_needed(list_t<DataType> *list) {
 template<typename DataType>
 b32 list_grow(list_t<DataType> *list) {
     assert(list != 0);
-    DataType *data = (DataType*)mem_alloc(list->alloc, list->grow_size * sizeof(DataType));
+    DataType *data = (DataType*)mem_alloc(&list->alloc, list->grow_size * sizeof(DataType));
 
     if (data == NULL) {
         log_error(STRING("List: Couldn't grow list."));
@@ -207,7 +204,7 @@ b32 list_grow(list_t<DataType> *list) {
 
     (void)mem_copy((u8*)data, (u8*)list->data, list->current_size * sizeof(DataType));
 
-    mem_free(list->alloc, list->data); 
+    mem_free(&list->alloc, list->data); 
     list->data = data;
     list->current_size  = list->grow_size;
     list->grow_size = list->current_size * 2;

@@ -11,4 +11,5 @@ for %%f in ("*.slm") do (
     %slm% %%f --output bin\%%~nf
 )
 
+
 endlocal

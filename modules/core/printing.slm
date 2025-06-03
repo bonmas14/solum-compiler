@@ -4,20 +4,38 @@ print_number: (num: s64) = {
         return;
     }
 
-    digits: [20]u8;
+    digits: [20]s64;
     count: s64 = 0;
     temp: s64 = num;
     
     while temp > 0 {
-        digit: u8 = (temp % 10) + 48;
-        @(^digits + count * 8) = digit;
+        digit: s64 = (temp % 10) + 48;
+        digits[count] = digit;
         temp = temp / 10;
         count = count + 1;
     }
 
     i: s64 = count - 1;
     while i >= 0 {
-        putchar(@(^digits + i * 8));
+        putchar(digits[i]);
         i = i - 1;
     }
+}
+
+read_number: () -> s64 = {
+    value: s64 = 0;
+    
+    while true {
+        c: s64 = getchar();
+
+        if !(c >= 0x30 && c <= 0x39) {
+            break;
+        }
+
+        putchar(c);
+        value = value * 10 + (c - 0x30);
+    }
+    
+
+    return value;
 }

@@ -13,7 +13,8 @@ factorial: (n: s64) -> s64 = {
 
 main: () -> s64 = {
     n: s64 = 0;
-    while n <= 20 {
+
+    while true {
         putchar(70);  // 'F'
         putchar(97);  // 'a'
         putchar(99);  // 'c'
@@ -21,7 +22,7 @@ main: () -> s64 = {
         putchar(58);  // ':'
         putchar(32);  // ' '
         
-        print_number(n);
+        n = read_number();
         
         putchar(33); // '!'
         putchar(32); // ' '
@@ -29,8 +30,7 @@ main: () -> s64 = {
         putchar(32); // ' '
         
         print_number(factorial(n));
-        
-        putchar(10); // Newline
+        putchar(0x0A);
         n = n + 1;
     }
 

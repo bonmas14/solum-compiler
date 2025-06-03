@@ -18,7 +18,7 @@ draw_square: (size: s64, angle: s64, buffer: ^u8) = {
             
             // Set pixel in buffer
             if (px >= 0 && px < 40) && (py >= 0 && py < 20) {
-                @(^buffer + (px + py * 40) * 8) = 0x23; // '#'
+                buffer[px + py * 40] = 0x23; // '#'
             }
             j = j + 1;
         }
@@ -51,7 +51,7 @@ main: () -> s64 = {
         // Clear buffer
         i: s64 = 0;
         while i < 40*20 {
-            @(^buffer + i * 8) = 0x20; // Space
+            buffer[i] = 0x20; // Space
             i = i + 1;
         }
         
@@ -62,9 +62,11 @@ main: () -> s64 = {
         console_cursor_reset();
         i = 0;
         while i < 40*20 {
-            putchar(@(^buffer + i * 8));
+            putchar(buffer[i]);
             putchar(0x20);
-            if i % 40 == 39 { putchar(0x0A); } // Newline
+            if i % 40 == 39 { 
+                putchar(0x0A);
+            }
             i = i + 1;
         }
         

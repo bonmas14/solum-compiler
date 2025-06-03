@@ -36,10 +36,9 @@ string_t get_global_modules_search_path(void) {
     return string_copy(STRING(env), default_allocator);
 }
 
-source_file_t create_source_file(compiler_t *compiler, allocator_t *alloc) {
+source_file_t create_source_file(allocator_t *alloc) {
     if (alloc == NULL) alloc = default_allocator;
     assert(alloc    != NULL);
-    assert(compiler != NULL);
 
     source_file_t file = {};
 
@@ -95,22 +94,28 @@ void compile(compiler_t *state) {
     profiler_block_end();
 
     if (result.is_valid) {
-        string_t key = STRING("compile_globals");
+        string_t key = STRING("__internal_compile_globals");
 
-        {
-            profiler_block_start(STRING("Interpretation"));
+        b32 interp_state = true;
+
+        profiler_block_start(STRING("Interpretation")); {
             ir_function_t *func = result.functions[key];
 
             assert(func);
 
-            // @todo fix pointer math, because we do unaligned stuff and it is automatically aligned in interpreter!
-            interop_func(&result, key);
+            interp_state = interop_func(&result, key);
 
-            if (hashmap_remove(&result.functions, STRING("compile_globals"))) {
+            if (hashmap_remove(&result.functions, STRING("__internal_compile_globals"))) {
                 array_delete(&func->code);
             }
-            profiler_block_end();
+
+        } profiler_block_end();
+
+        if (!interp_state) {
+            log_error("Error interpreting code!");
+            return;
         }
+
 
         profiler_block_start(STRING("Nasm backend generation"));
         backend_t backend = nasm_compile_program(&result);

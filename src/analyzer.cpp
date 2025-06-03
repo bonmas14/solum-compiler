@@ -1486,7 +1486,7 @@ string_t construct_module_name(string_t path, string_t name, allocator_t *alloc)
 b32 load_and_process_file(compiler_t *compiler, string_t filename) {
     assert(compiler != NULL);
 
-    source_file_t file = create_source_file(compiler, NULL);
+    source_file_t file = create_source_file(NULL);
 
     string_t source;
 
