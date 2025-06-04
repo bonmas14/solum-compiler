@@ -324,7 +324,9 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         case TOKEN_IDENT: {
                 string_t var_name = expr->token.data.string;
 
-                stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), var_name);
+                if (state->internal_deps.index > 0) {
+                    stack_push(hashmap_get(&state->symbol_deps, stack_peek(&state->internal_deps)), var_name);
+                }
                 scope_entry_t *output = NULL; 
                 switch (get_if_exists(state, true, var_name, &output)) {
                     case GET_NOT_FIND:
@@ -2010,19 +2012,25 @@ b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
         profiler_block_start(STRING("Code analyze step"));
 
         string_t key = pair->value.node->token.data.string;
-        stack_push(&state->internal_deps, key);
 
         {
             stack_t<string_t> symbol_deps = {};
             hashmap_add(&state->symbol_deps, key, &symbol_deps);
         }
 
+        if (pair->value.type != ENTRY_FUNC) {
+            stack_push(&state->internal_deps, key);
+        }
+
         if (!analyze_definition_expr(state, &pair->value)) {
             result = false;
         }
 
+        if (pair->value.type != ENTRY_FUNC) {
+            stack_pop(&state->internal_deps);
+        }
+
         assert(state->current_search_stack.index == 1);
-        stack_pop(&state->internal_deps);
         profiler_block_end();
     }
 

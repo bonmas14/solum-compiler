@@ -1,0 +1,52 @@
+use: "core";
+
+end: s64;
+
+// calc: s64 = calculate();
+
+main: () -> s64 = {
+    while !end {
+        putchar(0x3E);
+        putchar(0x20);
+        v: s64 = calculate();
+        putchar(0x0A);
+        print_number(v);
+        putchar(0x0A);
+    }
+
+    return 0;
+}
+
+calculate: () -> s64 = {
+    c : s64 = get_operator();
+    
+    if c == 0x0D || c == 0x71 {
+        end = true;
+        return 0;
+    }
+
+    if      c == 0x2A { putchar(0x20); a: s64 = calculate(); b: s64 = calculate(); return a * b; }
+    else if c == 0x2F { putchar(0x20); a: s64 = calculate(); b: s64 = calculate(); return a / b; }
+    else if c == 0x2B { putchar(0x20); a: s64 = calculate(); b: s64 = calculate(); return a + b; } 
+    else if c == 0x2D { putchar(0x20); a: s64 = calculate(); b: s64 = calculate(); return a - b; }
+    else              { return do_primary(); }
+}
+
+get_operator: () -> s64 = {
+    c : s64 = getchar();
+
+    while c != 0x71 && c != 0x40 && c != 0x2B && c != 0x2D && c != 0x2A && c != 0x2F && c != 0x0D {
+        c = getchar();
+    }
+
+    if      c == 0x0D { putchar(0x0A); }
+    else if c >= 0x20 { putchar(c);    }
+    return c;
+}
+
+do_primary: () -> s64 = {
+    putchar(0x28);
+    n : s64 = read_number();
+    putchar(0x29);
+    return n;
+}

@@ -162,7 +162,7 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 break;
             case IR_PUSH_GEA:
                 INSERT_LINE();
-                t = string_format(talloc, STRING("lea rax, QWORD[global_variables - %u * 8]"), op.u_operand);
+                t = string_format(talloc, STRING("lea rax, QWORD[global_variables + %u * 8]"), op.u_operand);
                 nasm_add_line(state, t, 1);
                 STORE("rax");
                 break;
@@ -255,14 +255,14 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
                 INSERT_LINE();
                 nasm_add_line(state, STRING("cmp rax, 0"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jne .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jnz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
                 break;
             case IR_JUMP_IF_NOT: 
                 LOAD("rax");
                 INSERT_LINE();
                 nasm_add_line(state, STRING("cmp rax, 0"), 1);
                 INSERT_LINE();
-                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("je .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
+                nasm_add_line(state, string_format(get_temporary_allocator(), STRING("jz .IROP_%u"), (u64)((s64)i + 1 + op.s_operand)), 1);
                 break;
 
             case IR_FREE:

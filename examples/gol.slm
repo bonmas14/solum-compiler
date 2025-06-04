@@ -11,9 +11,6 @@ main: () -> s64 = {
     console_cursor_reset();
     console_cursor_disable();
 
-    halfw: s64 = w / 2 - 3;
-    halfh: s64 = h / 2 - 1;
-
     set_cell(1, 0, ^array);
     set_cell(0, 2, ^array);
     set_cell(1, 2, ^array);
