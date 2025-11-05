@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "slm=..\bin\slm-r"
+set "slm=..\bin\slm-d"
 set "bin_dir=bin\"
 if exist %bin_dir% ( rmdir /s /q %bin_dir% )
 mkdir %bin_dir%

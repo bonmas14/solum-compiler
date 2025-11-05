@@ -5,130 +5,109 @@
 #include "talloc.h"
 #include "arena.h"
 #include "strings.h"
+#include "profiler.h"
 
 #include "hashmap.h"
 #include "stack.h"
 
-struct profile_block_t {
-    u64 depth;
-    u64 hits;
-    f64 time;
-    f64 max_time;
-};
-
-struct profiler_entry_t {
-    f64 start_time;
-    profile_block_t *block;
-};
-
-struct {
+struct Profiler_Context {
+    Profile_Data data;
+    list_t<Profile_Block*> block_stack;
     b32 running;
-    u64 current_depth;
-    hashmap_t<string_t, profile_block_t> blocks;
-    stack_t<profiler_entry_t> start_time;
-} profiler;
+};
 
-void profiler_init(void) {
-    profiler = {};
-}
 
-void profiler_begin(void) {
-    assert(!profiler.running);
+Profiler_Context profiler_ctx = {};
 
-    if (profiler.blocks.entries != NULL) {
-        hashmap_delete(&profiler.blocks);
-        profiler.blocks = {};
+void profiler_data_delete_impl(Profile_Data *data) {
+    if (data->strings.data) {
+        mem_delete(&data->strings);
+        data->strings = {};
     }
 
-    if (profiler.start_time.data != NULL) {
-        profiler.start_time.index = 0;
-    } else {
-        stack_create(&profiler.start_time, 1024);
+    if (data->blocks.data) {
+        mem_delete(&data->blocks);
+        data->blocks = {};
     }
-
-    hashmap_create(&profiler.blocks, 1024, NULL, NULL);
-    profiler.running = true;
 }
 
-void profiler_end(void) {
-    assert(profiler.running);
-    profiler.running = false;
+void profiler_begin_impl(string_t name) {
+    profiler_ctx.data = {};
+
+    profiler_ctx.data.blocks  = create_arena_allocator(KB(64));
+    profiler_ctx.data.strings = create_arena_allocator(KB(64));
+
+    Profile_Block *block = (Profile_Block*)mem_alloc(&profiler_ctx.data.blocks, sizeof(Profile_Block));
+
+    profiler_ctx.data.block = block;
+    block->name = string_copy(name, &profiler_ctx.data.strings);
+    block->start_time = debug_get_time();
+
+    list_add(&profiler_ctx.block_stack, &block);
+    profiler_ctx.running = true;
 }
 
-void profiler_block_start(string_t name) {
-    if (!profiler.running) return;
-    profiler.current_depth++;
+void add_and_push_block(Profile_Block block) {
+    Profile_Block *top = *list_get(&profiler_ctx.block_stack, profiler_ctx.block_stack.count - 1);
 
-    if (!hashmap_contains(&profiler.blocks, name)) {
-        profile_block_t b = {};
-        hashmap_add(&profiler.blocks, name, &b);
-    }
+    Profile_Block *next = (Profile_Block*)mem_alloc(&profiler_ctx.data.blocks, sizeof(Profile_Block));
+    *next = block;
 
-    profile_block_t *entry = hashmap_get(&profiler.blocks, name);
-    entry->hits++;
-    entry->depth = profiler.current_depth;
+    if (top->first_child) {
+        Profile_Block *child = top->first_child;
 
-    stack_push(&profiler.start_time, { debug_get_time(), entry });
-}
-
-void profiler_block_end(void) {
-    if (!profiler.running) return;
-    profiler.current_depth--;
-    f64 end_time = debug_get_time();
-
-    profiler_entry_t entry = stack_pop(&profiler.start_time);
-    f64 time = end_time - entry.start_time;
-    if (time > entry.block->max_time) entry.block->max_time = time;
-    entry.block->time += time;
-}
-
-void visualize_profiler_state(void) {
-    if (profiler.running) return;
-
-    log_push_color(192, 255, 255);
-
-    u64 amount = profiler.blocks.load;
-    u64 depth = 0;
-
-    while (amount > 0) {
-        for (u64 i = 0; i < profiler.blocks.capacity; i++) {
-            kv_pair_t<string_t, profile_block_t> pair = profiler.blocks.entries[i];
-
-            if (!pair.occupied) continue;
-            if (pair.deleted) continue;
-
-            log_update_color();
-
-            if (pair.value.depth == depth) {
-                fprintf(stderr, "Block:");
-
-                for (u64 j = 0; j < depth; j++) {
-                    fprintf(stderr, " ");
-                }
-
-                s32 offset = 40 - depth;
-                if (offset < 0) offset = 0;
-
-                
-                fprintf(stderr, "%-*.*s ",
-                        (int)offset,
-                        (int)pair.key.size,
-                        (char*)pair.key.data);
- 
-
-                fprintf(stderr, " %10llu Hits, %.4lf total(sec), %.4lf longest(sec), T/H: %.4lf\n",
-                        pair.value.hits,
-                        pair.value.time, 
-                        pair.value.max_time, 
-                        pair.value.time / (u64)pair.value.hits);
-
-                amount--;
-            }
+        while (child->next_in_list) {
+            child = child->next_in_list;
         }
 
-        depth += 1;
+        child->next_in_list = next;
+
+    } else {
+        top->first_child = next;
     }
 
-    log_pop_color();
-    log_update_color();
+    list_add(&profiler_ctx.block_stack, &next);
+}
+
+void profiler_push_impl(string_t name) {
+    if (!profiler_ctx.running) return;
+    Profile_Block block = {};
+    block.start_time = debug_get_time();
+
+    block.name = string_copy(name, &profiler_ctx.data.strings);
+
+    add_and_push_block(block);
+}
+
+void profiler_pop_impl(void) {
+    if (!profiler_ctx.running) return;
+    Profile_Block *top = *list_get(&profiler_ctx.block_stack, profiler_ctx.block_stack.count - 1);
+    profiler_ctx.block_stack.count--;
+
+    top->stop_time = debug_get_time();
+}
+
+Profile_Data profiler_end_impl(void) {
+    if (!profiler_ctx.running) return {};
+    Profile_Block *top = *list_get(&profiler_ctx.block_stack, profiler_ctx.block_stack.count - 1);
+    profiler_ctx.block_stack.count--;
+
+    assert(profiler_ctx.block_stack.count == 0);
+    assert(top == profiler_ctx.data.block);
+    profiler_ctx.running = false;
+    top->stop_time = debug_get_time();
+    return profiler_ctx.data;
+}
+
+void visualize_profiler_state(Profile_Block *block, u64 depth) {
+    while (block) {
+        add_left_pad(stderr, depth * 4);
+        fprintf(stderr, "%.*s: %.3f ms\n", block->name.size, block->name.data, (block->stop_time - block->start_time) * 1000);
+
+        if (block->first_child) {
+            visualize_profiler_state(block->first_child, depth + 1);
+        }
+
+        block = block->next_in_list;
+    }
 }

@@ -79,7 +79,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
         return false;
     }
 
-    output->data = (u8*)mem_alloc(default_allocator, file_size);
+    output->data = (u8*)mem_alloc(alloc, file_size);
 
     if (output->data == NULL) {
         log_error(STRING("Couldn't allocate memory for file contents."));

@@ -44,7 +44,6 @@ void init(void) {
     log_push_color(255, 255, 255);
     alloc_init();
     debug_init();
-    profiler_init();
     debug_tests();
 }
 
@@ -80,7 +79,7 @@ int main(int argc, char **argv) {
     f64 start = debug_get_time();
 
 #ifdef DEBUG
-    profiler_begin();
+    profiler_begin(STRING("Comp"));
     profiler_block_start(STRING("Compilation"));
 #endif
 
@@ -155,16 +154,18 @@ int main(int argc, char **argv) {
 
     if (status) compile(&state);
 
+    Profile_Data data;
 #ifdef DEBUG
     profiler_block_end();
-    profiler_end();
+    data = profiler_end();
 #endif
 
     f64 end = debug_get_time();
     if (status) {
         log_update_color();
         fprintf(stderr, "time: %lf\n", end - start);
-        visualize_profiler_state();
+        visualize_profiler_state(data.block, 0);
+        profiler_data_delete(&data);
     }
 
     log_reset_color();

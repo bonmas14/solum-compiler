@@ -3,26 +3,29 @@
 #include "array.h"
 #include "talloc.h"
 #include "strings.h"
+#include "profiler.h"
 
 struct nasm_state_t {
     ir_t       *ir;
-    array_t<u8> code;
+    list_t<u8> code;
     ir_function_t    *func;
     stack_t<string_t> labels;
 };
 
     // @todo @speed...
 void nasm_add_string(nasm_state_t *state, string_t data, u64 tab = 0) {
-    for (u64 i = 0; i < (tab * 4); i++) {
-        array_add(&state->code, (u8)' ');
-    }
+    u64 i;
+    u8 *v;
 
-    for (u64 i = 0; i < data.size; i++) {
-        array_add(&state->code, data[i]);
-    }
+    list_allocate(&state->code, tab * 4, &i);
+    v = list_get(&state->code, i);
+    mem_set(v, ' ', tab * 4);
+
+    list_allocate(&state->code, data.size, &i);
+    list_fill(&state->code, data.data, data.size, i);
 }
 
-void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
+inline void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
     nasm_add_string(state, data, tab);
     nasm_add_string(state, STRING("\n"));
 }
@@ -323,7 +326,7 @@ backend_t nasm_compile_program(ir_t *state) {
     nasm_state_t nasm = {};
 
     nasm.ir = state;
-    array_create(&nasm.code, (u64) 1024, create_arena_allocator(PG(4)));
+    list_create(&nasm.code, (u64) 1024, create_arena_allocator(PG(4)));
 
     { // header and RT   
         nasm_add_line(&nasm, STRING("; Created by bonmas14."));
@@ -503,11 +506,9 @@ backend_t nasm_compile_program(ir_t *state) {
         nasm_compile_func(pair->key, &nasm);
     }
 
-    list_t<u8> list = array_to_list(&nasm.code);
-
     if (!found_main) {
         log_error("Couldn't find main in code.");
     }
 
-    return {valid, list.alloc, list};
+    return {valid, nasm.code.alloc, nasm.code};
 }

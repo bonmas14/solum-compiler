@@ -131,7 +131,6 @@ b32 list_delete(list_t<DataType> *list) {
 template<typename DataType>
 void list_allocate(list_t<DataType> *list, u64 elements_amount, u64 *start_index) {
     list_create_if_needed(list);
-    assert(elements_amount > 0);
 
     if (!list_grow_fit(list, elements_amount)) {
         assert(false);
@@ -150,7 +149,7 @@ void list_fill(list_t<DataType> *list, DataType *data, u64 elements_amount, u64 
     DataType *start_address = list_get(list, start_index);
     
     if (start_address == NULL) {
-        assert(false);
+        return;
     }
 
     mem_copy((u8*)start_address, (u8*)data, elements_amount * sizeof(DataType));
@@ -214,7 +213,7 @@ b32 list_grow(list_t<DataType> *list) {
 
 template<typename DataType>
 b32 list_grow_fit(list_t<DataType> *list, u64 fit_elements) {
-    assert(fit_elements > 0);
+    if (fit_elements == 0) return true;
 
     if ((list->count + fit_elements - 1) < list->current_size) {
         return true;

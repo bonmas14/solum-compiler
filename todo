@@ -11,3 +11,5 @@ for debug purposes
 could be great for debug purposes?
 
 X- fix the alignment and make structs alignment.
+
+- fix shadowing of functions...
