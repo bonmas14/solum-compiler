@@ -75,30 +75,31 @@ compiler_t create_compiler_instance(allocator_t *alloc) {
 }
 
 void compile(compiler_t *state) {
-    profiler_block_start(STRING("Preload all files"));
+    profiler_push("Internal");
+    profiler_push("Preload all files");
     if (!analyzer_preload_all_files(state)) {
-        profiler_block_end();
+        profiler_pop("Preload all files");
         return;
     }
-    profiler_block_end();
+    profiler_pop("Preload all files");
 
-    profiler_block_start(STRING("Analyze"));
+    profiler_push("Analyze");
     if (!analyze(state)) {
-        profiler_block_end();
+        profiler_pop("Analyze");
         return;
     }
-    profiler_block_end();
+    profiler_pop("Analyze");
 
-    profiler_block_start(STRING("IR gen"));
+    profiler_push("IR gen");
     ir_t result = compile_program(state);
-    profiler_block_end();
+    profiler_pop("IR gen");
 
     if (result.is_valid) {
         string_t key = STRING("__internal_compile_globals");
 
         b32 interp_state = true;
 
-        profiler_block_start(STRING("Interpretation")); {
+        profiler_push("Interpretation"); {
             ir_function_t *func = result.functions[key];
 
             assert(func);
@@ -109,17 +110,21 @@ void compile(compiler_t *state) {
                 array_delete(&func->code);
             }
 
-        } profiler_block_end();
+        } profiler_pop("Interpretation");
 
         if (!interp_state) {
             log_error("Error interpreting code!");
             return;
         }
 
+        profiler_pop("Internal");
+        profiler_push("External");
 
-        profiler_block_start(STRING("Nasm backend generation"));
+        profiler_push("Nasm backend generation");
         backend_t backend = nasm_compile_program(&result);
-        profiler_block_end();
+        profiler_pop("Nasm backend generation");
+
+
 
         string_t content = { c_string_length((char*)backend.code.data), backend.code.data };
 
@@ -136,15 +141,16 @@ void compile(compiler_t *state) {
                                     link_config, filename, filename,
                                     compiler_config.show_link_time ? STRING("/TIME") : STRING(" "));
 
-        profiler_block_start(STRING("Assembling"));
+        profiler_push("Assembling");
         platform_write_file(backend_config, content);
-        if (platform_run_process(STRING("nasm.exe"),     nasm_config) != 0) { profiler_block_end(); return; }
-        profiler_block_end();
+        if (platform_run_process(STRING("nasm.exe"),     nasm_config) != 0) { profiler_pop("Assembling"); return; }
+        profiler_pop("Assembling");
 
-        profiler_block_start(STRING("Linking"));
-        if (platform_run_process(STRING("lld-link.exe"), link_config) != 0) { profiler_block_end(); return; }
-        profiler_block_end();
+        profiler_push("Linking");
+        if (platform_run_process(STRING("lld-link.exe"), link_config) != 0) { profiler_pop("Linking"); return; }
+        profiler_pop("Linking");
 
+        profiler_pop("External");
     } else {
         log_error(STRING("Compilation error"));
     }

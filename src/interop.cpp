@@ -326,12 +326,6 @@ b32 interop_func(ir_t *ir, string_t func_name) {
         }
         ir_opcode_t op = func->code[state.ip++];
 
-        if (compiler_config.verbose) {
-            log_update_color();
-            fprintf(stderr, " %4llu - about to: ", state.ip);
-            print_ir_opcode(op);
-        }
-
         execute_ir_opcode(&state, op);
     }
 

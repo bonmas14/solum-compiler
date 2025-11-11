@@ -42,6 +42,7 @@ b32 platform_file_exists(string_t name) {
 }
 
 b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *output) {
+    profiler_func_start();
     if (alloc == NULL) alloc = default_allocator;
 
     assert(alloc != NULL);
@@ -49,7 +50,10 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
     assert(name.data != NULL);
     assert(name.size > 0);
 
-    if (name.size > MAX_PATH) return false;
+    if (name.size > MAX_PATH) {
+        profiler_func_end();
+        return false;
+    }
 
     LPSTR filename = string_to_c_string(name, get_temporary_allocator());
 
@@ -63,6 +67,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
 
     if (file == INVALID_HANDLE_VALUE) {
         log_error(STRING("Couldn't load file."));
+        profiler_func_end();
         return false;
     }
 
@@ -76,6 +81,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
 
     if (file_size == 0) {
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
@@ -84,6 +90,7 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
     if (output->data == NULL) {
         log_error(STRING("Couldn't allocate memory for file contents."));
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
@@ -96,26 +103,33 @@ b32 platform_read_file_into_string(string_t name, allocator_t *alloc, string_t *
             NULL)) {
         log_error(STRING("Couldn't read file."));
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
     if ((u64)bytes_read < file_size) {
         log_error(STRING("Corrupted read."));
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
     output->size = file_size;
     CloseHandle(file);
+    profiler_func_end();
     return true;
 }
 
 b32 platform_write_file(string_t name, string_t content) {
+    profiler_func_start();
     assert(content.data != NULL);
     assert(name.data    != NULL);
     assert(name.size > 0);
 
-    if (name.size > MAX_PATH) return false;
+    if (name.size > MAX_PATH) {
+        profiler_func_end();
+        return false;
+    }
 
     LPSTR filename = string_to_c_string(name, get_temporary_allocator());
 
@@ -129,6 +143,7 @@ b32 platform_write_file(string_t name, string_t content) {
 
     if (file == INVALID_HANDLE_VALUE) {
         log_error(STRING("Couldn't open file for writing."));
+        profiler_func_end();
         return false;
     }
 
@@ -141,16 +156,19 @@ b32 platform_write_file(string_t name, string_t content) {
             NULL)) {
         log_error(STRING("Couldn't write a file."));
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
     if ((u64)bytes_written < content.size) {
         log_error(STRING("Corrupted writing."));
         CloseHandle(file);
+        profiler_func_end();
         return false;
     }
 
     CloseHandle(file);
+    profiler_func_end();
     return true;
 }
 

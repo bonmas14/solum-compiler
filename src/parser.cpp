@@ -62,11 +62,13 @@ static void panic_skip_until_token(u32 value, parser_state_t *state) {
 
 
 static b32 add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+    profiler_func_start();
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
+        profiler_func_end();
         return false;
     }
 
@@ -77,15 +79,18 @@ static b32 add_left_node(parser_state_t *state, ast_node_t *root, ast_node_t *no
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    profiler_func_end();
     return true;
 }
 
 static b32 add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+    profiler_func_start();
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
+        profiler_func_end();
         return false;
     }
 
@@ -96,15 +101,18 @@ static b32 add_right_node(parser_state_t *state, ast_node_t *root, ast_node_t *n
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    profiler_func_end();
     return true;
 }
 
 static b32 add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+    profiler_func_start();
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
+        profiler_func_end();
         return false;
     }
 
@@ -115,15 +123,18 @@ static b32 add_center_node(parser_state_t *state, ast_node_t *root, ast_node_t *
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    profiler_func_end();
     return true;
 }
 
 static b32 add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *node) {
+    profiler_func_start();
     assert(root != NULL);
     assert(node != NULL);
 
     if (node->type == AST_ERROR) {
         log_error_token("Bad expression: ", root->token);
+        profiler_func_end();
         return false;
     }
 
@@ -131,6 +142,7 @@ static b32 add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *no
         root->list_start = (ast_node_t*)mem_alloc(state->nodes, sizeof(ast_node_t));
         *root->list_start = *node;
         root->child_count++;
+        profiler_func_end();
         return true;
     }
 
@@ -148,6 +160,7 @@ static b32 add_list_node(parser_state_t *state, ast_node_t *root, ast_node_t *no
     if (node->type == AST_ERROR) {
         root->type = AST_ERROR;
     }
+    profiler_func_end();
     return true;
 }
 
@@ -314,6 +327,7 @@ static u32 get_ast_type_based_on_postfix_token(token_t token) {
 }
 
 static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0) {
+    profiler_func_start();
     assert(state != NULL);
     allocator_t *talloc = get_temporary_allocator();
     ast_node_t result = {};
@@ -379,6 +393,7 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
 
         default:
             result.type  = AST_EMPTY;
+            profiler_func_end();
             return result;
     }
 
@@ -400,7 +415,6 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
 
             ast_node_t lhs = result;
             ast_node_t rhs = parse_separated_expressions(state);
-            // ast_node_t rhs = parse_expression(state, 0);
 
             result.token = {};
             result.token = op;
@@ -446,12 +460,17 @@ static ast_node_t parse_expression(parser_state_t *state, s16 min_bind_power = 0
         break;
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t node = parse_expression(state, 100);
-    if (node.type == AST_EMPTY) return node;
+    if (node.type == AST_EMPTY) {
+        profiler_func_end();
+        return node;
+    }
 
     token_t current = peek_token(state->scanner, state->strings);
 
@@ -463,6 +482,7 @@ static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
     add_list_node(state, &result, &node);
 
     if (current.type != ',') {
+        profiler_func_end();
         return result;
     }
 
@@ -488,16 +508,21 @@ static ast_node_t parse_separated_primary_expressions(parser_state_t *state) {
         advance_token(state->scanner, talloc);
     }
 
+    profiler_func_end();
     return result;
 }
 
 // @todo, default, between these funcs
 static ast_node_t parse_separated_expressions(parser_state_t *state) {
+    profiler_func_start();
     token_t parsing_level = {};
     parsing_level.type = '=';
 
     ast_node_t node = parse_expression(state, get_infix_bind_power(parsing_level).left);
-    if (node.type == AST_EMPTY) return node;
+    if (node.type == AST_EMPTY) {
+        profiler_func_end();
+        return node;
+    }
 
     token_t current = peek_token(state->scanner, state->strings);
 
@@ -509,6 +534,7 @@ static ast_node_t parse_separated_expressions(parser_state_t *state) {
     add_list_node(state, &result, &node);
 
     if (current.type != ',') {
+        profiler_func_end();
         return result;
     }
 
@@ -534,15 +560,20 @@ static ast_node_t parse_separated_expressions(parser_state_t *state) {
         advance_token(state->scanner, talloc);
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr) {
+    profiler_func_start();
     ast_node_t node = {};
 
     if (expr == NULL) {
         node = parse_separated_expressions(state);
-        if (node.type == AST_EMPTY) return node;
+        if (node.type == AST_EMPTY) {
+            profiler_func_end();
+            return node;
+        }
     } else {
         node = *expr;
     }
@@ -559,9 +590,11 @@ static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr)
         case TOKEN_ERROR:
             advance_token(state->scanner, get_temporary_allocator());
             node.type = AST_ERROR;
+            profiler_func_end();
             return node;
 
         default: 
+            profiler_func_end();
             return node;
     }
 
@@ -570,9 +603,11 @@ static ast_node_t parse_swap_expression(parser_state_t *state, ast_node_t *expr)
     check_value(node.type != AST_EMPTY);
     add_right_node(state, &result, &node);
 
+    profiler_func_end();
     return result;
 }
 static ast_node_t parse_primary_type(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
 
     result.token = advance_token(state->scanner, state->strings);
@@ -609,11 +644,13 @@ static ast_node_t parse_primary_type(parser_state_t *state) {
             break;
     }
 
+    profiler_func_end();
     return result;
 }
 
 
 static ast_node_t parse_type(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
 
     token_t token = peek_token(state->scanner, get_temporary_allocator());
@@ -660,10 +697,13 @@ static ast_node_t parse_type(parser_state_t *state) {
         } break;
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_param_declaration(parser_state_t *state) {
+    profiler_func_start();
+
     ast_node_t node = {};
 
     token_t name, next;
@@ -671,12 +711,14 @@ static ast_node_t parse_param_declaration(parser_state_t *state) {
     if (!consume_token(TOKEN_IDENT, state->scanner, &name, false, state->strings)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
+        profiler_func_end();
         return node;
     }
 
     if (!consume_token(':', state->scanner, &next, false, state->strings)) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
+        profiler_func_end();
         return node;
     }
 
@@ -688,14 +730,17 @@ static ast_node_t parse_param_declaration(parser_state_t *state) {
     if (type.type == AST_ERROR) {
         node.type = AST_ERROR;
         panic_skip_until_token(')', state);
+        profiler_func_end();
         return node;
     }
 
     add_left_node(state, &node, &type);
+    profiler_func_end();
     return node;
 }
 
 static ast_node_t parse_parameter_list(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -721,10 +766,12 @@ static ast_node_t parse_parameter_list(parser_state_t *state) {
         }
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_return_list(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -732,6 +779,7 @@ static ast_node_t parse_return_list(parser_state_t *state) {
 
     if (!consume_token(TOKEN_RET, state->scanner, &result.token, true, state->strings)) {
         result.type = AST_EMPTY;
+        profiler_func_end();
         return result;
     }
 
@@ -760,10 +808,12 @@ static ast_node_t parse_return_list(parser_state_t *state) {
         }
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_function_type(parser_state_t *state) {
+    profiler_func_start();
     token_t token = {};
 
     if (!consume_token('(', state->scanner, &token, false, state->strings)) {
@@ -780,6 +830,7 @@ static ast_node_t parse_function_type(parser_state_t *state) {
 
     if (!consume_token(')', state->scanner, NULL, false, state->strings)) {
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     }
 
@@ -792,15 +843,18 @@ static ast_node_t parse_function_type(parser_state_t *state) {
 
     add_right_node(state, &result, &returns);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_multiple_types(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t node = parse_type(state);
 
     token_t current = peek_token(state->scanner, state->strings);
 
     if (current.type != ',') {
+        profiler_func_end();
         return node;
     }
 
@@ -829,29 +883,35 @@ static ast_node_t parse_multiple_types(parser_state_t *state) {
         if (current.type != ',') break;
     }
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_declaration_type(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t node = {};
 
     token_t token = peek_token(state->scanner, get_temporary_allocator());
 
     switch (token.type) {
         case '(':
+            profiler_func_end();
             return parse_function_type(state);
 
         case '=': 
             node.type  = AST_AUTO_TYPE;
             node.token = peek_token(state->scanner, get_temporary_allocator());
+            profiler_func_end();
             return node;
 
         default:
+            profiler_func_end();
             return parse_type(state);
     }
 }
 
 static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node_t *names) {
+    profiler_func_start();
     ast_node_t node = {}, type = {};
 
     node.type  = AST_TERN_MULT_DEF;
@@ -869,6 +929,7 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
     if (type.type == AST_ERROR) {
         node.type = AST_ERROR;
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
 
@@ -876,6 +937,7 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
         node.type = AST_ERROR;
         log_error_token("You can't define multiple funcitons in same statement.", type.token);
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
 
@@ -886,11 +948,13 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
     if (token.type == ';') {
         node.type = AST_BIN_MULT_DEF; 
         add_right_node(state, &node, &type);
+        profiler_func_end();
         return node;
     } else if (token.type != '=') {
         node.type = AST_ERROR;
         log_error_token("expected assignment or semicolon after expression.", type.token);
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
     add_center_node(state, &node, &type);
@@ -901,18 +965,22 @@ static ast_node_t parse_multiple_var_declaration(parser_state_t *state, ast_node
     if (data.type == AST_ERROR || data.type == AST_EMPTY) {
         node.type = AST_ERROR;
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
 
     add_right_node(state, &node, &data);
+    profiler_func_end();
     return node;
 }
 
 static ast_node_t parse_external_symbol_import(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
     if (!consume_token(TOK_EXTERNAL, state->scanner, &result.token, false, state->strings)) {
         result.type = AST_ERROR;
         panic_skip(state);
+        profiler_func_end();
         return result;
     }
 
@@ -923,6 +991,7 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
     if (node.type == AST_ERROR) {
         log_error_token("bad library import name.", result.token);
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     } else if (node.token.type != TOKEN_CONST_STRING) {
         log_error_token("Library import name should be a string.", node.token);
@@ -932,6 +1001,7 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
     add_left_node(state, &result, &node);
 
     if (!consume_token(TOK_AS, state->scanner, &result.token, true, state->strings)) {
+        profiler_func_end();
         return result;
     }
 
@@ -942,6 +1012,7 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
     if (node.type == AST_ERROR) {
         log_error_token("bad import symbol name.", result.token);
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     } else if (node.token.type != TOKEN_CONST_STRING) {
         log_error_token("Import symbol name should be a string", node.token);
@@ -952,10 +1023,12 @@ static ast_node_t parse_external_symbol_import(parser_state_t *state) {
 
     add_right_node(state, &result, &node);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *name) {
+    profiler_func_start();
     ast_node_t node = {};
 
     node.type  = AST_BIN_UNKN_DEF;
@@ -966,6 +1039,7 @@ static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *
     if (type.type == AST_ERROR) {
         node.type = AST_ERROR;
         panic_skip_until_token(';', state);
+        profiler_func_end();
         return node;
     }
 
@@ -975,12 +1049,14 @@ static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *
 
     if (token.type == ';') {
         node.type = AST_UNARY_VAR_DEF; 
+        profiler_func_end();
         return node;
     }
 
     if (!consume_token('=', state->scanner, NULL, false, state->strings)) {
         node.type = AST_ERROR;
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
     
@@ -999,15 +1075,18 @@ static ast_node_t parse_func_or_var_declaration(parser_state_t *state, token_t *
     if (data.type == AST_ERROR || data.type == AST_EMPTY) {
         node.type = AST_ERROR;
         panic_skip(state);
+        profiler_func_end();
         return node;
     }
 
     add_right_node(state, &node, &data);
 
+    profiler_func_end();
     return node;
 }
 
 static ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) {
+    profiler_func_start();
     // @todo better checking_value 
     consume_token(TOK_UNION, state->scanner, NULL, false, get_temporary_allocator());
     consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
@@ -1021,10 +1100,12 @@ static ast_node_t parse_union_declaration(parser_state_t *state, token_t *name) 
     // @todo add checks_value
     add_left_node(state, &result, &left);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name) {
+    profiler_func_start();
     // @todo better checking_value 
     consume_token(TOK_STRUCT, state->scanner, NULL, false, get_temporary_allocator());
     consume_token('=', state->scanner, NULL, false, get_temporary_allocator());
@@ -1038,10 +1119,12 @@ static ast_node_t parse_struct_declaration(parser_state_t *state, token_t *name)
     // @todo add checks_value
     add_left_node(state, &result, &left);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
+    profiler_func_start();
     ast_node_t result = {};
 
     allocator_t *talloc = get_temporary_allocator();
@@ -1059,6 +1142,7 @@ static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
             case TOK_BOOL32:
                 log_error_token("cant use float and bool types in enum definition", type.token);
                 result.type = AST_ERROR;
+                profiler_func_end();
                 return result;
 
             default:
@@ -1067,6 +1151,7 @@ static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     } else {
         log_error_token("cant use not integer types in enum definition", type.token);
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     }
 
@@ -1078,15 +1163,18 @@ static ast_node_t parse_enum_declaration(parser_state_t *state, token_t *name) {
     ast_node_t left = parse_block(state, AST_BLOCK_ENUM);
     if (left.type == AST_ERROR) {
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     }
     add_right_node(state, &result, &type);
     add_left_node(state, &result, &left);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_statement(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t node = {};
 
     node.type = AST_ERROR;
@@ -1269,6 +1357,7 @@ static ast_node_t parse_statement(parser_state_t *state) {
     }
 
     if (ignore_semicolon) {
+        profiler_func_end();
         return node;
     }
 
@@ -1279,10 +1368,12 @@ static ast_node_t parse_statement(parser_state_t *state) {
         panic_skip(state);
     }
 
+    profiler_func_end();
     return node;
 }
 
 static ast_node_t parse_imperative_block(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -1302,6 +1393,7 @@ static ast_node_t parse_imperative_block(parser_state_t *state) {
         current = peek_token(state->scanner, talloc);
     }
 
+    profiler_func_end();
     return result;
 }
 
@@ -1312,6 +1404,7 @@ ast_node_t parse_const_decl(parser_state_t *state) {
 */
 
 static ast_node_t parse_enum_decl(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
 
     result.type = AST_ENUM_DECL;
@@ -1324,6 +1417,7 @@ static ast_node_t parse_enum_decl(parser_state_t *state) {
         log_error_token("Declaration should start from identifier", peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     }
 
@@ -1333,16 +1427,19 @@ static ast_node_t parse_enum_decl(parser_state_t *state) {
         log_error_token("Declaration should have expression", peek_token(state->scanner, talloc));
 
         result.type = AST_ERROR;
+        profiler_func_end();
         return result;
     }
 
     ast_node_t left = parse_expression(state, 0);
     add_left_node(state, &result, &left);
 
+    profiler_func_end();
     return result;
 }
 
 static ast_node_t parse_enum_block(parser_state_t *state) {
+    profiler_func_start();
     ast_node_t result = {};
     allocator_t *talloc = get_temporary_allocator();
 
@@ -1373,6 +1470,7 @@ static ast_node_t parse_enum_block(parser_state_t *state) {
         }
     }
 
+    profiler_func_end();
     return result;
 }
 
@@ -1460,10 +1558,12 @@ string_t get_expression_string(ast_node_t *node) {
 }
 
 b32 parse_file(compiler_t *compiler, string_t filename) {
+    profiler_func_start();
     source_file_t *file = hashmap_get(&compiler->files, filename);
 
     if (file == NULL) {
         log_error("no such file in table.");
+        profiler_func_end();
         return false;
     }
 
@@ -1473,6 +1573,7 @@ b32 parse_file(compiler_t *compiler, string_t filename) {
     state.strings = compiler->strings;
 
     if (file->parsed_roots.data != NULL) {
+        profiler_func_end();
         assert(false);
         return false;
     }
@@ -1501,5 +1602,6 @@ b32 parse_file(compiler_t *compiler, string_t filename) {
         curr = peek_token(state.scanner, get_temporary_allocator());
     }
 
+    profiler_func_end();
     return valid_parse;
 }

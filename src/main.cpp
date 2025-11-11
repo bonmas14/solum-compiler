@@ -76,18 +76,16 @@ int main(int argc, char **argv) {
         return -10;
     }
 
-    f64 start = debug_get_time();
-
-#ifdef DEBUG
-    profiler_begin(STRING("Comp"));
-    profiler_block_start(STRING("Compilation"));
-#endif
+//#ifdef DEBUG
+    profiler_begin(STRING("PROF"));
+    profiler_push("Compilation");
+//#endif
 
     b32 status = true;
     b32 at_least_one_file_loaded = false;
     b32 wait_for_output_filename = false;
 
-    profiler_block_start(STRING("Load and process"));
+    profiler_push("Load and process");
     for (u64 i = 1; i < (u64)argc; i++) {
         argument_t arg = parse_argument(STRING(argv[i]));
 
@@ -140,7 +138,7 @@ int main(int argc, char **argv) {
 
         if (!status) break;
     }
-    profiler_block_end();
+    profiler_pop("Load and process");
 
     if (status) {
         if (wait_for_output_filename) {
@@ -155,15 +153,14 @@ int main(int argc, char **argv) {
     if (status) compile(&state);
 
     Profile_Data data;
-#ifdef DEBUG
-    profiler_block_end();
-    data = profiler_end();
-#endif
 
-    f64 end = debug_get_time();
+//#ifdef DEBUG
+    profiler_pop("Compilation");
+    data = profiler_end();
+//#endif
+
     if (status) {
         log_update_color();
-        fprintf(stderr, "time: %lf\n", end - start);
         visualize_profiler_state(data.block, 0);
         profiler_data_delete(&data);
     }

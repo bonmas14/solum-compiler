@@ -52,19 +52,27 @@ hashmap_t<string_t, scope_entry_t> create_scope(void) {
 }
 
 b32 check_if_unique(scope_entry_t *entry, ast_node_t *new_node) {
+    profiler_func_start();
     assert(entry != NULL);
     assert(new_node != NULL);
 
-    if (entry->node == NULL) return true;
-
-    if (mem_compare((u8*)entry->node, (u8*)new_node, sizeof(ast_node_t)))
+    if (entry->node == NULL) {
+        profiler_func_end();
+        return true;
+    }
+ 
+    if (mem_compare((u8*)entry->node, (u8*)new_node, sizeof(ast_node_t))) {
+        profiler_func_end();
         return false;
+    }
 
+    profiler_func_end();
     return true;
 }
 
 
 void add_blank_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, scope_entry_t **output) {
+    profiler_func_start();
     assert(output != NULL);
     assert(scope  != NULL);
 
@@ -76,9 +84,11 @@ void add_blank_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, sc
 
     *output = hashmap_get(scope, key);
     assert(*output != NULL);
+    profiler_func_end();
 }
 
 b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_node_t *node, scope_entry_t **output) {
+    profiler_func_start();
     assert(scope != NULL);
     assert(node != NULL);
     assert(output != NULL);
@@ -98,14 +108,17 @@ b32 aquire_entry(hashmap_t<string_t, scope_entry_t> *scope, string_t key, ast_no
             buffer = string_temp_concat(buffer, STRING("was used here:"));
             log_info_token(buffer, entry->node->token);
 
+            profiler_func_end();
             return false;
         }
 
         *output = entry;
+        profiler_func_end();
         return true;
     }
 
     add_blank_entry(scope, key, output);
+    profiler_func_end();
     return true;
 }
 
@@ -126,6 +139,7 @@ scope_entry_t get_entry_to_report(analyzer_state_t *state, string_t key) {
 }
 
 b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t *entry, string_t key) {
+    profiler_func_start();
     assert(state != NULL);
     assert(entry != NULL);
 
@@ -134,8 +148,10 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
         // @cleanup @speed @todo: doesnt work for pointers...
     for (u64 i = 0; i < state->internal_deps.index; i++) {
         if (string_compare(key, state->internal_deps.data[i]) == 0) {
-            if (!report_error)
+            if (!report_error) {
+                profiler_func_end();
                 return false;
+            }
 
             log_error_token("Identifier can not be resolved because it's definition is recursive.", entry->node->token);
 
@@ -143,6 +159,7 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
             scope_entry_t e      = get_entry_to_report(state, state->internal_deps.data[i]);
 
             log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(state->internal_deps.data[i], STRING("'"), talloc), talloc), e.node->token);
+            profiler_func_end();
             return false;
         }
 
@@ -150,8 +167,10 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
 
         for (u64 j = 0; j < deps->index; j++) {
             if (string_compare(state->internal_deps.data[i], deps->data[j]) == 0) {
-                if (!report_error)
+                if (!report_error) {
+                    profiler_func_end();
                     return false;
+                }
 
                 log_error_token("Identifier can not be resolved because type definition is recursive.", entry->node->token);
 
@@ -159,15 +178,18 @@ b32 check_dependencies(analyzer_state_t *state, b32 report_error, scope_entry_t 
                 scope_entry_t e      = get_entry_to_report(state, deps->data[j]);
 
                 log_error_token(string_concat(STRING("Recursion found in type '"), string_concat(deps->data[j], STRING("'"), talloc), talloc), e.node->token);
+                profiler_func_end();
                 return false;
             }
         }
     }
 
+    profiler_func_end();
     return true;
 }
 
 u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, scope_entry_t **output) {
+    profiler_func_start();
     assert(state != NULL);
     assert(output != NULL);
 
@@ -186,10 +208,12 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 
         if (entry->type == ENTRY_VAR && state->state == STATE_CODE_ANALYSIS) {
             if (!check_dependencies(state, report_deps_error, entry, key)) {
+                profiler_func_end();
                 return GET_DEPS_ERROR;
             }
         } else if (entry->type != ENTRY_VAR) {
             if (!check_dependencies(state, report_deps_error, entry, key)) {
+                profiler_func_end();
                 return GET_DEPS_ERROR;
             }
         }
@@ -200,12 +224,15 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
         }
 
         if (!entry->node->analyzed) {
+            profiler_func_end();
             return GET_NOT_ANALYZED;
         }
 
+        profiler_func_end();
         return GET_SUCCESS;
     }
 
+    profiler_func_end();
     if (was_uninit) {
         return GET_SUCCESS;
     } else {
@@ -216,6 +243,8 @@ u32 get_if_exists(analyzer_state_t *state, b32 report_deps_error, string_t key, 
 b32 add_var_type_into_search(analyzer_state_t *state, scope_entry_t *output) {
     if (output->info.type != TYPE_UNKN) return true;
 
+    profiler_func_start();
+
     string_t type_name = output->info.type_name;
 
     scope_entry_t *type = NULL; 
@@ -224,13 +253,18 @@ b32 add_var_type_into_search(analyzer_state_t *state, scope_entry_t *output) {
         case GET_NOT_FIND:
         case GET_NOT_ANALYZED:
             log_error_token("Couldn't find type name.", output->node->token);
+            profiler_func_end();
             return false;
 
-        case GET_DEPS_ERROR: assert(false); return false;
+        case GET_DEPS_ERROR:
+            assert(false);
+            profiler_func_end();
+            return false;
 
         case GET_SUCCESS: switch (type->type) {
             case ENTRY_VAR:
                 log_error_token("Type was a variable name.", output->node->token);
+                profiler_func_end();
                 return false;
 
             case ENTRY_FUNC:
@@ -243,11 +277,13 @@ b32 add_var_type_into_search(analyzer_state_t *state, scope_entry_t *output) {
 
 
             default:
+                profiler_func_end();
                 assert(false);
                 return false;
         } break;
     }
 
+    profiler_func_end();
     return true;
 }
 
@@ -307,6 +343,7 @@ struct output_info_t {
 };
 
 b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expressions, string_t *depend_on, ast_node_t *expr) {
+    profiler_func_start();
     assert(state != NULL);
     assert(expr != NULL);
 
@@ -319,6 +356,7 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         case TOK_TRUE:
         case TOK_FALSE:
             expr->analyzed = true;
+            profiler_func_end();
             return result;
 
         case TOKEN_IDENT: {
@@ -533,20 +571,24 @@ b32 analyze_expression(analyzer_state_t *state, s64 expected_count_of_expression
         expr->analyzed = true;
     }
 
+    profiler_func_end();
     return result;
 }
 
 b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
+    profiler_func_start();
     assert(state       != NULL);
     assert(entry       != NULL);
 
     ast_node_t *expr = entry->expr;
 
     if (expr == NULL) {
+        profiler_func_end();
         return entry->type != ENTRY_FUNC;
     }
 
     if (expr->analyzed) {
+        profiler_func_end();
         return true;
     }
 
@@ -557,6 +599,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
             case AST_EXT_FUNC_INFO:
                 entry->is_external = true;
                 entry->ext_from = string_copy(expr->left->token.data.string,  state->compiler->strings);
+                profiler_func_end();
                 return true;
 
             case AST_BLOCK_IMPERATIVE:
@@ -564,6 +607,7 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
 
             default:
                 log_error_token("Wrong function body.", expr->token);
+                profiler_func_end();
                 return false;
         }
 
@@ -628,12 +672,14 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
         stack_pop(&state->current_search_stack);
         expr->analyzed = true;
 
+        profiler_func_end();
         return result;
     } else if (entry->type == ENTRY_VAR) {
         entry->uninit = true;
 
         // is hardcoding to 1, good?
         if (!analyze_expression(state, 1, &entry->node->token.data.string, expr)) {
+            profiler_func_end();
             return false;
         }
 
@@ -643,10 +689,12 @@ b32 analyze_definition_expr(analyzer_state_t *state, scope_entry_t *entry) {
     }
 
     expr->analyzed = true;
+    profiler_func_end();
     return true;
 }
 
 b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *node, ast_node_t *name, ast_node_t *type, ast_node_t *expr, u32 offset, b32 *should_wait) {
+    profiler_func_start();
     assert(state != NULL);
     assert(name != NULL);
     assert(type != NULL);
@@ -657,6 +705,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
     scope_entry_t *entry = NULL;
 
     if (!aquire_entry(stack_peek(&state->current_search_stack), key, name, &entry)) {
+        profiler_func_end();
         return false;
     }
 
@@ -678,6 +727,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
 
         if (!result) {
             log_error_token("Bad array initializer", type->left->token);
+            profiler_func_end();
             return false;
         }
 
@@ -688,6 +738,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
     while (type->type == AST_PTR_TYPE || type->type == AST_ARR_TYPE) {
         if (type->type != AST_PTR_TYPE) {
             log_error_token("Cant create pointer to an array type.", type->token);
+            profiler_func_end();
             return false;
         } 
 
@@ -703,6 +754,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                     log_error("Cant do functions for multiple var decl...");
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
+                    profiler_func_end();
                     return false;
                 }
 
@@ -711,6 +763,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                 if (!analyze_function(state, entry, should_wait)) {
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
+                    profiler_func_end();
                     return false;
                 }
             } break;
@@ -720,6 +773,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                     log_error_token("Cant make variable with void type...", type->token);
                     entry->type = ENTRY_ERROR;
                     entry->node->analyzed = true;
+                    profiler_func_end();
                     return false;
                 }
             case AST_STD_TYPE:
@@ -733,10 +787,12 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                 log_error_token("Cant evaluate the types right now...", type->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
+                profiler_func_end();
                 return false;
 
             case AST_ARR_TYPE:
             case AST_PTR_TYPE:
+                profiler_func_end();
                 assert(false);
                 return false;
 
@@ -744,6 +800,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                 log_error_token("unexpected type of ast node...", entry->node->token);
                 entry->type = ENTRY_ERROR;
                 entry->node->analyzed = true;
+                profiler_func_end();
                 return false;
         }
     } else {
@@ -763,6 +820,7 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
 
             case GET_DEPS_ERROR:
                 if (!is_indirect) {
+                    profiler_func_end();
                     return false;
                 }
             case GET_SUCCESS: 
@@ -776,12 +834,14 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
                         log_error("Cant use FUNC as a type of variable [@better_message]");
                         entry->type = ENTRY_ERROR;
                         entry->node->analyzed = true;
+                        profiler_func_end();
                         return false;
 
                     default:
                         log_error("Unexpected type...");
                         entry->type = ENTRY_ERROR;
                         entry->node->analyzed = true;
+                        profiler_func_end();
                         return false;
                 }
 
@@ -802,10 +862,12 @@ b32 analyze_definition(analyzer_state_t *state, b32 can_do_func, ast_node_t *nod
         entry->node->analyzed = true;
     }
 
+    profiler_func_end();
     return result;
 }
 
 b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_wait) {
+    profiler_func_start();
     assert(state != NULL);
     assert(entry != NULL);
     assert(should_wait != NULL);
@@ -858,6 +920,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
             if (!result) {
                 log_error_token("Bad array initializer", curr->left->token);
+                profiler_func_end();
                 return false;
             }
 
@@ -920,6 +983,7 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
 
                 case GET_DEPS_ERROR:
                     if (!is_indirect) {
+                        profiler_func_end();
                         return false;
                     }
                 case GET_SUCCESS: 
@@ -963,23 +1027,28 @@ b32 analyze_function(analyzer_state_t *state, scope_entry_t *entry, b32 *should_
         entry->node->analyzed = true;
     }
 
+    profiler_func_end();
     return result;
 }
 
 b32 analyze_unary_var_def(analyzer_state_t *state, ast_node_t *node, u32 offset, b32 *should_wait) {
+    profiler_func_start();
     assert(node->type == AST_UNARY_VAR_DEF);
     assert(state       != NULL);
     assert(node        != NULL);
     assert(should_wait != NULL);
 
     if (!analyze_definition(state, false, node, node, node->left, NULL, offset, should_wait)) {
+        profiler_func_end();
         return false;
     }
 
     if (*should_wait) {
+        profiler_func_end();
         return true;
     }
 
+    profiler_func_end();
     return true;
 }
 
@@ -1010,6 +1079,8 @@ b32 analyze_enum_decl(analyzer_state_t *state, ast_node_t *node, b32 *should_wai
 }
 
 b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, b32 *should_wait) {
+    profiler_func_start();
+
     assert(node->type == AST_BIN_MULT_DEF);
     assert(state != NULL);
     assert(node  != NULL);
@@ -1025,12 +1096,14 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
 
         for (u64 i = 0; i < node->left->child_count; i++) {
             if (!analyze_definition(state, false, node, next, node->right, NULL, *offset, should_wait)) {
+                profiler_func_end();
                 return false;
             }
 
             (*offset)++;
 
             if (*should_wait) {
+                profiler_func_end();
                 return true;
             }
 
@@ -1038,6 +1111,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
         }
 
         node->analyzed = true;
+        profiler_func_end();
         return true;
     }
 
@@ -1049,6 +1123,7 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
         }
 
         log_error_token("This variable didn't have it's own type:", next->token);
+        profiler_func_end();
         return false;
     }
 
@@ -1057,10 +1132,12 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
 
     for (u64 i = 0; i < node->left->child_count; i++) {
         if (!analyze_definition(state, false, node, name, type, NULL, 0, should_wait)) {
+            profiler_func_end();
             return false;
         }
 
         if (*should_wait) {
+            profiler_func_end();
             return true;
         }
 
@@ -1070,27 +1147,33 @@ b32 analyze_bin_var_def(analyzer_state_t *state, ast_node_t *node, u32 *offset, 
 
     node->analyzed = true;
 
+    profiler_func_end();
     return true;
 } 
 
 b32 analyze_unkn_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+    profiler_func_start();
     assert(node->type == AST_BIN_UNKN_DEF);
     assert(state != NULL);
     assert(node  != NULL);
     assert(should_wait != NULL);
 
     if (!analyze_definition(state, true, node, node, node->left, node->right, 0, should_wait)) {
+        profiler_func_end();
         return false;
     }
 
     if (*should_wait) {
+        profiler_func_end();
         return true;
     }
 
+    profiler_func_end();
     return true;
 }
 
 b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait) {
+    profiler_func_start();
     assert(node->type  == AST_TERN_MULT_DEF);
     assert(node->right->type == AST_SEPARATION);
     assert(state != NULL);
@@ -1107,10 +1190,12 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
         for (u64 i = 0; i < node->left->child_count; i++) {
             if (!analyze_definition(state, false, node, next, node->center, node->right->list_start, 0, should_wait)) {
+                profiler_func_end();
                 return false;
             }
 
             if (*should_wait) {
+                profiler_func_end();
                 return true;
             }
 
@@ -1118,6 +1203,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
         }
 
         node->analyzed = true;
+        profiler_func_end();
         return true;
     }
 
@@ -1142,6 +1228,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
             }
 
             node->analyzed = true;
+            profiler_func_end();
             return false;
         }
 
@@ -1150,10 +1237,12 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
         for (u64 i = 0; i < node->left->child_count; i++) {
             if (!analyze_definition(state, false, node, name, type, node->right->list_start, 0, should_wait)) {
+                profiler_func_end();
                 return false;
             }
 
             if (*should_wait) {
+                profiler_func_end();
                 return true;
             }
 
@@ -1183,6 +1272,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
             }
 
             node->analyzed = true;
+            profiler_func_end();
             return false;
         }
 
@@ -1192,10 +1282,12 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
         for (u64 i = 0; i < node->left->child_count; i++) {
             if (!analyze_definition(state, false, node, name, type, expr, 0, should_wait)) {
+                profiler_func_end();
                 return false;
             }
 
             if (*should_wait) {
+                profiler_func_end();
                 return true;
             }
 
@@ -1214,6 +1306,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
             log_error_token("This variable didn't have it's own type:", next->token);
             node->analyzed = true;
+            profiler_func_end();
             return false;
         }
 
@@ -1237,6 +1330,7 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
             }
 
             node->analyzed = true;
+            profiler_func_end();
             return false;
         }
 
@@ -1246,10 +1340,12 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
 
         for (u64 i = 0; i < node->left->child_count; i++) {
             if (!analyze_definition(state, false, node, name, type, expr, 0, should_wait)) {
+                profiler_func_end();
                 return false;
             }
 
             if (*should_wait) {
+                profiler_func_end();
                 return true;
             }
 
@@ -1260,10 +1356,12 @@ b32 analyze_tern_def(analyzer_state_t *state, ast_node_t *node, b32 *should_wait
     }
 
     node->analyzed = true;
+    profiler_func_end();
     return true;
 }
 
 b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scope_entry_t *entry) {
+    profiler_func_start();
     assert(state != NULL);
     assert(should_wait != NULL);
     assert(entry != NULL);
@@ -1304,6 +1402,7 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
         offset++;
 
         if (*should_wait) {
+            profiler_func_end();
             return result;
         }
 
@@ -1311,6 +1410,7 @@ b32 analyze_and_add_type_members(analyzer_state_t *state, b32 *should_wait, scop
     }
 
     entry->node->analyzed = true;
+    profiler_func_end();
     return result;
 }
 
@@ -1477,15 +1577,16 @@ b32 analyze_enum(analyzer_state_t *state, ast_node_t *node) {
 
 #define GREEN_COLOR 63, 255, 63
 
-string_t construct_source_name(string_t path, string_t name, allocator_t *alloc) {
+inline string_t construct_source_name(string_t path, string_t name, allocator_t *alloc) {
     return string_swap(string_concat(path, string_concat(name, STRING(".slm"), alloc), alloc), SWAP_SLASH, (u8)HOST_SYSTEM_SLASH, alloc);
 }
 
-string_t construct_module_name(string_t path, string_t name, allocator_t *alloc) {
+inline string_t construct_module_name(string_t path, string_t name, allocator_t *alloc) {
     return string_swap(string_concat(path, string_concat(name, STRING("/module.slm"), alloc), alloc), SWAP_SLASH, (u8)HOST_SYSTEM_SLASH, alloc);
 }
 
 b32 load_and_process_file(compiler_t *compiler, string_t filename) {
+    profiler_func_start();
     assert(compiler != NULL);
 
     source_file_t file = create_source_file(NULL);
@@ -1493,30 +1594,34 @@ b32 load_and_process_file(compiler_t *compiler, string_t filename) {
     string_t source;
 
     if (!platform_read_file_into_string(filename, compiler->strings, &source)) {
+        profiler_func_end();
         return false;
     }
 
     if (!scanner_open(&filename, &source, file.scanner)) {
+        profiler_func_end();
         return false;
     }
 
     if (!hashmap_add(&compiler->files, filename, &file)) {
         log_error("Couldn't add file to work with.");
+        profiler_func_end();
         return false;
     }
 
     if (!parse_file(compiler, filename)) {
+        profiler_func_end();
         return false;
     }
 
+    profiler_func_end();
     return true;
 }
 
 b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
+    profiler_func_start();
     assert(compiler != NULL);
     assert(valid_file != NULL);
-
-    profiler_func_start();
 
     if (!platform_file_exists(file)) { 
         profiler_func_end();
@@ -1530,8 +1635,10 @@ b32 add_file_if_exists(compiler_t *compiler, b32 *valid_file, string_t file) {
 }
 
 b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
+    profiler_func_start();
     assert(compiler != NULL);
     assert(node != NULL);
+
     allocator_t *talloc = get_temporary_allocator();
 
     // ./<file>.slm
@@ -1553,32 +1660,38 @@ b32 find_and_add_file(compiler_t *compiler, ast_node_t *node) {
 
     if (add_file_if_exists(compiler, &valid_file, construct_source_name(directory, name, talloc))) {
         node->analyzed = true;
+        profiler_func_end();
         return valid_file;
     }
 
     if (add_file_if_exists(compiler, &valid_file, construct_module_name(directory, name, talloc))) {
         node->analyzed = true;
+        profiler_func_end();
         return valid_file;
     }
 
     if (add_file_if_exists(compiler, &valid_file, construct_source_name(compiler->modules_path, name, talloc))) {
         node->analyzed = true;
+        profiler_func_end();
         return valid_file;
     }
 
     if (add_file_if_exists(compiler, &valid_file, construct_module_name(compiler->modules_path, name, talloc))) {
         node->analyzed = true;
+        profiler_func_end();
         return valid_file;
     }
 
     log_error_token("Couldn't find corresponding file to this declaration.", node->token);
     node->analyzed = true;
+    profiler_func_end();
     return false;
 }
 
 // --------------------
 
 u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 scope_index, b32 in_loop, ast_node_t *node) {
+    profiler_func_start();
     assert(state != NULL);
     assert(node != NULL);
 
@@ -1740,13 +1853,16 @@ u32 analyze_statement(analyzer_state_t *state, u64 expect_return_amount, u32 sco
 
     if (should_wait) {
         log_error_token("Unordered instructions in imperative block.", node->token);
+        profiler_func_end();
         return false;
     }
 
+    profiler_func_end();
     return result;
 }
 
 b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
+    profiler_func_start();
     temp_reset();
 
     assert(!node->analyzed);
@@ -1789,6 +1905,7 @@ b32 analyze_global_statement(analyzer_state_t *state, ast_node_t *node) {
             break;
     }
 
+    profiler_func_end();
     return result;
 }
 
@@ -1957,6 +2074,7 @@ void clear_state(analyzer_state_t *state) {
 }
 
 b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
+    profiler_func_start();
     b32 result       = true;
     b32 not_finished = true;
 
@@ -1994,13 +2112,17 @@ b32 analyze_global_statements(analyzer_state_t *state, compiler_t *compiler) {
 
     if (not_finished) {
         log_error("Probably undefined symbols...");
+
+        profiler_func_end();
         return false;
     }
 
+    profiler_func_end();
     return result;
 }
 
 b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
+    profiler_func_start();
     b32 result = true;
     hashmap_t<string_t, scope_entry_t> *scope = array_get(&compiler->scopes, 0);
 
@@ -2009,7 +2131,7 @@ b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
 
         if (!pair->occupied)      continue;
         if (pair->deleted)        continue;
-        profiler_block_start(STRING("Code analyze step"));
+        profiler_push("Code analyze step");
 
         string_t key = pair->value.node->token.data.string;
 
@@ -2031,9 +2153,10 @@ b32 analyze_code(analyzer_state_t *state, compiler_t *compiler) {
         }
 
         assert(state->current_search_stack.index == 1);
-        profiler_block_end();
+        profiler_pop("Code analyze step");
     }
 
+    profiler_func_end();
     return result;
 }
 
@@ -2047,10 +2170,10 @@ b32 analyze(compiler_t *compiler) {
 
     stack_push(&state.current_search_stack, scope);
     {
-        profiler_block_start(STRING("Global analysis"));
+        profiler_push("Global analysis");
         state.state = STATE_GLOBAL_ANALYSIS;
         result = analyze_global_statements(&state, compiler);
-        profiler_block_end();
+        profiler_pop("Global analysis");
 
         if (!result) {
             log_error("Errors on early step of analysis.");
@@ -2062,10 +2185,10 @@ b32 analyze(compiler_t *compiler) {
         state.internal_deps.index = 0;
         assert(state.current_search_stack.index == 1);
 
-        profiler_block_start(STRING("Code analysis"));
+        profiler_push("Code analysis");
         state.state = STATE_CODE_ANALYSIS;
         result = analyze_code(&state, compiler);
-        profiler_block_end();
+        profiler_pop("Code analysis");
 
         if (!result) {
             log_error("Errors while analyzing code.");

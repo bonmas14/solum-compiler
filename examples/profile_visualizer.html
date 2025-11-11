@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flame Graph</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1e1e1e;
+            color: #ffffff;
+        }
+        
+        #flameGraph {
+            background: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 4px;
+            overflow: auto;
+            position: relative;
+            min-height: 400px;
+        }
+        
+        .flame-rect {
+            stroke: #444;
+            stroke-width: 1px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .flame-rect:hover {
+            opacity: 0.8;
+        }
+        
+        .flame-text {
+            font-size: 12px;
+            pointer-events: none;
+            fill: #ffffff;
+            text-shadow: 1px 1px 1px #000;
+        }
+        
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            border: 1px solid #555;
+        }
+        
+        .controls {
+            margin-bottom: 10px;
+        }
+        
+        button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            cursor: pointer;
+            background: #555;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 3px;
+        }
+        
+        button:hover {
+            background: #666;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        #jsonInput {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            background: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #444;
+        }
+        
+        .breadcrumb {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <textarea id="jsonInput" placeholder="Paste your JSON profile data here..."></textarea>
+        <button onclick="loadJsonData()">Load Data</button>
+        <button onclick="zoomToRoot()">Reset View</button>
+        <button onclick="stepUp()" id="stepUpBtn" disabled>Step Up</button>
+        <button onclick="toggleSort()">Toggle Sort</button>
+        
+        <div class="breadcrumb" id="breadcrumb">Current: root</div>
+    </div>
+    <div id="flameGraph"></div>
+    <div id="tooltip"></div>
+
+    <script>
+        const sampleData = {
+            "block": "main",
+            "ns_start": 0,
+            "ns_stop": 100000000,
+            "childs": [
+                {
+                    "block": "parse",
+                    "ns_start": 10000000,
+                    "ns_stop": 40000000,
+                    "childs": [
+                        {
+                            "block": "lexer",
+                            "ns_start": 15000000,
+                            "ns_stop": 25000000,
+                            "childs": []
+                        }
+                    ]
+                },
+                {
+                    "block": "render",
+                    "ns_start": 50000000,
+                    "ns_stop": 80000000,
+                    "childs": []
+                }
+            ]
+        };
+
+        let currentData = sampleData;
+        let sortByName = false;
+        const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+        let width = 1200;
+        let height = 600;
+        let xScale, yScale;
+        let svg, tooltip;
+        
+        let navigationStack = [];
+
+        function initFlameGraph() {
+            const container = document.getElementById('flameGraph');
+            width = container.clientWidth - margin.left - margin.right;
+            height = 600;
+
+            container.innerHTML = '';
+            
+            svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("width", width + margin.left + margin.right);
+            svg.setAttribute("height", height + margin.top + margin.bottom);
+            container.appendChild(svg);
+
+            tooltip = document.getElementById('tooltip');
+
+            const totalDuration = currentData.ns_stop - currentData.ns_start;
+            
+            xScale = (ns) => (ns - currentData.ns_start) / totalDuration * width;
+            yScale = (depth) => depth * 20;
+
+            updateBreadcrumb();
+            updateStepUpButton();
+
+            const processedData = processNode(currentData, 0, currentData.ns_start, currentData.ns_stop);
+            renderFlameGraph(processedData);
+        }
+
+        function processNode(node, depth, parentStart, parentEnd) {
+            const duration = node.ns_stop - node.ns_start;
+            const width = xScale(node.ns_stop) - xScale(node.ns_start);
+            
+            return {
+                name: node.block,
+                depth: depth,
+                start: node.ns_start,
+                end: node.ns_stop,
+                duration: duration,
+                width: width,
+                x: xScale(node.ns_start),
+                y: yScale(depth),
+                children: node.childs ? node.childs.map(child => 
+                    processNode(child, depth + 1, node.ns_start, node.ns_stop)
+                ) : []
+            };
+        }
+
+        function renderFlameGraph(data) {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("transform", `translate(${margin.left},${margin.top})`);
+            svg.appendChild(g);
+
+            renderNode(g, data);
+        }
+
+        function renderNode(container, node) {
+            if (node.width < 1) return; 
+            
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("class", "flame-rect");
+            rect.setAttribute("x", node.x);
+            rect.setAttribute("y", node.y);
+            rect.setAttribute("width", Math.max(node.width, 1));
+            rect.setAttribute("height", 18);
+            rect.setAttribute("fill", getColor(node.name));
+            
+            rect.addEventListener('mouseover', (e) => showTooltip(e, node));
+            rect.addEventListener('mouseout', hideTooltip);
+            rect.addEventListener('click', () => zoomToNode(node));
+            
+            container.appendChild(rect);
+
+            if (node.width > 40) {
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("class", "flame-text");
+                text.setAttribute("x", node.x + 4);
+                text.setAttribute("y", node.y + 12);
+                text.textContent = `${node.name} (${formatTime(node.duration)})`;
+                container.appendChild(text);
+            }
+
+            let children = [...node.children];
+            if (sortByName) {
+                children.sort((a, b) => a.name.localeCompare(b.name));
+            }
+            
+            children.forEach(child => renderNode(container, child));
+        }
+
+        function getColor(name) {
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = hash % 360;
+            return `hsl(${hue}, 70%, 40%)`; 
+        }
+
+        function formatTime(nanoseconds) {
+            if (nanoseconds < 1000) return nanoseconds + 'ns';
+            if (nanoseconds < 1000000) return (nanoseconds / 1000).toFixed(1) + 'µs';
+            if (nanoseconds < 1000000000) return (nanoseconds / 1000000).toFixed(1) + 'ms';
+            return (nanoseconds / 1000000000).toFixed(2) + 's';
+        }
+
+        function showTooltip(event, node) {
+            tooltip.innerHTML = `
+                <strong>${node.name}</strong><br>
+                Duration: ${formatTime(node.duration)}<br>
+                Start: ${node.start}ns<br>
+                End: ${node.end}ns
+            `;
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY + 10) + 'px';
+            tooltip.style.opacity = 1;
+        }
+
+        function hideTooltip() {
+            tooltip.style.opacity = 0;
+        }
+
+        function zoomToNode(node) {
+            navigationStack.push(JSON.parse(JSON.stringify(currentData)));
+            
+            function createSubtree(originalNode) {
+                return {
+                    block: originalNode.name,
+                    ns_start: originalNode.start,
+                    ns_stop: originalNode.end,
+                    childs: originalNode.children.map(child => createSubtree(child))
+                };
+            }
+
+            currentData = createSubtree(node);
+            initFlameGraph();
+        }
+
+        function stepUp() {
+            if (navigationStack.length > 0) {
+                currentData = navigationStack.pop();
+                initFlameGraph();
+            }
+        }
+
+        function zoomToRoot() {
+            navigationStack = [];
+            currentData = getCurrentRootData();
+            initFlameGraph();
+        }
+
+        function toggleSort() {
+            sortByName = !sortByName;
+            initFlameGraph();
+        }
+
+        function updateBreadcrumb() {
+            const breadcrumb = document.getElementById('breadcrumb');
+            const path = getCurrentPath();
+            breadcrumb.textContent = `Current: ${path.join(' → ')}`;
+        }
+
+        function updateStepUpButton() {
+            const stepUpBtn = document.getElementById('stepUpBtn');
+            stepUpBtn.disabled = navigationStack.length === 0;
+        }
+
+        function getCurrentPath() {
+            const path = [currentData.block];
+            return path;
+        }
+
+        function loadJsonData() {
+            const jsonInput = document.getElementById('jsonInput').value;
+            if (!jsonInput.trim()) {
+                alert('Please paste some JSON data first');
+                return;
+            }
+
+            try {
+                const parsedData = JSON.parse(jsonInput);
+                if (isValidProfileData(parsedData)) {
+                    currentData = parsedData;
+                    navigationStack = []; 
+                    initFlameGraph();
+                } else {
+                    alert('Invalid profile data structure. Expected fields: block, ns_start, ns_stop, childs');
+                }
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        function isValidProfileData(data) {
+            return data && 
+                   typeof data.block === 'string' &&
+                   typeof data.ns_start === 'number' && 
+                   typeof data.ns_stop === 'number' &&
+                   Array.isArray(data.childs);
+        }
+
+        function getCurrentRootData() {
+            const jsonInput = document.getElementById('jsonInput').value;
+            if (jsonInput.trim()) {
+                try {
+                    return JSON.parse(jsonInput);
+                } catch (e) {
+                    return sampleData;
+                }
+            }
+            return sampleData;
+        }
+
+        window.addEventListener('load', function() {
+            document.getElementById('jsonInput').value = JSON.stringify(sampleData, null, 2);
+            initFlameGraph();
+        });
+        window.addEventListener('resize', initFlameGraph);
+    </script>
+</body>
+</html>

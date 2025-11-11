@@ -5,6 +5,7 @@
 #include "stddefines.h"
 #include "logger.h"
 #include "memctl.h"
+#include "profiler.h"
 
 #ifndef CUSTOM_MEM_CTRL
 #define ALLOC(x)      calloc(1, x) 
@@ -94,6 +95,7 @@ b32 rebuild_map(hashmap_t<KeyType, DataType> *map);
 
 template<typename KeyType, typename DataType>
 b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t *hash_func, key_compare_func_t *compare_func) {
+    profiler_func_start();
     *map = {};
     assert(init_size > 0);
 
@@ -118,22 +120,27 @@ b32 hashmap_create(hashmap_t<KeyType, DataType> *map, u64 init_size, hash_func_t
 
     if (map->entries == NULL) {
         log_warning(STRING("Hashmap: Couldn't initialize map"));
+        profiler_func_end();
         return false;
     }
 
+    profiler_func_end();
     return true;
 }
 
 template<typename KeyType, typename DataType>
 hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map) {
+    profiler_func_start();
     if (map->capacity == 0) {
         map->hash_func    = map->hash_func;
         map->compare_func = map->compare_func;
+        profiler_func_end();
         return {};
     }
 
     hashmap_t<KeyType, DataType> clone = {};
     if (!hashmap_create(&clone, map->capacity, map->hash_func, map->compare_func)) {
+        profiler_func_end();
         return {};
     }
 
@@ -141,13 +148,16 @@ hashmap_t<KeyType, DataType> hashmap_clone(hashmap_t<KeyType, DataType> *map) {
 
     clone.load = map->load;
     mem_copy((u8*)clone.entries, (u8*)map->entries, clone.capacity * sizeof(kv_pair_t<KeyType, DataType>));
+    profiler_func_end();
     return clone;
 }
 
 template<typename KeyType, typename DataType>
 b32 hashmap_delete(hashmap_t<KeyType, DataType> *map) {
+    profiler_func_start();
     FREE(map->entries);
     *map = {};
+    profiler_func_end();
     return true;
 }
 
@@ -155,13 +165,16 @@ template<typename KeyType, typename DataType>
 void hashmap_clear(hashmap_t<KeyType, DataType> *map) {
     if (map->entries == 0) return;
 
+    profiler_func_start();
     map->load = 0;
     mem_set((u8*)map->entries, 0, map->capacity * sizeof(kv_pair_t<KeyType, DataType>));
+    profiler_func_end();
 }
 
 
 template<typename KeyType, typename DataType>
 DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    profiler_func_start();
     create_map_if_needed(map);
 
     u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
@@ -172,18 +185,24 @@ DataType *hashmap_get(hashmap_t<KeyType, DataType> *map, KeyType key) {
 
         if (map->entries[lookup].deleted) continue;
 
-        if (!map->entries[lookup].occupied) return NULL;
+        if (!map->entries[lookup].occupied) {
+            profiler_func_end();
+            return NULL;
+        }
 
         if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
+            profiler_func_end();
             return &(map->entries + lookup)->value;
         }
     }
 
+    profiler_func_end();
     return NULL;
 }
 // note about implication
 template<typename KeyType, typename DataType>
 b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value) {
+    profiler_func_start();
     create_map_if_needed(map);
 
     if (map->load > (map->capacity * MAX_HASHMAP_LOAD)) {
@@ -205,18 +224,22 @@ b32 hashmap_add(hashmap_t<KeyType, DataType> *map, KeyType key, DataType *value)
             map->entries[lookup].deleted  = false;
             map->entries[lookup].occupied = true;
             map->load++;
-
+            
+            profiler_func_end();
             return true;
         } else if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
+            profiler_func_end();
             return false;
         }
     }
 
+    profiler_func_end();
     return false;
 }
 
 template<typename KeyType, typename DataType>
 b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
+    profiler_func_start();
     create_map_if_needed(map);
 
     u32 hash = map->hash_func(sizeof(KeyType), (void*)&key);
@@ -227,15 +250,20 @@ b32 hashmap_remove(hashmap_t<KeyType, DataType> *map, KeyType key) {
 
         if (map->entries[lookup].deleted) continue;
 
-        if (!map->entries[lookup].occupied) return false;
+        if (!map->entries[lookup].occupied) {
+            profiler_func_end();
+            return false;
+        }
 
         if (map->compare_func(sizeof(KeyType), (void*)&key, (void*)&map->entries[lookup].key)) {
             map->entries[lookup].deleted = true;
             map->load--;
+            profiler_func_end();
             return true;
         }
     }
 
+    profiler_func_end();
     return false;
 }
 
@@ -248,10 +276,12 @@ void create_map_if_needed(hashmap_t<KeyType, DataType> *map) {
 
 template<typename KeyType, typename DataType>
 b32 rebuild_map(hashmap_t<KeyType, DataType> *map) {
+    profiler_func_start();
     hashmap_t<KeyType, DataType> old_map = *map;
 
     if (!hashmap_create(map, old_map.capacity * 2, old_map.hash_func, old_map.compare_func)) {
         *map = old_map;
+        profiler_func_end();
         return false;
     }
 
@@ -263,6 +293,7 @@ b32 rebuild_map(hashmap_t<KeyType, DataType> *map) {
     }
 
     hashmap_delete(&old_map);
+    profiler_func_end();
     return true;
 }
 

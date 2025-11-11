@@ -43,6 +43,7 @@ b32 platform_file_exists(string_t name) {
 }
 
 b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string_t *output) {
+    profiler_func_start();
     if (alloc == NULL) alloc = default_allocator;
 
     assert(alloc != NULL);
@@ -55,6 +56,7 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
     if (file == NULL) {
         log_error("Could not open file.");
         log_error(filename); 
+        profiler_func_end();
         return false;
     }
 
@@ -64,6 +66,7 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
 
     if (file_size == 0) {
         fclose(file);
+        profiler_func_end();
         return false;
     }
 
@@ -75,20 +78,24 @@ b32 platform_read_file_into_string(string_t filename, allocator_t *alloc, string
         log_error("Could not read file.");
         log_error(filename); 
         fclose(file);
+        profiler_func_end();
         return false;
     }
 
     output->size = file_size;
     fclose(file);
+    profiler_func_end();
     return true;
 }
 
 b32 platform_write_file(string_t name, string_t content) {
+    profiler_func_start();
     const char *filename = string_to_c_string(name, get_temporary_allocator());
 
     FILE *file = fopen(filename, "wb");
     if (!file) {
         log_error("Could not write file.");
+        profiler_func_end();
         return false;
     }
     if (content.data) {
@@ -96,6 +103,7 @@ b32 platform_write_file(string_t name, string_t content) {
     }
     fflush(file);
     fclose(file);
+    profiler_func_end();
     return true; // we dont check if write was corrupted...
 }
 

@@ -79,12 +79,16 @@ void profiler_push_impl(string_t name) {
     add_and_push_block(block);
 }
 
-void profiler_pop_impl(void) {
+void profiler_pop_impl(string_t name) {
     if (!profiler_ctx.running) return;
     Profile_Block *top = *list_get(&profiler_ctx.block_stack, profiler_ctx.block_stack.count - 1);
     profiler_ctx.block_stack.count--;
 
     top->stop_time = debug_get_time();
+
+    if (0 != string_compare(top->name, name)) {
+        assert(false);
+    }
 }
 
 Profile_Data profiler_end_impl(void) {
@@ -100,14 +104,23 @@ Profile_Data profiler_end_impl(void) {
 }
 
 void visualize_profiler_state(Profile_Block *block, u64 depth) {
+    if (!compiler_config.verbose) return;
+
     while (block) {
-        add_left_pad(stderr, depth * 4);
-        fprintf(stderr, "%.*s: %.3f ms\n", block->name.size, block->name.data, (block->stop_time - block->start_time) * 1000);
+        fprintf(stdout, "{\"block\":\"%.*s\",\"ns_start\":%.0f, \"ns_stop\": %.0f, \"childs\":", (int)block->name.size, block->name.data, block->start_time * 1000000000.0, block->stop_time * 1000000000.0);
 
         if (block->first_child) {
+            fprintf(stdout, "[");
             visualize_profiler_state(block->first_child, depth + 1);
+            fprintf(stdout, "]");
+        } else {
+            fprintf(stdout, "null");
         }
 
+        fprintf(stdout, "}");
         block = block->next_in_list;
+        if (block) {
+            fprintf(stdout, ",");
+        }
     }
 }

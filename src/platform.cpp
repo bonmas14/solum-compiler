@@ -3,6 +3,7 @@
 #include "strings.h"
 #include "allocator.h"
 #include "talloc.h"
+#include "profiler.h"
 
 #ifdef _WIN32
 #include "platform/win32_layer.cpp"

@@ -1,3 +1,5 @@
+#if !defined(PROFILER_H)
+#define PROFILER_H
 #include "stddefines.h"
 #include "strings.h"
 
@@ -18,17 +20,18 @@ struct Profile_Data {
     Profile_Block *block;
 };
 
-#define profiler_func_start() profiler_block_start(STRING(__func__));
-#define profiler_func_end()   profiler_block_end()
+#define profiler_func_start() profiler_push_impl(STRING(__func__))
+#define profiler_func_end()   profiler_pop_impl(STRING(__func__))
 
 
 #define profiler_push_func()       profiler_push_impl(STRING(__func__))
-#define profiler_pop()             profiler_pop_impl()
+#define profiler_push(name)        profiler_push_impl(STRING(name))
+#define profiler_pop(name)         profiler_pop_impl(STRING(name))
 #define profiler_begin(name)       profiler_begin_impl(name)
 #define profiler_end()             profiler_end_impl()
 #define profiler_data_delete(data) profiler_data_delete_impl(data)
 #define profiler_block_start(name) profiler_push_impl(name)
-#define profiler_block_end()       profiler_pop_impl()
+#define profiler_block_end(name)   profiler_pop_impl(STRING(name))
 
 void profiler_begin_impl(string_t name);
 void visualize_profiler_state(Profile_Block *block, u64 depth);
@@ -37,4 +40,6 @@ void         profiler_begin_impl(string_t name);
 Profile_Data profiler_end_impl(void);
 void         profiler_data_delete_impl(Profile_Data *data);
 void         profiler_push_impl(string_t name);
-void         profiler_pop_impl(void);
+void         profiler_pop_impl(string_t name);
+
+#endif

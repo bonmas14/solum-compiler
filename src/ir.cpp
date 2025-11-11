@@ -723,20 +723,6 @@ void compile_function(ir_state_t *state, string_t key, scope_entry_t *entry) {
         } else {
             emit_op(state, IR_INVALID, entry->node->token, 0);
         }
-
-        if (compiler_config.verbose) {
-            u64 last_line = 0;
-
-            for (u64 i = 0; i < state->current_function->code.count; i++) {
-                if (last_line != state->current_function->code[i].info.l0) {
-                    printf("\n");
-                    print_lines_of_code(stdout, state->current_function->code[i].info, 0, 0, 0);
-                    last_line = state->current_function->code[i].info.l0;
-                }
-
-                print_ir_opcode(state->current_function->code[i]);
-            }
-        }
     }
     stack_pop(&state->search_scopes);
     state->current_function = NULL;
@@ -786,22 +772,6 @@ void compile_globals(ir_state_t *state) {
         // code for initing the globals
         emit_op(state, IR_STACK_FRAME_POP, {}, 0);
         emit_op(state, IR_RET,             {}, 0);
-
-        if (compiler_config.verbose) {
-            u64 last_line = 0;
-
-            for (u64 i = 0; i < state->current_function->code.count; i++) {
-                if (last_line != state->current_function->code[i].info.l0) {
-                    if (state->current_function->code[i].info.from != NULL) {
-                        log_write("\n");
-                        print_lines_of_code(stdout, state->current_function->code[i].info, 0, 0, 0);
-                        last_line = state->current_function->code[i].info.l0;
-                    }
-                }
-
-                print_ir_opcode(state->current_function->code[i]);
-            }
-        }
     }
     state->current_function = NULL;
 }

@@ -32,7 +32,6 @@ inline void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
 
 
 #define INSERT_LINE() nasm_add_line(state, string_format(get_temporary_allocator(), STRING("%%line %u \"%s\""), op.info.l0, op.info.from->filename), 1)
-
 #define LOAD(reg)\
                 INSERT_LINE();\
                 nasm_add_line(state, STRING("dec r15"), 1);\
@@ -83,21 +82,27 @@ inline void nasm_add_line(nasm_state_t *state, string_t data, u64 tab = 0) {
                 STORE("rcx");
 
 void nasm_compile_func(string_t name, nasm_state_t *state) {
+    profiler_func_start();
+
     if (!state->func->code.count) {
         if (state->func->is_external) {
             if (string_compare(name, STRING("getchar")) == 0) {
+                profiler_func_end();
                 return;
             }
 
             if (string_compare(name, STRING("putchar")) == 0) {
+                profiler_func_end();
                 return;
             }
 
             if (string_compare(name, STRING("debug_break")) == 0) {
+                profiler_func_end();
                 return;
             }
         }
 
+        profiler_func_end();
         assert(false);
         return;
     }
@@ -320,9 +325,12 @@ void nasm_compile_func(string_t name, nasm_state_t *state) {
     nasm_add_line(state, STRING("int3"), 1);
     nasm_add_line(state, STRING("int3"), 1);
     nasm_add_line(state, STRING(""), 0);
+
+    profiler_func_end();
 }
 
 backend_t nasm_compile_program(ir_t *state) {
+    profiler_func_start();
     nasm_state_t nasm = {};
 
     nasm.ir = state;
@@ -510,5 +518,6 @@ backend_t nasm_compile_program(ir_t *state) {
         log_error("Couldn't find main in code.");
     }
 
+    profiler_func_end();
     return {valid, nasm.code.alloc, nasm.code};
 }

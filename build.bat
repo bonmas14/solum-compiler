@@ -3,7 +3,7 @@ setlocal
 
 set "filename=slm"
 set "cc=clang-cl"
-set "lld=lld-link"
+set "lld=link"
 
 set "log_dir=log\"
 set "bin_dir=bin\"
@@ -16,9 +16,16 @@ set "defines=/D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE"
 set "compile_config=/nologo -fansi-escape-codes -fcolor-diagnostics -m64 /c /std:c++14 /utf-8 /Gr /TP /Z7 /W4 /WX- /diagnostics:column /fp:precise /Iinclude /Ideps %defines%"
 
 if "%1"=="Release"  ( goto release )
+if "%1"=="release"  ( goto release )
+if "%1"=="rel"      ( goto release )
+
 if "%1"=="Sanitize" ( goto sanitize )
+if "%1"=="sanitize" ( goto sanitize )
+
+if "%1"=="asan"     ( goto sanitize )
 if "%1"=="Debug"    ( goto debug )
 if "%1"=="Clear"    ( goto clear )
+if "%1"=="cls"      ( goto clear )
 
 :: some aliases for help
 if "%1"=="Help"  ( goto help )
@@ -62,7 +69,7 @@ echo Building: Release
 echo:
 set "name=%bin_dir%%filename%-r"
 set "obj_path=%obj_out_dir%Release\\"
-set "complie=%compile_config% /Ox /Oi /GF /MT /Gy /D NDEBUG /D RADDBG_MARKUP_STUBS"
+set "complie=%compile_config% /Ox /Oi /GF /cgthreads8 /MT /Gy /D NDEBUG /D RADDBG_MARKUP_STUBS"
 set "link_config=/INCREMENTAL:NO /OPT:REF /OPT:ICF /time"
 set "per_target_link_deps="
 goto configured
@@ -113,7 +120,7 @@ set pdb="%name%.pdb"
 set out="%name%.exe" 
 set imp="%name%.lib"
 
-set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /IMPLIB:%imp% /DEBUG:FULL"
+set "link=/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /DEBUG:FULL %link_config% /OUT:%out% /PDB:%pdb% /IMPLIB:%imp%"
 
 setlocal enabledelayedexpansion
 
